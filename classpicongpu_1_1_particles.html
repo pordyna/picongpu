@@ -94,10 +94,10 @@ Inheritance diagram for picongpu::Particles&lt; T_Name, T_Flags, T_Attributes &g
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-types"></a>
 Public Types</h2></td></tr>
 <tr class="memitem:a58003ba69da366ff5fbbc5de1b4ba077"><td class="memItemLeft" align="right" valign="top"><a id="a58003ba69da366ff5fbbc5de1b4ba077"></a>
-typedef <a class="el" href="structpmacc_1_1_particle_description.html">pmacc::ParticleDescription</a>&lt; T_Name, SuperCellSize, T_Attributes, T_Flags, typename bmpl::if_&lt; bmpl::contains&lt; T_Flags, typename <a class="el" href="structpmacc_1_1_get_key_from_alias.html">GetKeyFromAlias</a>&lt; T_Flags, boundaryCondition&lt; &gt; &gt;::type &gt;, typename <a class="el" href="structpmacc_1_1traits_1_1_resolve.html">pmacc::traits::Resolve</a>&lt; typename <a class="el" href="structpmacc_1_1_get_key_from_alias.html">GetKeyFromAlias</a>&lt; T_Flags, boundaryCondition&lt; &gt; &gt;::type &gt;::type, <a class="el" href="structpmacc_1_1_handle_guard_region.html">pmacc::HandleGuardRegion</a>&lt; <a class="el" href="structpmacc_1_1particles_1_1policies_1_1_exchange_particles.html">pmacc::particles::policies::ExchangeParticles</a>, <a class="el" href="structpicongpu_1_1particles_1_1boundary_1_1_call_plugins_and_delete_particles.html">particles::boundary::CallPluginsAndDeleteParticles</a> &gt; &gt;::type &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>SpeciesParticleDescription</b></td></tr>
+typedef <a class="el" href="structpmacc_1_1_particle_description.html">pmacc::ParticleDescription</a>&lt; T_Name, <a class="el" href="memory_8param.html#a5495cb778dcda321e7a831346ef54a77">SuperCellSize</a>, T_Attributes, T_Flags, typename bmpl::if_&lt; bmpl::contains&lt; T_Flags, typename <a class="el" href="structpmacc_1_1_get_key_from_alias.html">GetKeyFromAlias</a>&lt; T_Flags, boundaryCondition&lt; &gt; &gt;::type &gt;, typename <a class="el" href="structpmacc_1_1traits_1_1_resolve.html">pmacc::traits::Resolve</a>&lt; typename <a class="el" href="structpmacc_1_1_get_key_from_alias.html">GetKeyFromAlias</a>&lt; T_Flags, boundaryCondition&lt; &gt; &gt;::type &gt;::type, <a class="el" href="structpmacc_1_1_handle_guard_region.html">pmacc::HandleGuardRegion</a>&lt; <a class="el" href="structpmacc_1_1particles_1_1policies_1_1_exchange_particles.html">pmacc::particles::policies::ExchangeParticles</a>, <a class="el" href="structpicongpu_1_1particles_1_1boundary_1_1_call_plugins_and_delete_particles.html">particles::boundary::CallPluginsAndDeleteParticles</a> &gt; &gt;::type &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>SpeciesParticleDescription</b></td></tr>
 <tr class="separator:a58003ba69da366ff5fbbc5de1b4ba077"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a54d3f107dbbe6bffe710eb78b2da2eda"><td class="memItemLeft" align="right" valign="top"><a id="a54d3f107dbbe6bffe710eb78b2da2eda"></a>
-typedef <a class="el" href="classpmacc_1_1_particles_base.html">ParticlesBase</a>&lt; <a class="el" href="structpmacc_1_1_particle_description.html">SpeciesParticleDescription</a>, <a class="el" href="classpmacc_1_1_mapping_description.html">picongpu::MappingDesc</a>, <a class="el" href="structpicongpu_1_1_device_heap.html">DeviceHeap</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>ParticlesBaseType</b></td></tr>
+typedef <a class="el" href="classpmacc_1_1_particles_base.html">ParticlesBase</a>&lt; <a class="el" href="structpmacc_1_1_particle_description.html">SpeciesParticleDescription</a>, <a class="el" href="memory_8param.html#afa4e51ff66db1d549123f10b285153b9">picongpu::MappingDesc</a>, <a class="el" href="structpicongpu_1_1_device_heap.html">DeviceHeap</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>ParticlesBaseType</b></td></tr>
 <tr class="separator:a54d3f107dbbe6bffe710eb78b2da2eda"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0130e908325aad8eabedfd417a819361"><td class="memItemLeft" align="right" valign="top"><a id="a0130e908325aad8eabedfd417a819361"></a>
 typedef <a class="el" href="structpmacc_1_1_frame.html">ParticlesBaseType::FrameType</a>&#160;</td><td class="memItemRight" valign="bottom"><b>FrameType</b></td></tr>
@@ -137,7 +137,7 @@ typedef MappingDesc&#160;</td><td class="memItemRight" valign="bottom"><b>Mappin
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
 <tr class="memitem:a0ebf244b5bac3b6879a4fe99e64c7d9f"><td class="memItemLeft" align="right" valign="top"><a id="a0ebf244b5bac3b6879a4fe99e64c7d9f"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>Particles</b> (const std::shared_ptr&lt; <a class="el" href="structpicongpu_1_1_device_heap.html">DeviceHeap</a> &gt; &amp;heap, <a class="el" href="classpmacc_1_1_mapping_description.html">picongpu::MappingDesc</a> cellDescription, SimulationDataId datasetID)</td></tr>
+&#160;</td><td class="memItemRight" valign="bottom"><b>Particles</b> (const std::shared_ptr&lt; <a class="el" href="structpicongpu_1_1_device_heap.html">DeviceHeap</a> &gt; &amp;heap, <a class="el" href="memory_8param.html#afa4e51ff66db1d549123f10b285153b9">picongpu::MappingDesc</a> cellDescription, SimulationDataId datasetID)</td></tr>
 <tr class="separator:a0ebf244b5bac3b6879a4fe99e64c7d9f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a4cc95a8c1c3ae9bde49faf2538f2b472"><td class="memItemLeft" align="right" valign="top"><a id="a4cc95a8c1c3ae9bde49faf2538f2b472"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>createParticleBuffer</b> ()</td></tr>
@@ -182,7 +182,7 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>deleteGuardParticles<
 void&#160;</td><td class="memItemRight" valign="bottom"><b>deleteParticlesInArea</b> ()</td></tr>
 <tr class="separator:a65628496d40b8028735c786a27002b8f inherit pub_methods_classpmacc_1_1_particles_base"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab0b501eea854b6131724bad369ecc81e inherit pub_methods_classpmacc_1_1_particles_base"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classpmacc_1_1_particles_base.html#ab0b501eea854b6131724bad369ecc81e">copyGuardToExchange</a> (uint32_t exchangeType)</td></tr>
-<tr class="memdesc:ab0b501eea854b6131724bad369ecc81e inherit pub_methods_classpmacc_1_1_particles_base"><td class="mdescLeft">&#160;</td><td class="mdescRight">copy gard particles to intermediate exchange buffer  <a href="classpmacc_1_1_particles_base.html#ab0b501eea854b6131724bad369ecc81e">More...</a><br /></td></tr>
+<tr class="memdesc:ab0b501eea854b6131724bad369ecc81e inherit pub_methods_classpmacc_1_1_particles_base"><td class="mdescLeft">&#160;</td><td class="mdescRight">copy guard particles to intermediate exchange buffer  <a href="classpmacc_1_1_particles_base.html#ab0b501eea854b6131724bad369ecc81e">More...</a><br /></td></tr>
 <tr class="separator:ab0b501eea854b6131724bad369ecc81e inherit pub_methods_classpmacc_1_1_particles_base"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ae0c826087869d550457b77ca1ce48d5d inherit pub_methods_classpmacc_1_1_particles_base"><td class="memItemLeft" align="right" valign="top"><a id="ae0c826087869d550457b77ca1ce48d5d"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>insertParticles</b> (uint32_t exchangeType)</td></tr>
@@ -279,8 +279,8 @@ template&lt;typename T_Name , typename T_Flags , typename T_Attributes &gt; </di
 </div>
 </div>
 <hr/>The documentation for this class was generated from the following files:<ul>
-<li>/tmp/tmp.zPmyXlhei3/picongpu/include/picongpu/particles/<a class="el" href="_particles_8hpp_source.html">Particles.hpp</a></li>
-<li>/tmp/tmp.zPmyXlhei3/picongpu/include/picongpu/particles/Particles.tpp</li>
+<li>/tmp/tmp.wonmlbUUD8/picongpu/include/picongpu/particles/<a class="el" href="_particles_8hpp_source.html">Particles.hpp</a></li>
+<li>/tmp/tmp.wonmlbUUD8/picongpu/include/picongpu/particles/Particles.tpp</li>
 </ul>
 </div><!-- contents -->
 <!-- start footer part -->
