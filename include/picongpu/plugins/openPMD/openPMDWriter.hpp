@@ -1,4 +1,4 @@
-/* Copyright 2014-2019 Axel Huebl, Felix Schmitt, Heiko Burau, Rene Widera,
+/* Copyright 2014-2018 Axel Huebl, Felix Schmitt, Heiko Burau, Rene Widera,
  *                     Benjamin Worpitz, Alexander Grund
  *
  * This file is part of PIConGPU.
@@ -22,7 +22,7 @@
 
 #include <pmacc/static_assert.hpp>
 #include "picongpu/simulation_defines.hpp"
-#include "picongpu/plugins/adios/ADIOSWriter.def"
+#include "picongpu/plugins/openPMD/openPMDWriter.def"
 #include "picongpu/plugins/misc/misc.hpp"
 #include "picongpu/plugins/multi/Option.hpp"
 #include "picongpu/particles/traits/SpeciesEligibleForSolver.hpp"
@@ -53,12 +53,12 @@
 
 #include "picongpu/plugins/output/IIOBackend.hpp"
 
-#include "picongpu/plugins/adios/WriteMeta.hpp"
-#include "picongpu/plugins/adios/WriteSpecies.hpp"
-#include "picongpu/plugins/adios/ADIOSCountParticles.hpp"
-#include "picongpu/plugins/adios/restart/LoadSpecies.hpp"
-#include "picongpu/plugins/adios/restart/RestartFieldLoader.hpp"
-#include "picongpu/plugins/adios/NDScalars.hpp"
+#include "picongpu/plugins/openPMD/WriteMeta.hpp"
+#include "picongpu/plugins/openPMD/WriteSpecies.hpp"
+#include "picongpu/plugins/openPMD/openPMDCountParticles.hpp"
+#include "picongpu/plugins/openPMD/restart/LoadSpecies.hpp"
+#include "picongpu/plugins/openPMD/restart/RestartFieldLoader.hpp"
+#include "picongpu/plugins/openPMD/NDScalars.hpp"
 #include "picongpu/plugins/misc/SpeciesFilter.hpp"
 
 #include <adios.h>
@@ -89,7 +89,7 @@
 namespace picongpu
 {
 
-namespace adios
+namespace openPMD
 {
 
 using namespace pmacc;
@@ -111,17 +111,11 @@ int64_t defineAdiosVar(int64_t group_id,
 {
     int64_t var_id = 0;
 
-    std::string const revertedDimensions =
-        dimensions.revert().toString(",", "");
-    std::string const revertedGlobalDimensions =
-        globalDimensions.revert().toString(",", "");
-    std::string const revertedOffset =
-        offset.revert().toString(",", "");
     var_id = adios_define_var(
         group_id, name, path, type,
-        revertedDimensions.c_str(),
-        revertedGlobalDimensions.c_str(),
-        revertedOffset.c_str()
+        dimensions.revert().toString(",", "").c_str(),
+        globalDimensions.revert().toString(",", "").c_str(),
+        offset.revert().toString(",", "").c_str()
     );
 
     if(compression)
@@ -139,14 +133,13 @@ int64_t defineAdiosVar(int64_t group_id,
  *
  * Implements the IIOBackend interface.
  */
-class ADIOSWriter : public IIOBackend
+class openPMDWriter : public IIOBackend
 {
 public:
     struct Help : public plugins::multi::IHelp
     {
         /** creates a instance of ISlave
          *
-         * @tparam T_Slave type of the interface implementation (must inherit from ISlave)
          * @param help plugin defined help
          * @param id index of the plugin, range: [0;help->getNumPlugins())
          */
@@ -157,7 +150,7 @@ public:
         )
         {
             return std::shared_ptr< ISlave >(
-                new ADIOSWriter(
+                new openPMDWriter(
                     help,
                     id,
                     cellDescription
@@ -268,13 +261,13 @@ public:
                 AllEligibleSpeciesSources,
                 plugins::misc::AppendName< bmpl::_1 >
             > getEligibleDataSourceNames;
-            getEligibleDataSourceNames( allowedDataSources );
+            getEligibleDataSourceNames( forward( allowedDataSources ) );
 
             ForEach<
                 AllFieldSources,
                 plugins::misc::AppendName< bmpl::_1 >
             > appendFieldSourceNames;
-            appendFieldSourceNames( allowedDataSources );
+            appendFieldSourceNames( forward( allowedDataSources ) );
 
             // string list with all possible particle sources
             std::string concatenatedSourceNames = plugins::misc::concatenateToString(
@@ -383,7 +376,7 @@ public:
             return name;
         }
 
-        std::string const name = "ADIOSWriter";
+        std::string const name = "openPMDWriter";
         //! short description of the plugin
         std::string const description = "dump simulation data with ADIOS";
         //! prefix used for command line arguments
@@ -427,7 +420,7 @@ private:
             params->gridLayout = field->getGridLayout();
 
             PICToAdios<ComponentType> adiosType;
-            ADIOSWriter::template writeField<ComponentType>(params,
+            openPMDWriter::template writeField<ComponentType>(params,
                        sizeof(ComponentType),
                        adiosType.type,
                        GetNComponents<ValueType>::value,
@@ -505,7 +498,7 @@ private:
 
             params->gridLayout = fieldTmp->getGridLayout();
             /*write data to ADIOS file*/
-            ADIOSWriter::template writeField<ComponentType>(params,
+            openPMDWriter::template writeField<ComponentType>(params,
                        sizeof(ComponentType),
                        adiosType.type,
                        components,
@@ -540,15 +533,16 @@ private:
 
         for( uint32_t c = 0; c < nComponents; c++ )
         {
-            std::string datasetName = recordName;
+            std::stringstream datasetName;
+            datasetName << recordName;
             if (nComponents > 1)
-                datasetName +=  "/" + name_lookup_tpl[c];
+                datasetName << "/" << name_lookup_tpl[c];
 
             /* define adios var for field, e.g. field_FieldE_y */
             const char* path = nullptr;
             int64_t adiosFieldVarId = defineAdiosVar<simDim>(
                     params->adiosGroupHandle,
-                    datasetName.c_str(),
+                    datasetName.str().c_str(),
                     path,
                     adiosType,
                     params->fieldsSizeDims,
@@ -562,11 +556,11 @@ private:
             /* already add the unitSI and further attribute so `adios_group_size`
              * calculates the reservation for the buffer correctly */
             ADIOS_CMD(adios_define_attribute_byvalue(params->adiosGroupHandle,
-                      "position", datasetName.c_str(),
+                      "position", datasetName.str().c_str(),
                       adiosFloatXType.type, simDim, &(*inCellPosition.at(c).begin()) ));
 
             ADIOS_CMD(adios_define_attribute_byvalue(params->adiosGroupHandle,
-                      "unitSI", datasetName.c_str(),
+                      "unitSI", datasetName.str().c_str(),
                       adiosDoubleType.type, 1, &unit.at(c) ));
         }
 
@@ -773,7 +767,7 @@ public:
      * @param id index of this plugin instance within help
      * @param cellDescription PIConGPu cell description information for kernel index mapping
      */
-    ADIOSWriter(
+    openPMDWriter(
         std::shared_ptr< plugins::multi::IHelp > & help,
         size_t const id,
         MappingDesc* cellDescription
@@ -839,7 +833,7 @@ public:
         mpiTransportParams = strMPITransportParams.str();
     }
 
-    virtual ~ADIOSWriter()
+    virtual ~openPMDWriter()
     {
         if (mThreadParams.adiosComm != MPI_COMM_NULL)
         {
@@ -930,7 +924,7 @@ public:
         mThreadParams.adiosBasePath = adiosPathBase.str();
         //mThreadParams.isCheckpoint = isCheckpoint;
         mThreadParams.currentStep = restartStep;
-        mThreadParams.cellDescription = m_cellDescription; // koi ahnig
+        mThreadParams.cellDescription = m_cellDescription;
 
         /** one could try ADIOS_READ_METHOD_BP_AGGREGATE too which might
          *  be beneficial for re-distribution on a different number of GPUs
@@ -950,10 +944,8 @@ public:
         std::stringstream strFname;
         strFname << restartFilename << "_" << mThreadParams.currentStep << ".bp";
 
-        const std::string filename = strFname.str( );
-
         // adios_read_open( fname, method, comm, lock_mode, timeout_sec )
-        log< picLog::INPUT_OUTPUT > ("ADIOS: open file: %1%") % filename;
+        log<picLog::INPUT_OUTPUT > ("ADIOS: open file: %1%") % strFname.str();
 
         // when reading in BG_AGGREGATE mode, adios can not distinguish between
         // "file does not exist" and "stream is not (yet) available, so we
@@ -964,7 +956,7 @@ public:
         /* <0 sec: wait forever
          * >=0 sec: return immediately if stream is not available */
         float_32 timeout = 0.0f;
-        mThreadParams.fp = adios_read_open(filename.c_str(),
+        mThreadParams.fp = adios_read_open(strFname.str().c_str(),
                         ADIOS_READ_METHOD_BP, mThreadParams.adiosComm,
                         ADIOS_LOCKMODE_CURRENT, timeout);
 
@@ -976,7 +968,7 @@ public:
             /* give the file system 1s of peace and quiet */
             usleep(1e6);
 #endif
-            mThreadParams.fp = adios_read_open(filename.c_str(),
+            mThreadParams.fp = adios_read_open(strFname.str().c_str(),
                         ADIOS_READ_METHOD_BP, mThreadParams.adiosComm,
                         ADIOS_LOCKMODE_CURRENT, timeout);
         }
@@ -997,10 +989,8 @@ public:
         void* slidesPtr = nullptr;
         int slideSize;
         enum ADIOS_DATATYPES slidesType;
-        const std::string simSlidesPath =
-            mThreadParams.adiosBasePath + std::string("sim_slides");
         ADIOS_CMD(adios_get_attr( mThreadParams.fp,
-                                  simSlidesPath.c_str(),
+                                  (mThreadParams.adiosBasePath + std::string("sim_slides")).c_str(),
                                   &slidesType,
                                   &slideSize,
                                   &slidesPtr ));
@@ -1015,10 +1005,8 @@ public:
         void* lastStepPtr = nullptr;
         int lastStepSize;
         enum ADIOS_DATATYPES lastStepType;
-        const std::string iterationPath =
-            mThreadParams.adiosBasePath + std::string("iteration");
         ADIOS_CMD(adios_get_attr( mThreadParams.fp,
-                                  iterationPath.c_str(),
+                                  (mThreadParams.adiosBasePath + std::string("iteration")).c_str(),
                                   &lastStepType,
                                   &lastStepSize,
                                   &lastStepPtr ));
@@ -1334,11 +1322,9 @@ private:
         ADIOS_STATISTICS_FLAG noStatistics = adios_stat_no;
 
         /* create adios group for fields without statistics */
-        const std::string iterationPath =
-            threadParams->adiosBasePath + std::string("iteration");
         ADIOS_CMD(adios_declare_group(&(threadParams->adiosGroupHandle),
                 ADIOS_GROUP_NAME,
-                iterationPath.c_str(),
+                (threadParams->adiosBasePath + std::string("iteration")).c_str(),
                 noStatistics));
 
         /* select MPI method, #OSTs and #aggregators */
@@ -1407,7 +1393,7 @@ private:
                 CallCollectFieldsSizes<
                     bmpl::_1
                 >
-            >{}(vectorOfDataSourceNames, threadParams);
+            >{}(vectorOfDataSourceNames, forward(threadParams));
         }
         log<picLog::INPUT_OUTPUT > ("ADIOS: ( end ) collecting fields.");
 
@@ -1431,7 +1417,7 @@ private:
                     plugins::misc::UnfilteredSpecies< bmpl::_1 >
                 >
             > adiosCountParticles;
-            adiosCountParticles( threadParams );
+            adiosCountParticles( forward(threadParams) );
         }
         else
         {
@@ -1454,7 +1440,7 @@ private:
                 CallCountParticles<
                     bmpl::_1
                 >
-            >{}(vectorOfDataSourceNames, threadParams);
+            >{}(vectorOfDataSourceNames, forward(threadParams));
         }
         log<picLog::INPUT_OUTPUT > ("ADIOS: ( end ) counting particles.");
 
@@ -1515,7 +1501,7 @@ private:
                 CallGetFields<
                     bmpl::_1
                 >
-            >{}(vectorOfDataSourceNames, threadParams);
+            >{}(vectorOfDataSourceNames, forward(threadParams));
         }
         log<picLog::INPUT_OUTPUT > ("ADIOS: ( end ) writing fields.");
 
@@ -1543,7 +1529,7 @@ private:
                         plugins::misc::UnfilteredSpecies< bmpl::_1 >
                     >
                 > writeSpecies;
-                writeSpecies( threadParams, particleOffset );
+                writeSpecies( forward(threadParams), particleOffset );
             }
 
             // move over all species data sources
@@ -1552,7 +1538,7 @@ private:
                 CallWriteSpecies<
                     bmpl::_1
                 >
-            >{}(vectorOfDataSourceNames, threadParams, particleOffset);
+            >{}(vectorOfDataSourceNames, forward(threadParams), particleOffset);
         }
         log<picLog::INPUT_OUTPUT > ("ADIOS: ( end ) writing particle species.");
 
@@ -1592,6 +1578,6 @@ private:
     DataSpace<simDim> mpi_size;
 };
 
-} //namespace adios
+} //namespace openPMD
 } //namespace picongpu
 

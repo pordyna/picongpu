@@ -44,6 +44,10 @@
 #   include "picongpu/plugins/adios/ADIOSWriter.hpp"
 #endif
 
+#if (ENABLE_OPENPMD == 1) || true // hehehe
+#   include "picongpu/plugins/openPMD/openPMDWriter.hpp"
+#endif
+
 #if( PMACC_CUDA_ENABLED == 1 )
 #   include "picongpu/plugins/PositionsParticles.hpp"
 #   include "picongpu/plugins/ChargeConservation.hpp"
@@ -165,6 +169,10 @@ private:
         EnergyFields
 #if (ENABLE_ADIOS == 1)
         , plugins::multi::Master< adios::ADIOSWriter >
+#endif
+
+#if (ENABLE_OPENPMD == 1)
+        , plugins::multi::Master< openPMD::openPMDWriter >
 #endif
 
 #if( PMACC_CUDA_ENABLED == 1 )
