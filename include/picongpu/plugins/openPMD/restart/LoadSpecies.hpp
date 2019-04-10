@@ -82,7 +82,7 @@ public:
     typename ReplaceValueTypeSeq<ParticleDescription, ParticleNewAttributeList>::type
     NewParticleDescription;
 
-    typedef Frame<OperatorCreateVectorBox, NewParticleDescription> AdiosFrameType;
+    typedef Frame<OperatorCreateVectorBox, NewParticleDescription> openPMDFrameType;
 
     /** Load species from ADIOS checkpoint file
      *
@@ -155,19 +155,19 @@ public:
         log<picLog::INPUT_OUTPUT > ("ADIOS: Loading %1% particles from offset %2%") %
             (long long unsigned) totalNumParticles % (long long unsigned) particleOffset;
 
-        AdiosFrameType hostFrame;
+        openPMDFrameType hostFrame;
         log<picLog::INPUT_OUTPUT > ("ADIOS: malloc mapped memory: %1%") % speciesName;
         /*malloc mapped memory*/
-        ForEach<typename AdiosFrameType::ValueTypeSeq, MallocMemory<bmpl::_1> > mallocMem;
+        ForEach<typename openPMDFrameType::ValueTypeSeq, MallocMemory<bmpl::_1> > mallocMem;
         mallocMem(forward(hostFrame), totalNumParticles);
 
         log<picLog::INPUT_OUTPUT > ("ADIOS: get mapped memory device pointer: %1%") % speciesName;
         /*load device pointer of mapped memory*/
-        AdiosFrameType deviceFrame;
-        ForEach<typename AdiosFrameType::ValueTypeSeq, GetDevicePtr<bmpl::_1> > getDevicePtr;
+        openPMDFrameType deviceFrame;
+        ForEach<typename openPMDFrameType::ValueTypeSeq, GetDevicePtr<bmpl::_1> > getDevicePtr;
         getDevicePtr(forward(deviceFrame), forward(hostFrame));
 
-        ForEach<typename AdiosFrameType::ValueTypeSeq, LoadParticleAttributesFromADIOS<bmpl::_1> > loadAttributes;
+        ForEach<typename openPMDFrameType::ValueTypeSeq, LoadParticleAttributesFromADIOS<bmpl::_1> > loadAttributes;
         loadAttributes(forward(params), forward(hostFrame), particlePath, particleOffset, totalNumParticles);
 
         if (totalNumParticles != 0)
@@ -184,7 +184,7 @@ public:
             );
 
             /*free host memory*/
-            ForEach<typename AdiosFrameType::ValueTypeSeq, FreeMemory<bmpl::_1> > freeMem;
+            ForEach<typename openPMDFrameType::ValueTypeSeq, FreeMemory<bmpl::_1> > freeMem;
             freeMem(forward(hostFrame));
         }
         log<picLog::INPUT_OUTPUT > ("ADIOS: ( end ) load species: %1%") % speciesName;

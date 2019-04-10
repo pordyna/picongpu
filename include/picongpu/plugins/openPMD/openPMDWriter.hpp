@@ -64,6 +64,7 @@
 #include <adios.h>
 #include <adios_read.h>
 #include <adios_error.h>
+#include <openPMD/openPMD.hpp>
 
 #include <boost/mpl/vector.hpp>
 #include <boost/mpl/pair.hpp>
@@ -128,6 +129,11 @@ int64_t defineAdiosVar(int64_t group_id,
                 var_id % std::string(name) % offset.toString() % dimensions.toString() % globalDimensions.toString();
     return var_id;
 }
+
+// template <unsigned DIM>
+// Dataset & defineDataset(
+//     RecordComponent & recordComponent,
+//     )
 
 /** Writes simulation data to adios files.
  *
@@ -706,7 +712,7 @@ private:
             this->operator_impl(tparam);
         }
 
-   private:
+    private:
         typedef typename FieldTmp::ValueType ValueType;
         typedef typename FieldTmp::UnitValueType UnitType;
         typedef typename GetComponentsType<ValueType>::type ComponentType;
@@ -1099,6 +1105,7 @@ private:
      */
     void dumpData(uint32_t currentStep)
     {
+        // local offset + extent
         const pmacc::Selection<simDim>& localDomain = Environment<simDim>::get().SubGrid().getLocalDomain();
         mThreadParams.cellDescription = m_cellDescription;
         mThreadParams.currentStep = currentStep;
@@ -1137,7 +1144,7 @@ private:
 
         beginAdios(mThreadParams.adiosFilename);
 
-        writeAdios((void*) &mThreadParams, mpiTransportParams);
+        writeAdios(&mThreadParams, mpiTransportParams);
 
         endAdios();
     }
@@ -1306,11 +1313,10 @@ private:
         }
     };
 
-    void *writeAdios(void *p_args, std::string mpiTransportParams)
+    void writeAdios(ThreadParams *threadParams, std::string mpiTransportParams)
     {
 
         // synchronize, because following operations will be blocking anyway
-        ThreadParams *threadParams = (ThreadParams*) (p_args);
         threadParams->adiosGroupSize = 0;
 
         /* y direction can be negative for first gpu */
@@ -1557,7 +1563,7 @@ private:
         /*\todo: copied from adios example, we might not need this ? */
         MPI_CHECK(MPI_Barrier(threadParams->adiosComm));
 
-        return nullptr;
+        return;
     }
 
     ThreadParams mThreadParams;

@@ -87,7 +87,7 @@ public:
     typename ReplaceValueTypeSeq<ParticleDescription, ParticleNewAttributeList>::type
     NewParticleDescription;
 
-    typedef Frame<OperatorCreateVectorBox, NewParticleDescription> AdiosFrameType;
+    typedef Frame<OperatorCreateVectorBox, NewParticleDescription> openPMDFrameType;
 
     template<typename Space>
     HINLINE void operator()(ThreadParams* params,
@@ -111,11 +111,11 @@ public:
                                                                                     particleFilter);
         log<picLog::INPUT_OUTPUT > ("ADIOS:   ( end ) count particles: %1% = %2%") % T_SpeciesFilter::getName() % totalNumParticles;
 
-        AdiosFrameType hostFrame;
+        openPMDFrameType hostFrame;
 
         /* malloc host memory */
         log<picLog::INPUT_OUTPUT > ("ADIOS:   (begin) malloc host memory: %1%") % T_SpeciesFilter::getName();
-        ForEach<typename AdiosFrameType::ValueTypeSeq, MallocHostMemory<bmpl::_1> > mallocMem;
+        ForEach<typename openPMDFrameType::ValueTypeSeq, MallocHostMemory<bmpl::_1> > mallocMem;
         mallocMem(forward(hostFrame), totalNumParticles);
         log<picLog::INPUT_OUTPUT > ("ADIOS:   ( end ) malloc host memory: %1%") % T_SpeciesFilter::getName();
 
@@ -173,11 +173,11 @@ public:
             PMACC_ASSERT((uint64_cu) globalParticleOffset == totalNumParticles);
         }
         /* dump to adios file */
-        ForEach<typename AdiosFrameType::ValueTypeSeq, openPMD::ParticleAttribute<bmpl::_1> > writeToAdios;
+        ForEach<typename openPMDFrameType::ValueTypeSeq, openPMD::ParticleAttribute<bmpl::_1> > writeToAdios;
         writeToAdios(params, forward(hostFrame), totalNumParticles);
 
         /* free host memory */
-        ForEach<typename AdiosFrameType::ValueTypeSeq, FreeHostMemory<bmpl::_1> > freeMem;
+        ForEach<typename openPMDFrameType::ValueTypeSeq, FreeHostMemory<bmpl::_1> > freeMem;
         freeMem(forward(hostFrame));
         log<picLog::INPUT_OUTPUT > ("ADIOS: ( end ) writing species: %1%") % T_SpeciesFilter::getName();
 

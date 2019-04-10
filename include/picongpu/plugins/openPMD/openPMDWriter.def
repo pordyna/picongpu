@@ -36,12 +36,15 @@
 #include "picongpu/simulationControl/MovingWindow.hpp"
 #include "picongpu/traits/PICToAdios.hpp"
 
+#include <openPMD/openPMD.hpp>
+
 namespace picongpu
 {
 
 namespace openPMD
 {
 using namespace pmacc;
+using namespace ::openPMD;
 
 
 namespace po = boost::program_options;
@@ -93,6 +96,8 @@ struct ThreadParams
     std::string adiosFilename;              /* e.g., simData */
     std::string fullFilename;               /* e.g., simData_1000.bp */
 
+    std::unique_ptr<Series> openPMDSeries;
+
     /** current dump is a checkpoint */
     bool isCheckpoint;
     ADIOS_FILE* fp;                          /* file pointer for checkpoint file */
@@ -125,6 +130,15 @@ struct ThreadParams
     Window window;                                  /* window describing the volume to be dumped */
 
     DataSpace<simDim> localWindowToDomainOffset;    /** offset from local moving window to local domain */
+
+    Series & openSeries() 
+    {
+        if (!openPMDSeries) 
+        {
+            openPMDSeries = std::unique_ptr<Series>(new Series("FIXME", AccessType::READ_WRITE));
+        }
+        return *openPMDSeries;
+    }
 };
 
 /**

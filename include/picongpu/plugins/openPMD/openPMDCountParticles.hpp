@@ -45,6 +45,7 @@
 #include <boost/mpl/begin_end.hpp>
 #include <boost/mpl/find.hpp>
 #include <boost/type_traits.hpp>
+#include <openPMD/openPMD.hpp>
 
 #include <string>
 
@@ -87,7 +88,7 @@ public:
     typename ReplaceValueTypeSeq<ParticleDescription, ParticleNewAttributeList>::type
     NewParticleDescription;
 
-    typedef Frame<OperatorCreateVectorBox, NewParticleDescription> AdiosFrameType;
+    typedef Frame<OperatorCreateVectorBox, NewParticleDescription> openPMDFrameType;
 
     HINLINE void operator()(ThreadParams* params)
     {
@@ -96,9 +97,14 @@ public:
         uint64_t mpiSize = gc.getGlobalSize();
         uint64_t mpiRank = gc.getGlobalRank();
 
-        const std::string speciesGroup( T_SpeciesFilter::getName() + "/" );
+        const std::string speciesGroup( T_SpeciesFilter::getName() );
+        auto & series = params->openSeries();
+        auto & iteration = series.iterations[params->currentStep];
+        auto const & species = iteration.particles[speciesGroup];
+
         const std::string speciesPath( params->adiosBasePath +
             std::string(ADIOS_PATH_PARTICLES) + speciesGroup );
+        
 
         /* load particle without copy particle data to host */
         auto speciesTmp = dc.get< ThisSpecies >( ThisSpecies::FrameType::getName(), true );
@@ -134,7 +140,7 @@ public:
         }
 
         /* iterate over all attributes of this species */
-        ForEach<typename AdiosFrameType::ValueTypeSeq, openPMD::ParticleAttributeSize<bmpl::_1> > attributeSize;
+        ForEach<typename openPMDFrameType::ValueTypeSeq, openPMD::ParticleAttributeSize<bmpl::_1> > attributeSize;
         attributeSize(params, speciesGroup, myNumParticles, globalNumParticles, myParticleOffset);
 
         /* TODO: constant particle records */
@@ -142,34 +148,25 @@ public:
         /* openPMD ED-PIC: additional attributes */
         traits::PICToAdios<float_64> adiosDoubleType;
         const float_64 particleShape( GetShape<ThisSpecies>::type::support - 1 );
-        ADIOS_CMD(adios_define_attribute_byvalue(params->adiosGroupHandle,
-            "particleShape", speciesPath.c_str(),
-            adiosDoubleType.type, 1, (void*)&particleShape ));
+        iteration.setAttribute("particleShape", particleShape);
 
         traits::GetSpeciesFlagName<ThisSpecies, current<> > currentDepositionName;
         const std::string currentDeposition( currentDepositionName() );
-        ADIOS_CMD(adios_define_attribute_byvalue(params->adiosGroupHandle,
-            "currentDeposition", speciesPath.c_str(),
-            adios_string, 1, (void*)currentDeposition.c_str() ));
+        iteration.setAttribute("currentDeposition", speciesPath.c_str());
 
         traits::GetSpeciesFlagName<ThisSpecies, particlePusher<> > particlePushName;
         const std::string particlePush( particlePushName() );
-        ADIOS_CMD(adios_define_attribute_byvalue(params->adiosGroupHandle,
-            "particlePush", speciesPath.c_str(),
-            adios_string, 1, (void*)particlePush.c_str() ));
+        iteration.setAttribute("particlePush", particlePush.c_str());
 
         traits::GetSpeciesFlagName<ThisSpecies, interpolation<> > particleInterpolationName;
         const std::string particleInterpolation( particleInterpolationName() );
-        ADIOS_CMD(adios_define_attribute_byvalue(params->adiosGroupHandle,
-            "particleInterpolation", speciesPath.c_str(),
-            adios_string, 1, (void*)particleInterpolation.c_str() ));
+        iteration.setAttribute("particleInterpolation", particleInterpolation.c_str());
 
         const std::string particleSmoothing( "none" );
-        ADIOS_CMD(adios_define_attribute_byvalue(params->adiosGroupHandle,
-            "particleSmoothing", speciesPath.c_str(),
-            adios_string, 1, (void*)particleSmoothing.c_str() ));
+        iteration.setAttribute("particleSmoothing", particleSmoothing.c_str());
 
         /* define adios var for species index/info table */
+        // need to define openPMD datasets now?
         {
             const uint64_t localTableSize = 5;
             traits::PICToAdios<uint64_t> adiosIndexType;
@@ -190,6 +187,7 @@ public:
 
             params->adiosGroupSize += sizeof(uint64_t) * localTableSize * gc.getGlobalSize();
         }
+        series.flush();    
     }
 };
 
