@@ -98,12 +98,9 @@ public:
         uint64_t mpiRank = gc.getGlobalRank();
 
         const std::string speciesGroup( T_SpeciesFilter::getName() );
-        auto & series = params->openSeries();
-        auto & iteration = series.iterations[params->currentStep];
-        auto const & species = iteration.particles[speciesGroup];
-
-        const std::string speciesPath( params->adiosBasePath +
-            std::string(ADIOS_PATH_PARTICLES) + speciesGroup );
+        Series & series = params->openSeries();
+        Iteration & iteration = series.iterations[params->currentStep];
+        Container< Record > & particleSpecies = iteration.particles[speciesGroup];
         
 
         /* load particle without copy particle data to host */
@@ -146,13 +143,12 @@ public:
         /* TODO: constant particle records */
 
         /* openPMD ED-PIC: additional attributes */
-        traits::PICToAdios<float_64> adiosDoubleType;
         const float_64 particleShape( GetShape<ThisSpecies>::type::support - 1 );
         iteration.setAttribute("particleShape", particleShape);
 
         traits::GetSpeciesFlagName<ThisSpecies, current<> > currentDepositionName;
         const std::string currentDeposition( currentDepositionName() );
-        iteration.setAttribute("currentDeposition", speciesPath.c_str());
+        iteration.setAttribute("currentDeposition", currentDeposition.c_str());
 
         traits::GetSpeciesFlagName<ThisSpecies, particlePusher<> > particlePushName;
         const std::string particlePush( particlePushName() );
@@ -165,27 +161,24 @@ public:
         const std::string particleSmoothing( "none" );
         iteration.setAttribute("particleSmoothing", particleSmoothing.c_str());
 
-        /* define adios var for species index/info table */
-        // need to define openPMD datasets now?
+        /* define openPMD dataset for species index/info table */
         {
             const uint64_t localTableSize = 5;
-            traits::PICToAdios<uint64_t> adiosIndexType;
+            Datatype datatype = determineDatatype< uint64_t >( );
+            RecordComponent & recordComponent = particleSpecies["particles_info"][RecordComponent::SCALAR];
+            params->speciesIndices.push_back(
+                prepareDataset< DIM1 >(
+                    recordComponent,
+                    datatype,
+                    pmacc::math::UInt64<DIM1>(localTableSize * uint64_t(gc.getGlobalSize()) ),
+                    pmacc::math::UInt64<DIM1>(localTableSize),
+                    pmacc::math::UInt64<DIM1>(localTableSize * uint64_t(gc.getGlobalRank()) ),
+                    true,
+                    params->adiosCompression
+                )
+            );
 
-            const char* path = nullptr;
-            int64_t adiosSpeciesIndexVar = defineAdiosVar<DIM1>(
-                params->adiosGroupHandle,
-                (speciesPath + "particles_info").c_str(),
-                path,
-                adiosIndexType.type,
-                pmacc::math::UInt64<DIM1>(localTableSize),
-                pmacc::math::UInt64<DIM1>(localTableSize * uint64_t(gc.getGlobalSize()) ),
-                pmacc::math::UInt64<DIM1>(localTableSize * uint64_t(gc.getGlobalRank()) ),
-                true,
-                params->adiosCompression);
-
-            params->adiosSpeciesIndexVarIds.push_back(adiosSpeciesIndexVar);
-
-            params->adiosGroupSize += sizeof(uint64_t) * localTableSize * gc.getGlobalSize();
+            params->openPMDGroupSize += sizeof(uint64_t) * localTableSize * gc.getGlobalSize(); // TODO
         }
         series.flush();    
     }

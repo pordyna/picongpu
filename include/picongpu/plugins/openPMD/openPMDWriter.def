@@ -90,6 +90,39 @@ namespace po = boost::program_options;
     }                                                                         \
 }
 
+template <typename T>
+struct WithWindow
+{
+    T & m_data;
+    Offset m_offset;
+    Extent m_extent;
+
+    // regular method and no constructor since we would
+    // have to rely on template parameter deduction with constructors
+    template <unsigned DIM>
+    static WithWindow< T > init(
+        T & data,
+        pmacc::math::UInt64<DIM> offset,
+        pmacc::math::UInt64<DIM> extent
+    )
+    {
+        Offset offset_v;
+        Extent extent_v;
+        offset_v.reserve(DIM);
+        extent_v.reserve(DIM);
+        for (unsigned i = 0; i < DIM; i++)
+        {
+            offset_v[i] = offset[i];
+            extent_v[i] = extent[i];
+        }
+        return WithWindow< T > {
+            data,
+            std::move( offset_v ),
+            std::move( extent_v )
+        };
+    }
+};
+
 struct ThreadParams
 {
     uint32_t currentStep;                   /** current simulation step */
@@ -106,7 +139,7 @@ struct ThreadParams
     bool adiosBufferInitialized;            /* set if ADIOS buffer has been allocated */
     int64_t adiosFileHandle;                /* ADIOS file handle */
     int64_t adiosGroupHandle;               /* ADIOS group handle */
-    uint64_t adiosGroupSize;                /* size of ADIOS group in bytes */
+    uint64_t openPMDGroupSize;                /* size of ADIOS group in bytes */
     uint32_t adiosAggregators;              /* number of ADIOS aggregators for MPI_AGGREGATE */
     uint32_t adiosOST;                      /* number of ADIOS OST for MPI_AGGREGATE */
     bool adiosDisableMeta;                  /* disable online gather and write of a meta file */
@@ -119,8 +152,9 @@ struct ThreadParams
     pmacc::math::UInt64<simDim> fieldsOffsetDims;
 
     std::list<int64_t> adiosFieldVarIds;        /* var IDs for fields in order of appearance */
-    std::list<int64_t> adiosParticleAttrVarIds; /* var IDs for particle attributes in order of appearance */
+    std::list<WithWindow<RecordComponent>> particleAttributes; /* var IDs for particle attributes in order of appearance */
     std::list<int64_t> adiosSpeciesIndexVarIds; /* var IDs for species index tables in order of appearance */
+    std::list<WithWindow<RecordComponent>> speciesIndices;
 
     GridLayout<simDim> gridLayout;
     MappingDesc *cellDescription;
@@ -179,6 +213,18 @@ int64_t defineAdiosVar(int64_t group_id,
                        pmacc::math::UInt64<DIM> offset,
                        bool compression,
                        std::string compressionMethod);
+
+template <unsigned DIM>
+WithWindow< RecordComponent >
+prepareDataset(
+    RecordComponent & recordComponent,
+    Datatype datatype,
+    pmacc::math::UInt64<DIM> globalDimensions,
+    pmacc::math::UInt64<DIM> localDimensions,
+    pmacc::math::UInt64<DIM> offset,
+    bool compression,
+    std::string compressionMethod
+);
 
 } //namespace openPMD
 } //namespace picongpu

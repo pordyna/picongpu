@@ -57,33 +57,37 @@ struct ParticleAttribute
         const uint32_t components = GetNComponents<ValueType>::value;
         typedef typename GetComponentsType<ValueType>::type ComponentType;
 
-        log<picLog::INPUT_OUTPUT > ("ADIOS:  (begin) write species attribute: %1%") % Identifier::getName();
+        log<picLog::INPUT_OUTPUT > ("openPMD:  (begin) write species attribute: %1%") % Identifier::getName();
+        
+        std::shared_ptr< ComponentType > storeBfr { 
+            new ComponentType[elements],
+            []( ComponentType *ptr ) { delete[] ptr; }
+        };
 
-        ComponentType* tmpBfr = nullptr;
-
-        if (elements > 0)
-            tmpBfr = new ComponentType[elements];
-
-        for (uint32_t d = 0; d < components; d++)
+        for (uint32_t d = 0; d < components; d++) 
         {
-            ValueType* dataPtr = frame.getIdentifier(Identifier()).getPointer();
+            ValueType* dataPtr = frame.getIdentifier(Identifier()).getPointer(); // can be moved up?
+            auto storePtr = storeBfr.get( );
 
             /* copy strided data from source to temporary buffer */
             #pragma omp parallel for
             for (size_t i = 0; i < elements; ++i)
             {
-                tmpBfr[i] = ((ComponentType*) dataPtr)[d + i * components];
+                // TODO wtf?
+                storePtr[i] = reinterpret_cast<ComponentType*>( dataPtr )[d + i * components];
             }
 
-            int64_t adiosAttributeVarId = *(params->adiosParticleAttrVarIds.begin());
-            params->adiosParticleAttrVarIds.pop_front();
-
-            ADIOS_CMD(adios_write_byid(params->adiosFileHandle, adiosAttributeVarId, tmpBfr));
+            auto & window = params->particleAttributes.front();
+            window.m_data.storeChunk(
+                storeBfr,
+                window.m_offset,
+                window.m_extent
+            );
+            params->openSeries().flush();
+            params->particleAttributes.pop_front();
         }
 
-        __deleteArray(tmpBfr);
-
-        log<picLog::INPUT_OUTPUT > ("ADIOS:  ( end ) write species attribute: %1%") %
+        log<picLog::INPUT_OUTPUT > ("openPMD:  ( end ) write species attribute: %1%") %
             Identifier::getName();
     }
 

@@ -89,39 +89,39 @@ public:
 
     typedef Frame<OperatorCreateVectorBox, NewParticleDescription> openPMDFrameType;
 
-    template<typename Space>
+    template<typename Space> // has operator[] -> integer type
     HINLINE void operator()(ThreadParams* params,
                             const Space particleOffset)
     {
-        log<picLog::INPUT_OUTPUT > ("ADIOS: (begin) write species: %1%") % T_SpeciesFilter::getName();
+        log<picLog::INPUT_OUTPUT > ("openPMD: (begin) write species: %1%") % T_SpeciesFilter::getName();
         DataConnector &dc = Environment<>::get().DataConnector();
         /* load particle without copy particle data to host */
         auto speciesTmp = dc.get< ThisSpecies >( ThisSpecies::FrameType::getName(), true );
 
         /* count total number of particles on the device */
-        log<picLog::INPUT_OUTPUT > ("ADIOS:   (begin) count particles: %1%") % T_SpeciesFilter::getName();
+        log<picLog::INPUT_OUTPUT > ("openPMD:   (begin) count particles: %1%") % T_SpeciesFilter::getName();
         // enforce that the filter interface is fulfilled
         particles::filter::IUnary< typename T_SpeciesFilter::Filter > particleFilter{ params->currentStep };
-        uint64_cu totalNumParticles = 0;
-        totalNumParticles = pmacc::CountParticles::countOnDevice < CORE + BORDER > (
+        uint64_cu const totalNumParticles = pmacc::CountParticles::countOnDevice < CORE + BORDER > (
                                                                                     *speciesTmp,
                                                                                     *(params->cellDescription),
                                                                                     params->localWindowToDomainOffset,
                                                                                     params->window.localDimensions.size,
                                                                                     particleFilter);
-        log<picLog::INPUT_OUTPUT > ("ADIOS:   ( end ) count particles: %1% = %2%") % T_SpeciesFilter::getName() % totalNumParticles;
+        log<picLog::INPUT_OUTPUT > ("openPMD:   ( end ) count particles: %1% = %2%") % T_SpeciesFilter::getName() % totalNumParticles;
 
+        // copy over particles to host
         openPMDFrameType hostFrame;
 
         /* malloc host memory */
-        log<picLog::INPUT_OUTPUT > ("ADIOS:   (begin) malloc host memory: %1%") % T_SpeciesFilter::getName();
+        log<picLog::INPUT_OUTPUT > ("openPMD:   (begin) malloc host memory: %1%") % T_SpeciesFilter::getName(); 
         ForEach<typename openPMDFrameType::ValueTypeSeq, MallocHostMemory<bmpl::_1> > mallocMem;
         mallocMem(forward(hostFrame), totalNumParticles);
-        log<picLog::INPUT_OUTPUT > ("ADIOS:   ( end ) malloc host memory: %1%") % T_SpeciesFilter::getName();
+        log<picLog::INPUT_OUTPUT > ("openPMD:   ( end ) malloc host memory: %1%") % T_SpeciesFilter::getName();
 
         if (totalNumParticles > 0)
         {
-            log<picLog::INPUT_OUTPUT > ("ADIOS:   (begin) copy particle host (with hierarchy) to host (without hierarchy): %1%") % T_SpeciesFilter::getName();
+            log<picLog::INPUT_OUTPUT > ("openPMD:   (begin) copy particle host (with hierarchy) to host (without hierarchy): %1%") % T_SpeciesFilter::getName();
             typedef bmpl::vector< typename GetPositionFilter<simDim>::type > usedFilters;
             typedef typename FilterFactory<usedFilters>::FilterType MyParticleFilter;
             MyParticleFilter filter;
@@ -169,42 +169,55 @@ public:
 #if( PMACC_CUDA_ENABLED == 1 )
             dc.releaseData( MallocMCBuffer< DeviceHeap >::getName() );
 #endif
-            /* this costs a little bit of time but adios writing is slower */
+            /* this costs a little bit of time but writing to external is slower in general */
             PMACC_ASSERT((uint64_cu) globalParticleOffset == totalNumParticles);
         }
-        /* dump to adios file */
-        ForEach<typename openPMDFrameType::ValueTypeSeq, openPMD::ParticleAttribute<bmpl::_1> > writeToAdios;
-        writeToAdios(params, forward(hostFrame), totalNumParticles);
+        /* dump to openPMD storage */
+        ForEach<typename openPMDFrameType::ValueTypeSeq, openPMD::ParticleAttribute<bmpl::_1> > writeToOpenPMD;
+        writeToOpenPMD(params, forward(hostFrame), totalNumParticles); 
 
         /* free host memory */
         ForEach<typename openPMDFrameType::ValueTypeSeq, FreeHostMemory<bmpl::_1> > freeMem;
         freeMem(forward(hostFrame));
-        log<picLog::INPUT_OUTPUT > ("ADIOS: ( end ) writing species: %1%") % T_SpeciesFilter::getName();
+        log<picLog::INPUT_OUTPUT > ("openPMD: ( end ) writing species: %1%") % T_SpeciesFilter::getName();
 
-        /* write species counter table to adios file */
-        log<picLog::INPUT_OUTPUT > ("ADIOS: (begin) writing particle index table for %1%") % T_SpeciesFilter::getName();
+        /* write species counter table to openPMD storage */
+        log<picLog::INPUT_OUTPUT > ("openPMD: (begin) writing particle index table for %1%") % T_SpeciesFilter::getName();
         {
             GridController<simDim>& gc = Environment<simDim>::get().GridController();
 
             const size_t pos_offset = 2;
 
             /* particlesMetaInfo = (num particles, scalar position, particle offset x, y, z) */
-            uint64_t particlesMetaInfo[5] = {totalNumParticles, gc.getScalarPosition(), 0, 0, 0};
-            for (size_t d = 0; d < simDim; ++d)
-                particlesMetaInfo[pos_offset + d] = particleOffset[d];
+            std::shared_ptr< uint64_t > particlesMetaInfo {
+                new uint64_t[5] {
+                    totalNumParticles, gc.getScalarPosition( ), 0, 0, 0
+                },
+                [] (uint64_t *ptr) { delete[] ptr; }
+            };
+            auto particlesMetaInfoPtr = particlesMetaInfo.get();
+            for (size_t d = 0; d < simDim; ++d) 
+            {  
+                particlesMetaInfoPtr[pos_offset + d] = particleOffset[d];
+            }
 
             /* prevent that top (y) gpus have negative value here */
             if (gc.getPosition().y() == 0)
-                particlesMetaInfo[pos_offset + 1] = 0;
+                particlesMetaInfoPtr[pos_offset + 1] = 0;
 
             if (particleOffset[1] < 0) // 1 == y
-                particlesMetaInfo[pos_offset + 1] = 0;
+                particlesMetaInfoPtr[pos_offset + 1] = 0;
 
-            int64_t adiosIndexVarId = *(params->adiosSpeciesIndexVarIds.begin());
-            params->adiosSpeciesIndexVarIds.pop_front();
-            ADIOS_CMD(adios_write_byid(params->adiosFileHandle, adiosIndexVarId, particlesMetaInfo));
+            auto & dataset = params->speciesIndices.front( );
+            dataset.m_data.storeChunk(
+                particlesMetaInfo,
+                dataset.m_offset,
+                dataset.m_extent
+            );
+            params->speciesIndices.pop_front( );
+            params->openSeries( ).flush( );
         }
-        log<picLog::INPUT_OUTPUT > ("ADIOS: ( end ) writing particle index table for %1%") % T_SpeciesFilter::getName();
+        log<picLog::INPUT_OUTPUT > ("openPMD: ( end ) writing particle index table for %1%") % T_SpeciesFilter::getName();
     }
 };
 

@@ -130,10 +130,35 @@ int64_t defineAdiosVar(int64_t group_id,
     return var_id;
 }
 
-// template <unsigned DIM>
-// Dataset & defineDataset(
-//     RecordComponent & recordComponent,
-//     )
+template <unsigned DIM>
+WithWindow< RecordComponent >
+prepareDataset(
+    RecordComponent & recordComponent,
+    Datatype datatype,
+    pmacc::math::UInt64<DIM> globalDimensions,
+    pmacc::math::UInt64<DIM> localDimensions,
+    pmacc::math::UInt64<DIM> offset,
+    bool compression,
+    std::string compressionMethod
+) {
+    std::vector<uint64_t> v;
+    v.reserve(DIM);
+    for (unsigned i = 0; i < DIM; i++) 
+    {
+        v[i] = globalDimensions[i];
+    }
+    Dataset dataset{datatype, std::move(v)};
+    if (compression)
+    {
+        dataset.compression = compressionMethod;
+    }
+    recordComponent.resetDataset(std::move(dataset));
+    return WithWindow< RecordComponent >::init< DIM >(
+        recordComponent,
+        offset,
+        localDimensions
+    );
+}
 
 /** Writes simulation data to adios files.
  *
@@ -671,7 +696,7 @@ private:
                     sizeof(ComponentType) *
                     components;
 
-            params->adiosGroupSize += localGroupSize;
+            params->openPMDGroupSize += localGroupSize;
 
             // convert in a std::vector of std::vector format for writeField API
             const traits::FieldPosition<typename fields::Solver::NummericalCellType, T> fieldPos;
@@ -742,7 +767,7 @@ private:
                     sizeof(ComponentType) *
                     components;
 
-            params->adiosGroupSize += localGroupSize;
+            params->openPMDGroupSize += localGroupSize;
 
             /*wrap in a one-component vector for writeField API*/
             const traits::FieldPosition<typename fields::Solver::NummericalCellType, FieldTmp>
@@ -1317,7 +1342,7 @@ private:
     {
 
         // synchronize, because following operations will be blocking anyway
-        threadParams->adiosGroupSize = 0;
+        threadParams->openPMDGroupSize = 0;
 
         /* y direction can be negative for first gpu */
         const pmacc::Selection<simDim>& localDomain = Environment<simDim>::get().SubGrid().getLocalDomain();
@@ -1406,8 +1431,8 @@ private:
         /* collect size information for all attributes of all species and define
          * particle variables
          */
-        threadParams->adiosParticleAttrVarIds.clear();
-        threadParams->adiosSpeciesIndexVarIds.clear();
+        threadParams->particleAttributes.clear( );
+        threadParams->speciesIndices.clear( );
 
         bool dumpAllParticles = plugins::misc::containsObject(
             vectorOfDataSourceNames,
@@ -1478,7 +1503,7 @@ private:
          */
         uint64_t adiosTotalSize;
         ADIOS_CMD(adios_group_size(threadParams->adiosFileHandle,
-                threadParams->adiosGroupSize, &adiosTotalSize));
+                threadParams->openPMDGroupSize, &adiosTotalSize));
 
         /* write fields */
         log<picLog::INPUT_OUTPUT > ("ADIOS: (begin) writing fields.");

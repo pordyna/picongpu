@@ -43,7 +43,7 @@ struct WriteNDScalars
         name(name), attrName(attrName){}
 
     /** Prepare the write operation:
-     *  Define ADIOS variable, increase params.adiosGroupSize and write attribute (if attrName is non-empty)
+     *  Define ADIOS variable, increase params.openPMDGroupSize and write attribute (if attrName is non-empty)
      *
      *  Must be called before executing the functor
      */
@@ -54,9 +54,9 @@ struct WriteNDScalars
 
         log<picLog::INPUT_OUTPUT> ("ADIOS: prepare write %1%D scalars: %2%") % simDim % name;
 
-        params.adiosGroupSize += sizeof(T_Scalar);
+        params.openPMDGroupSize += sizeof(T_Scalar);
         if(!attrName.empty())
-            params.adiosGroupSize += sizeof(T_Attribute);
+            params.openPMDGroupSize += sizeof(T_Attribute);
 
         // Size over all processes
         Dimensions globalDomainSize = Dimensions::create(1);

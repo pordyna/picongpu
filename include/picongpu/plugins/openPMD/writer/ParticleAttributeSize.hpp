@@ -28,6 +28,7 @@
 #include <pmacc/traits/Resolve.hpp>
 #include <pmacc/assert.hpp>
 
+
 namespace picongpu
 {
 
@@ -62,19 +63,14 @@ struct ParticleAttributeSize
         const uint32_t components = GetNComponents<ValueType>::value;
         typedef typename GetComponentsType<ValueType>::type ComponentType;
 
-        params->adiosGroupSize += elements * components * sizeof(ComponentType);
-
-        /* define adios var for particle attribute */
-        PICToAdios<ComponentType> adiosType;
-        PICToAdios<float_X> adiosFloatXType;
-        PICToAdios<float_64> adiosDoubleType;
-        PICToAdios<uint32_t> adiosUInt32Type;
+        params->openPMDGroupSize += elements * components * sizeof(ComponentType);
 
         const std::string name_lookup[] = {"x", "y", "z"};
 
         OpenPMDName<T_Identifier> openPMDName;
-        const std::string recordPath( params->adiosBasePath +
-            std::string(ADIOS_PATH_PARTICLES) + speciesGroup + openPMDName() );
+        Series & series = params->openSeries();
+        Iteration & iteration = series.iterations[params->currentStep];
+        Record & record = iteration.particles[speciesGroup][openPMDName()];
 
         // get the SI scaling, dimensionality and weighting of the attribute
         OpenPMDUnit<T_Identifier> openPMDUnit;
@@ -90,56 +86,62 @@ struct ParticleAttributeSize
 
         for (uint32_t d = 0; d < components; d++)
         {
-            std::stringstream datasetName;
-            datasetName << recordPath;
-            if (components > 1)
-                datasetName << "/" << name_lookup[d];
-
-            const char* path = nullptr;
-            int64_t adiosParticleAttrId = defineAdiosVar<DIM1>(
-                params->adiosGroupHandle,
-                datasetName.str().c_str(),
-                path,
-                adiosType.type,
-                pmacc::math::UInt64<DIM1>(elements),
-                pmacc::math::UInt64<DIM1>(globalElements),
-                pmacc::math::UInt64<DIM1>(globalOffset),
-                true,
-                params->adiosCompression);
-
-            params->adiosParticleAttrVarIds.push_back(adiosParticleAttrId);
+            RecordComponent & recordComponent = components > 1 
+                ? record[name_lookup[d]]
+                : record[MeshRecordComponent::SCALAR];
+            Datatype openPMDType = determineDatatype< ComponentType >();
+            
+            params->particleAttributes.push_back(
+                prepareDataset<DIM1>(
+                    recordComponent,
+                    openPMDType,
+                    pmacc::math::UInt64<DIM1>(globalElements),
+                    pmacc::math::UInt64<DIM1>(elements),
+                    pmacc::math::UInt64<DIM1>(globalOffset),
+                    true,
+                    params->adiosCompression 
+                )
+            );
 
             /* already add the unitSI and further attribute so `adios_group_size`
              * calculates the reservation for the buffer correctly */
 
             /* check if this attribute actually has a unit (unit.size() == 0 is no unit) */
             if (unit.size() >= (d + 1))
-                ADIOS_CMD(adios_define_attribute_byvalue(params->adiosGroupHandle,
-                          "unitSI", datasetName.str().c_str(),
-                          adiosDoubleType.type, 1, &unit.at(d) ));
+            {
+                record.setAttribute( "unitSI", unit.at( d ) );
+            }
         }
 
-        ADIOS_CMD(adios_define_attribute_byvalue(params->adiosGroupHandle,
-            "unitDimension", recordPath.c_str(),
-            adiosDoubleType.type, 7, &(*unitDimension.begin()) ));
+        std::array< double, 7 > unitDimensionArr;
+        std::copy_n( 
+            unitDimension.begin( ),
+            7,
+            unitDimensionArr.begin( )
+        );
+        record.setAttribute(
+            "unitDimension",
+            std::move( unitDimensionArr )
+        );
+        record.setAttribute(
+            "macroWeighted",
+            macroWeighted
+        );
+        record.setAttribute(
+            "weightingPower",
+            weightingPower
+        );
 
-        ADIOS_CMD(adios_define_attribute_byvalue(params->adiosGroupHandle,
-            "macroWeighted", recordPath.c_str(),
-            adiosUInt32Type.type, 1, (void*)&macroWeighted ));
-
-        ADIOS_CMD(adios_define_attribute_byvalue(params->adiosGroupHandle,
-            "weightingPower", recordPath.c_str(),
-            adiosDoubleType.type, 1, (void*)&weightingPower ));
-
-        /** \todo check if always correct at this point, depends on attribute
-         *        and MW-solver/pusher implementation */
-        const float_X timeOffset = 0.0;
-        ADIOS_CMD(adios_define_attribute_byvalue(params->adiosGroupHandle,
-            "timeOffset", recordPath.c_str(),
-            adiosFloatXType.type, 7, (void*)&timeOffset ));
-
+        // /** \todo check if always correct at this point, depends on attribute
+        //  *        and MW-solver/pusher implementation */
+        const std::vector< float_X > timeOffset(
+            7, 0.0
+        );
+        record.setAttribute(
+            "timeOffset",
+            timeOffset
+        );
     }
-
 };
 
 } //namspace adios
