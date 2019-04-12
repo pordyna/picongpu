@@ -30,6 +30,8 @@
 #include "picongpu/traits/SIBaseUnits.hpp"
 #include "picongpu/traits/PICToAdios.hpp"
 
+#include <openPMD/openPMD.hpp>
+
 #include <string>
 #include <sstream>
 #include <list>
@@ -39,6 +41,7 @@ namespace picongpu
 {
 namespace openPMD
 {
+    using namespace ::openPMD;
 using namespace pmacc;
 
 namespace writeMeta
@@ -56,15 +59,18 @@ namespace writeMeta
          * @param fullMeshesPath path to mesh entry
          */
         void operator()(
-            ThreadParams* threadParams,
-            const std::string& fullMeshesPath
+            ThreadParams* threadParams
         ) const
         {
+            
             // assume all boundaries are like the first species for openPMD 1.0.0
             GetStringProperties<bmpl::at_c<VectorAllSpecies, 0>::type> particleBoundaryProp;
-            std::list<std::string> listParticleBoundary;
-            std::list<std::string> listParticleBoundaryParam;
-            for( uint32_t i = NumberOfExchanges<simDim>::value - 1; i > 0; --i )
+            std::vector<std::string> listParticleBoundary;
+            std::vector<std::string> listParticleBoundaryParam;
+            auto n = NumberOfExchanges< simDim >::value;
+            listParticleBoundary.reserve( n - 1 );
+            listParticleBoundaryParam.reserve( n - 1 );
+            for( uint32_t i = n - 1; i > 0; --i )
             {
                 if( FRONT % i == 0 )
                 {
@@ -76,16 +82,16 @@ namespace writeMeta
                     );
                 }
             }
-            helper::GetADIOSArrayOfString getADIOSArrayOfString;
-            auto arrParticleBoundary = getADIOSArrayOfString( listParticleBoundary );
-            auto arrParticleBoundaryParam = getADIOSArrayOfString( listParticleBoundaryParam );
 
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                "particleBoundary", fullMeshesPath.c_str(), adios_string_array,
-                listParticleBoundary.size(), &( arrParticleBoundary.starts.at( 0 ) )));
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                "particleBoundaryParameters", fullMeshesPath.c_str(), adios_string_array,
-                listParticleBoundaryParam.size(), &( arrParticleBoundaryParam.starts.at( 0 ) )));
+            Iteration & iteration = threadParams->openSeries( ).iterations[threadParams->currentStep];
+            iteration.setAttribute(
+                "particleBoundary",
+                listParticleBoundary
+            );
+            iteration.setAttribute(
+                "particleBoundaryParameters",
+                listParticleBoundaryParam
+            );
         }
     };
 
@@ -117,51 +123,22 @@ namespace writeMeta
             traits::PICToAdios<uint32_t> adiosUInt32Type;
             traits::PICToAdios<float_X> adiosFloatXType;
             traits::PICToAdios<float_64> adiosDoubleType;
+            Series & series = threadParams->openSeries( );
 
-            /* openPMD attributes */
-            /*   required */
-            const std::string openPMDversion( "1.0.0" );
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                "openPMD", "/", adios_string, 1, (void*)openPMDversion.c_str()));
-
-            const uint32_t openPMDextension = 1; // ED-PIC ID
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                "openPMDextension", "/", adiosUInt32Type.type, 1, (void*)&openPMDextension));
-
-            const std::string basePath( ADIOS_PATH_ROOT"%T/" );
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                "basePath", "/", adios_string, 1, (void*)basePath.c_str()));
-
-            const std::string meshesPath( ADIOS_PATH_FIELDS );
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                "meshesPath", "/", adios_string, 1, (void*)meshesPath.c_str()));
-
-            const std::string particlesPath( ADIOS_PATH_PARTICLES );
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                "particlesPath", "/", adios_string, 1, (void*)particlesPath.c_str()));
-
-            const std::string iterationEncoding( "fileBased" );
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                "iterationEncoding", "/", adios_string, 1, (void*)iterationEncoding.c_str()));
-
-            const std::string iterationFormat(
-                Environment< simDim >::get().Filesystem().basename( threadParams->adiosFilename ) +
-                std::string("_%T.bp")
-            );
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                "iterationFormat", "/", adios_string, 1, (void*)iterationFormat.c_str()));
+            /*
+             * The openPMD API will kindly write the central metadata by itself,
+             * so we don't need to do this manually. We give the optional metadata:
+             */
 
             /*   recommended */
             const std::string author = Environment<>::get().SimulationDescription().getAuthor();
             if( author.length() > 0 )
             {
-                ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                    "author", "/", adios_string, 1, (void*)author.c_str()));
+                series.setAuthor( author );
             }
 
             const std::string software( "PIConGPU" );
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                "software", "/", adios_string, 1, (void*)software.c_str()));
+            series.setSoftware( "PIConGPU" );
 
             std::stringstream softwareVersion;
             softwareVersion << PICONGPU_VERSION_MAJOR << "."
@@ -169,30 +146,33 @@ namespace writeMeta
                             << PICONGPU_VERSION_PATCH;
             if( ! std::string(PICONGPU_VERSION_LABEL).empty() )
                 softwareVersion << "-" << PICONGPU_VERSION_LABEL;
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                "softwareVersion", "/", adios_string, 1, (void*)softwareVersion.str().c_str()));
+            series.setSoftwareVersion( softwareVersion.str( ) );
 
             const std::string date = helper::getDateString( "%F %T %z" );
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                "date", "/", adios_string, 1, (void*)date.c_str()));
+            series.setDate( date );
+            series.setMeshesPath( ADIOS_PATH_FIELDS );
 
-            /*   ED-PIC */
-            const std::string fullMeshesPath( threadParams->adiosBasePath +
-                std::string(ADIOS_PATH_FIELDS) );
+            Iteration & iteration = series.iterations[threadParams->currentStep];
+            Container< Mesh > & meshes = iteration.meshes;
 
             GetStringProperties<fields::Solver> fieldSolverProps;
             const std::string fieldSolver( fieldSolverProps["name"].value );
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                "fieldSolver", fullMeshesPath.c_str(), adios_string, 1, (void*)fieldSolver.c_str()));
+            meshes.setAttribute(
+                "fieldSolver",
+                fieldSolver
+            );
 
             /* order as in axisLabels:
              *    3D: z-lower, z-upper, y-lower, y-upper, x-lower, x-upper
              *    2D: y-lower, y-upper, x-lower, x-upper
              */
             GetStringProperties<FieldManipulator> fieldBoundaryProp;
-            std::list<std::string> listFieldBoundary;
-            std::list<std::string> listFieldBoundaryParam;
-            for( uint32_t i = NumberOfExchanges<simDim>::value - 1; i > 0; --i )
+            std::vector<std::string> listFieldBoundary;
+            std::vector<std::string> listFieldBoundaryParam;
+            auto n = NumberOfExchanges<simDim>::value;
+            listFieldBoundary.reserve( n - 1 );
+            listFieldBoundaryParam.reserve( n - 1 );
+            for( uint32_t i = n - 1; i > 0; --i )
             {
                 if( FRONT % i == 0 )
                 {
@@ -204,101 +184,109 @@ namespace writeMeta
                     );
                 }
             }
-            helper::GetADIOSArrayOfString getADIOSArrayOfString;
-            auto arrFieldBoundary = getADIOSArrayOfString( listFieldBoundary );
-            auto arrFieldBoundaryParam = getADIOSArrayOfString( listFieldBoundaryParam );
 
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                "fieldBoundary", fullMeshesPath.c_str(), adios_string_array,
-                listFieldBoundary.size(), &( arrFieldBoundary.starts.at( 0 ) )));
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                "fieldBoundaryParameters", fullMeshesPath.c_str(), adios_string_array,
-                listFieldBoundaryParam.size(), &( arrFieldBoundaryParam.starts.at( 0 ) )));
+            meshes.setAttribute(
+                "fieldBoundary",
+                listFieldBoundary
+            );
+            meshes.setAttribute(
+                "fieldBoundaryParameters",
+                listFieldBoundaryParam
+            );
 
-            writeMeta::OfAllSpecies<>()( threadParams, fullMeshesPath );
+            writeMeta::OfAllSpecies<>()( threadParams );
 
             GetStringProperties<typename fields::Solver::CurrentInterpolation> currentSmoothingProp;
             const std::string currentSmoothing( currentSmoothingProp["name"].value );
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                "currentSmoothing", fullMeshesPath.c_str(), adios_string, 1, (void*)currentSmoothing.c_str()));
+            meshes.setAttribute(
+                "currentSmoothing",
+                currentSmoothing
+            );
 
             if( currentSmoothingProp.find( "param" ) != currentSmoothingProp.end() )
             {
                 const std::string currentSmoothingParam( currentSmoothingProp["param"].value );
-                ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                    "currentSmoothingParameters", fullMeshesPath.c_str(), adios_string,
-                    1, (void*)currentSmoothingParam.c_str()));
+                meshes.setAttribute(
+                    "currentSmoothingParameters",
+                    currentSmoothingParam
+                );
             }
 
             const std::string chargeCorrection( "none" );
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                "chargeCorrection", fullMeshesPath.c_str(), adios_string, 1, (void*)chargeCorrection.c_str()));
+            meshes.setAttribute(
+                "chargeCorrection",
+                chargeCorrection
+            );
 
             /* write current iteration */
             log<picLog::INPUT_OUTPUT > ("ADIOS: meta: iteration");
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                      "iteration", threadParams->adiosBasePath.c_str(),
-                      adiosUInt32Type.type, 1, (void*)&threadParams->currentStep ));
+            iteration.setAttribute(
+                "iteration",
+                threadParams->currentStep
+            ); // openPMD API will not write this automatically
 
             /* write number of slides */
             log<picLog::INPUT_OUTPUT > ("ADIOS: meta: sim_slides");
             uint32_t slides = MovingWindow::getInstance().getSlideCounter(threadParams->currentStep);
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                      "sim_slides", threadParams->adiosBasePath.c_str(),
-                      adiosUInt32Type.type, 1, (void*)&slides ));
+            iteration.setAttribute(
+                "sim_slides",
+                slides
+            );
 
-            /* openPMD: required time attributes */
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                      "dt", threadParams->adiosBasePath.c_str(),
-                      adiosFloatXType.type, 1, (void*)&DELTA_T ));
-            const float_X time = float_X( threadParams->currentStep ) * DELTA_T;
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                      "time", threadParams->adiosBasePath.c_str(),
-                      adiosFloatXType.type, 1, (void*)&time ));
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                      "timeUnitSI", threadParams->adiosBasePath.c_str(),
-                      adiosDoubleType.type, 1, (void*)&UNIT_TIME ));
+            /*
+             * Required time attributes are written automatically by openPMD API
+             */
+           
 
             /* write normed grid parameters */
-            log<picLog::INPUT_OUTPUT > ("ADIOS: meta: grid");
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                      "cell_width", threadParams->adiosBasePath.c_str(),
-                      adiosFloatXType.type, 1, (void*)&cellSize[0] ));
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                      "cell_height", threadParams->adiosBasePath.c_str(),
-                      adiosFloatXType.type, 1, (void*)&cellSize[1] ));
-
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                      "cell_depth", threadParams->adiosBasePath.c_str(),
-                      adiosFloatXType.type, 1, (void*)&cellSize[2] ));
+            log<picLog::INPUT_OUTPUT > ("openPMD: meta: grid");
+            std::string names[3] = {
+                "cell_width", "cell_height", "cell_depth"
+            };
+            for ( unsigned i = 0; i < 3; ++i )
+            {
+                iteration.setAttribute(
+                    names[i],
+                    cellSize[i]
+                );
+            }
 
 
             /* write base units */
             log<picLog::INPUT_OUTPUT > ("ADIOS: meta: units");
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                      "unit_energy", threadParams->adiosBasePath.c_str(),
-                      adiosDoubleType.type, 1, (void*)&UNIT_ENERGY ));
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                      "unit_length", threadParams->adiosBasePath.c_str(),
-                      adiosDoubleType.type, 1, (void*)&UNIT_LENGTH ));
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                      "unit_speed", threadParams->adiosBasePath.c_str(),
-                      adiosDoubleType.type, 1, (void*)&UNIT_SPEED ));
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                      "unit_time", threadParams->adiosBasePath.c_str(),
-                      adiosDoubleType.type, 1, (void*)&UNIT_TIME ));
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                      "unit_mass", threadParams->adiosBasePath.c_str(),
-                      adiosDoubleType.type, 1, (void*)&UNIT_MASS ));
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                      "unit_charge", threadParams->adiosBasePath.c_str(),
-                      adiosDoubleType.type, 1, (void*)&UNIT_CHARGE ));
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                      "unit_efield", threadParams->adiosBasePath.c_str(),
-                      adiosDoubleType.type, 1, (void*)&UNIT_EFIELD ));
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                      "unit_bfield", threadParams->adiosBasePath.c_str(),
-                      adiosDoubleType.type, 1, (void*)&UNIT_BFIELD ));
+            iteration.setAttribute(
+                "unit_energy",
+                UNIT_ENERGY
+            );
+            iteration.setAttribute(
+                "unit_length",
+                UNIT_LENGTH
+            );
+            iteration.setAttribute(
+                "unit_speed",
+                UNIT_SPEED
+            );
+            iteration.setAttribute(
+                "unit_time",
+                UNIT_TIME
+            );
+            iteration.setAttribute(
+                "unit_mass",
+                UNIT_MASS
+            );
+            iteration.setAttribute(
+                "unit_charge",
+                UNIT_CHARGE
+            );
+            iteration.setAttribute(
+                "unit_efield",
+                UNIT_EFIELD
+            );
+            iteration.setAttribute(
+                "unit_bfield",
+                UNIT_BFIELD
+            );
+
 
             /* write physical constants */
             log<picLog::INPUT_OUTPUT > ("ADIOS: meta: mue0/eps0");
@@ -308,8 +296,16 @@ namespace writeMeta
             ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
                       "eps0", threadParams->adiosBasePath.c_str(),
                       adiosFloatXType.type, 1, (void*)&EPS0 ));
+            iteration.setAttribute(
+                "mue0",
+                MUE0
+            );
+            iteration.setAttribute(
+                "eps0",
+                EPS0
+            );
 
-            log<picLog::INPUT_OUTPUT > ("ADIOS: ( end ) wite meta attributes.");
+            log<picLog::INPUT_OUTPUT > ("openPMD: ( end ) wite meta attributes.");
         }
     };
 } // namespace openPMD
