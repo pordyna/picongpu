@@ -19,147 +19,222 @@
 
 #pragma once
 
-#include <pmacc/types.hpp>
-#include "picongpu/plugins/openPMD/openPMDWriter.def"
-#include "picongpu/plugins/openPMD/restart/ReadAttribute.hpp"
-#include "picongpu/traits/PICToAdios.hpp"
 #include <pmacc/Environment.hpp>
+#include <pmacc/types.hpp>
 #include <stdexcept>
+#include "picongpu/plugins/openPMD/openPMDWriter.def"
 
-namespace picongpu {
-namespace openPMD {
+namespace picongpu
+{
+namespace openPMD
+{
+template < typename F, typename... Params >
+void withAlteredMeshesPath(
+    ::openPMD::Series & series,
+    std::string const & path,
+    F f,
+    Params &&... params )
+{
+    series.flush( );
+    std::string oldPath = series.meshesPath( );
+    series.setMeshesPath( path );
+    f( params... );
+    series.flush( );
+    series.setMeshesPath( oldPath );
+}
 
 /** Functor for writing N-dimensional scalar fields with N=simDim
- * In the current implementation each process (of the ND grid of processes) writes 1 scalar value
- * Optionally the processes can also write an attribute for this dataset by using a non-empty attrName
+ * In the current implementation each process (of the ND grid of processes)
+ * writes 1 scalar value Optionally the processes can also write an attribute
+ * for this dataset by using a non-empty attrName
  *
  * @tparam T_Scalar    Type of the scalar value to write
- * @tparam T_Attribute Type of the attribute (can be omitted if attribute is not written, defaults to uint64_t)
+ * @tparam T_Attribute Type of the attribute (can be omitted if attribute is not
+ * written, defaults to uint64_t)
  */
-template<typename T_Scalar, typename T_Attribute = uint64_t>
+template < typename T_Scalar, typename T_Attribute = uint64_t >
 struct WriteNDScalars
 {
-    WriteNDScalars(const std::string& name, const std::string& attrName = ""):
-        name(name), attrName(attrName){}
+    WriteNDScalars(
+        const std::string & baseName,
+        const std::string & group,
+        const std::string & dataset,
+        const std::string & attrName = "" )
+    : baseName( baseName )
+    , group( group )
+    , dataset( dataset )
+    , attrName( attrName )
+    {
+    }
 
     /** Prepare the write operation:
-     *  Define ADIOS variable, increase params.openPMDGroupSize and write attribute (if attrName is non-empty)
+     *  Define ADIOS variable, increase params.openPMDGroupSize and write
+     * attribute (if attrName is non-empty)
      *
      *  Must be called before executing the functor
      */
-    void prepare(ThreadParams& params, T_Attribute attribute = T_Attribute())
+    void prepare(
+        ThreadParams & params, T_Attribute attribute = T_Attribute( ) )
     {
-        typedef traits::PICToAdios<T_Scalar> AdiosSkalarType;
-        typedef pmacc::math::UInt64<simDim> Dimensions;
+        auto f = [&params, &attribute, this]( ) {
+            auto name = baseName + "/" + group + "/" + dataset;
+            const auto openPMDScalarType =
+                ::openPMD::determineDatatype< T_Scalar >( );
+            typedef pmacc::math::UInt64< simDim > Dimensions;
 
-        log<picLog::INPUT_OUTPUT> ("ADIOS: prepare write %1%D scalars: %2%") % simDim % name;
+            log< picLog::INPUT_OUTPUT >(
+                "openPMD: prepare write %1%D scalars: %2%" ) %
+                simDim % name;
 
-        params.openPMDGroupSize += sizeof(T_Scalar);
-        if(!attrName.empty())
-            params.openPMDGroupSize += sizeof(T_Attribute);
+            params.openPMDGroupSize += sizeof( T_Scalar );
+            if ( !attrName.empty( ) )
+                params.openPMDGroupSize += sizeof( T_Attribute );
 
-        // Size over all processes
-        Dimensions globalDomainSize = Dimensions::create(1);
-        // Offset for this process
-        Dimensions localDomainOffset = Dimensions::create(0);
+            // Size over all processes
+            Dimensions globalDomainSize = Dimensions::create( 1 );
+            // Offset for this process
+            Dimensions localDomainOffset = Dimensions::create( 0 );
 
-        for (uint32_t d = 0; d < simDim; ++d)
-        {
-            globalDomainSize[d] = Environment<simDim>::get().GridController().getGpuNodes()[d];
-            localDomainOffset[d] = Environment<simDim>::get().GridController().getPosition()[d];
-        }
+            for ( uint32_t d = 0; d < simDim; ++d )
+            {
+                globalDomainSize[d] = Environment< simDim >::get( )
+                                          .GridController( )
+                                          .getGpuNodes( )[d];
+                localDomainOffset[d] = Environment< simDim >::get( )
+                                           .GridController( )
+                                           .getPosition( )[d];
+            }
 
-        std::string datasetName = params.adiosBasePath + name;
+            ::openPMD::Series & series = params.openSeries( );
+            ::openPMD::MeshRecordComponent & mrc =
+                series.iterations[params.currentStep].meshes[group][dataset];
 
-        varId = defineAdiosVar<simDim>(
-                    params.adiosGroupHandle,
-                    datasetName.c_str(),
-                    nullptr,
-                    AdiosSkalarType().type,
-                    Dimensions::create(1),
+            preparedDataset = std::unique_ptr< WithWindow< RecordComponent > >{
+                new WithWindow< RecordComponent >{prepareDataset< simDim >(
+                    mrc,
+                    openPMDScalarType,
                     globalDomainSize,
+                    Dimensions::create( 1 ),
                     localDomainOffset,
                     true,
-                    params.adiosCompression);
+                    params.adiosCompression )}};
 
-        if(!attrName.empty())
-        {
-            typedef traits::PICToAdios<T_Attribute> AdiosAttrType;
+            if ( !attrName.empty( ) )
+            {
+                log< picLog::INPUT_OUTPUT >(
+                    "openPMD: write attribute %1% of %2%D scalars: %3%" ) %
+                    attrName % simDim % name;
 
-            log<picLog::INPUT_OUTPUT> ("ADIOS: write attribute %1% of %2%D scalars: %3%") % attrName % simDim % name;
-            ADIOS_CMD( adios_define_attribute_byvalue(params.adiosGroupHandle,
-                       attrName.c_str(), datasetName.c_str(),
-                       AdiosAttrType().type, 1, (void*)&attribute) );
-        }
+                mrc.setAttribute( attrName, attribute );
+            }
+        };
+
+        withAlteredMeshesPath( params.openSeries( ), baseName, f );
     }
 
-    void operator()(ThreadParams& params, T_Scalar value)
+    void operator( )( ThreadParams & params, T_Scalar value )
     {
-        log<picLog::INPUT_OUTPUT> ("ADIOS: write %1%D scalars: %2%") % simDim % name;
+        auto name = baseName + "/" + group + "/" + dataset;
+        log< picLog::INPUT_OUTPUT >( "openPMD: write %1%D scalars: %2%" ) %
+            simDim % name;
 
-        ADIOS_CMD( adios_write_byid(params.adiosFileHandle, varId, &value) );
+        withAlteredMeshesPath(
+            params.openSeries( ), baseName, [&value, this]( ) {
+                preparedDataset->m_data.storeChunk(
+                    std::make_shared< T_Scalar >( value ),
+                    preparedDataset->m_offset,
+                    preparedDataset->m_extent );
+            } );
     }
+
 private:
-    const std::string name, attrName;
+    const std::string baseName, group, dataset, attrName;
     int64_t varId;
+    std::unique_ptr< WithWindow< RecordComponent > > preparedDataset;
 };
 
 /** Functor for reading ND scalar fields with N=simDim
- * In the current implementation each process (of the ND grid of processes) reads 1 scalar value
- * Optionally the processes can also read an attribute for this dataset by using a non-empty attrName
+ * In the current implementation each process (of the ND grid of processes)
+ * reads 1 scalar value Optionally the processes can also read an attribute for
+ * this dataset by using a non-empty attrName
  *
  * @tparam T_Scalar    Type of the scalar value to read
- * @tparam T_Attribute Type of the attribute (can be omitted if attribute is not read, defaults to uint64_t)
+ * @tparam T_Attribute Type of the attribute (can be omitted if attribute is not
+ * read, defaults to uint64_t)
  */
-template<typename T_Scalar, typename T_Attribute = uint64_t>
+template < typename T_Scalar, typename T_Attribute = uint64_t >
 struct ReadNDScalars
 {
-    /** Read the skalar field and optionally the attribute into the values referenced by the pointers */
-    void operator()(ThreadParams& params,
-                const std::string& name, T_Scalar* value,
-                const std::string& attrName = "", T_Attribute* attribute = nullptr)
+    /** Read the skalar field and optionally the attribute into the values
+     * referenced by the pointers */
+    void operator( )(
+        ThreadParams & params,
+        const std::string & baseName,
+        const std::string & group,
+        const std::string & dataset,
+        T_Scalar * value,
+        const std::string & attrName = "",
+        T_Attribute * attribute = nullptr )
     {
-        log<picLog::INPUT_OUTPUT> ("ADIOS: read %1%D scalars: %2%") % simDim % name;
-        std::string datasetName = params.adiosBasePath + name;
+        auto name = baseName + "/" + group + "/" + dataset;
+        log< picLog::INPUT_OUTPUT >( "openPMD: read %1%D scalars: %2%" ) %
+            simDim % name;
 
-        ADIOS_VARINFO* varInfo;
-        ADIOS_CMD_EXPECT_NONNULL( varInfo = adios_inq_var(params.fp, datasetName.c_str()) );
-        if(varInfo->ndim != simDim)
-            throw std::runtime_error(std::string("Invalid dimensionality for ") + name);
-        if(varInfo->type != traits::PICToAdios<T_Scalar>().type)
-            throw std::runtime_error(std::string("Invalid type for ") + name);
+        auto f = [&params,
+                  &baseName,
+                  &group,
+                  &dataset,
+                  value,
+                  &attrName,
+                  attribute,
+                  &name]( ) {
+            auto datasetName = baseName + "/" + group + "/" + dataset;
+            ::openPMD::Series & series = params.openSeries( );
+            ::openPMD::RecordComponent & rc =
+                series.iterations[params.currentStep].meshes[group][dataset];
+            auto ndim = rc.getDimensionality( );
+            if ( ndim != simDim )
+            {
+                throw std::runtime_error(
+                    std::string( "Invalid dimensionality for " ) + name );
+            }
 
-        DataSpace<simDim> gridPos = Environment<simDim>::get().GridController().getPosition();
-        uint64_t start[varInfo->ndim];
-        uint64_t count[varInfo->ndim];
-        for(int d = 0; d < varInfo->ndim; ++d)
-        {
-            /* \see adios_define_var: z,y,x in C-order */
-            start[d] = gridPos.revert()[d];
-            count[d] = 1;
-        }
+            DataSpace< simDim > gridPos =
+                Environment< simDim >::get( ).GridController( ).getPosition( );
+            ::openPMD::Offset start;  //[varInfo->ndim];
+            ::openPMD::Extent count;  //[varInfo->ndim];
+            start.reserve( ndim );
+            count.reserve( ndim );
+            for ( int d = 0; d < ndim; ++d )
+            {
+                /* \see adios_define_var: z,y,x in C-order */
+                start[d] = gridPos.revert( )[d];
+                count[d] = 1;
+            }
 
-        ADIOS_SELECTION* fSel = adios_selection_boundingbox(varInfo->ndim, start, count);
+            __getTransactionEvent( ).waitForFinished( );
 
-        // avoid deadlock between not finished pmacc tasks and mpi calls in adios
-        __getTransactionEvent().waitForFinished();
+            log< picLog::INPUT_OUTPUT >(
+                "openPMD: Schedule read skalar %1%)" ) %
+                datasetName;
 
-        /* specify what we want to read, but start reading at below at `adios_perform_reads` */
-        /* magic parameters (0, 1): `from_step` (not used in streams), `nsteps` to read (must be 1 for stream) */
-        log<picLog::INPUT_OUTPUT > ("ADIOS: Schedule read skalar %1%)") % datasetName;
-        ADIOS_CMD( adios_schedule_read(params.fp, fSel, datasetName.c_str(), 0, 1, (void*)value) );
+            std::shared_ptr< T_Scalar > readValue =
+                rc.loadChunk< T_Scalar >( start, count );
 
-        /* start a blocking read of all scheduled variables */
-        ADIOS_CMD( adios_perform_reads(params.fp, 1) );
+            series.flush( );
 
-        adios_selection_delete(fSel);
-        adios_free_varinfo(varInfo);
+            *value = *readValue;
 
-        if(!attrName.empty())
-        {
-            log<picLog::INPUT_OUTPUT> ("ADIOS: read attribute %1% for scalars: %2%") % attrName % name;
-            *attribute = readAttribute<T_Attribute>(params.fp, datasetName, attrName);
-        }
+            if ( !attrName.empty( ) )
+            {
+                log< picLog::INPUT_OUTPUT >(
+                    "openPMD: read attribute %1% for scalars: %2%" ) %
+                    attrName % name;
+                *attribute = rc.getAttribute( name ).get< T_Attribute >( );
+            }
+        };
+
+        withAlteredMeshesPath( params.openSeries( ), baseName, f );
     }
 };
 
