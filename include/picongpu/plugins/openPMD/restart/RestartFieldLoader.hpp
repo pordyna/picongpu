@@ -29,6 +29,7 @@
 #include <pmacc/dimensions/DataSpace.hpp>
 #include <pmacc/dimensions/GridLayout.hpp>
 #include "picongpu/simulationControl/MovingWindow.hpp"
+#include <openPMD/openPMD.hpp>
 
 #include <adios.h>
 #include <adios_read.h>
@@ -66,62 +67,52 @@ public:
         DataSpace<simDim> domain_offset = localDomain.offset;
 
         DataSpace<simDim> local_domain_size = params->window.localDimensions.size;
+        ::openPMD::Series & series = params->openSeries();
+        ::openPMD::Container<::openPMD::Mesh> & meshes = series.iterations[params->currentStep].meshes;
 
         auto destBox = field.getHostBuffer().getDataBox();
         for (uint32_t n = 0; n < numComponents; ++n)
         {
             // Read the subdomain which belongs to our mpi position.
             // The total grid size must match the grid size of the stored data.
-            log<picLog::INPUT_OUTPUT > ("ADIOS: Read from domain: offset=%1% size=%2%") %
+            log<picLog::INPUT_OUTPUT > ("openPMD: Read from domain: offset=%1% size=%2%") %
                 domain_offset % local_domain_size;
+            ::openPMD::RecordComponent & rc = numComponents > 1
+                ? meshes[objectName][name_lookup_tpl[n]]
+                : meshes[objectName][::openPMD::RecordComponent::SCALAR];
 
-            std::stringstream datasetName;
-            datasetName << params->adiosBasePath << ADIOS_PATH_FIELDS << objectName;
-            if (numComponents > 1)
-                datasetName << "/" << name_lookup_tpl[n];
+            log<picLog::INPUT_OUTPUT > ("openPMD: Read from field '%1%'") %
+                objectName;
 
-            log<picLog::INPUT_OUTPUT > ("ADIOS: Read from field '%1%'") %
-                datasetName.str();
-
-            ADIOS_VARINFO* varInfo = adios_inq_var( params->fp, datasetName.str().c_str() );
-            if( varInfo == nullptr )
-            {
-                std::string errMsg( adios_errmsg() );
-                if( errMsg.empty() ) errMsg = '\n';
-                std::stringstream s;
-                s << "ADIOS: error at adios_inq_var '"
-                  << "' (" << adios_errno << ") in "
-                  << __FILE__ << ":" << __LINE__ << " " << errMsg;
-                throw std::runtime_error(s.str());
-            }
-            uint64_t start[varInfo->ndim];
-            uint64_t count[varInfo->ndim];
-            for(int d = 0; d < varInfo->ndim; ++d)
+            auto ndim = rc.getDimensionality();
+            ::openPMD::Offset start;
+            ::openPMD::Extent count;
+            start.reserve(ndim);
+            count.reserve(ndim);
+            for(int d = 0; d < ndim; ++d)
             {
                 /* \see adios_define_var: z,y,x in C-order */
                 start[d] = domain_offset.revert()[d];
                 count[d] = local_domain_size.revert()[d];
             }
 
-            ADIOS_SELECTION* fSel = adios_selection_boundingbox( varInfo->ndim, start, count );
-
             /* specify what we want to read, but start reading at below at
              * `adios_perform_reads` */
-            log<picLog::INPUT_OUTPUT > ("ADIOS: Allocate %1% elements") %
+            log<picLog::INPUT_OUTPUT > ("openPMD: Allocate %1% elements") %
                 local_domain_size.productOfComponents();
 
             /// \todo float_X should be some kind of gridBuffer's GetComponentsType<ValueType>::type
-            float_X* field_container = new float_X[local_domain_size.productOfComponents()];
             /* magic parameters (0, 1): `from_step` (not used in streams), `nsteps` to read (must be 1 for stream) */
-            log<picLog::INPUT_OUTPUT > ("ADIOS: Schedule read from field (%1%, %2%, %3%, %4%)") %
-                                        params->fp % fSel % datasetName.str() % (void*)field_container;
+            // log<picLog::INPUT_OUTPUT > ("ADIOS: Schedule read from field (%1%, %2%, %3%, %4%)") %
+            //                             params->fp % fSel % datasetName.str() % (void*)field_container;
 
             // avoid deadlock between not finished pmacc tasks and mpi calls in adios
             __getTransactionEvent().waitForFinished();
-            ADIOS_CMD(adios_schedule_read( params->fp, fSel, datasetName.str().c_str(), 0, 1, (void*)field_container ));
+
+            std::shared_ptr< float_X > field_container = rc.loadChunk< float_X >(start, count);
+            series.flush();
 
             /* start a blocking read of all scheduled variables */
-            ADIOS_CMD(adios_perform_reads( params->fp, 1 ));
 
             int elementCount = params->window.localDimensions.size.productOfComponents();
 
@@ -133,21 +124,17 @@ public:
                 /* jump over guard and local sliding window offset*/
                 destIdx += field_guard + params->localWindowToDomainOffset;
 
-                destBox(destIdx)[n] = field_container[linearId];
+                destBox(destIdx)[n] = field_container.get()[linearId];
             }
-
-            __deleteArray(field_container);
-            adios_selection_delete(fSel);
-            adios_free_varinfo(varInfo);
         }
 
         field.hostToDevice();
 
         __getTransactionEvent().waitForFinished();
 
-        log<picLog::INPUT_OUTPUT > ("ADIOS: Read from domain: offset=%1% size=%2%") %
+        log<picLog::INPUT_OUTPUT > ("openPMD: Read from domain: offset=%1% size=%2%") %
             domain_offset % local_domain_size;
-        log<picLog::INPUT_OUTPUT > ("ADIOS: Finished loading field '%1%'") % objectName;
+        log<picLog::INPUT_OUTPUT > ("openPMD: Finished loading field '%1%'") % objectName;
     }
 
 };

@@ -93,21 +93,20 @@ namespace po = boost::program_options;
 template < unsigned DIM, typename T >
 std::vector< T > asStandardVector( pmacc::math::Vector< T, DIM > );
 
-template <typename T>
+template < typename T >
 struct WithWindow
 {
-    T & m_data;
+    T m_data;
     Offset m_offset;
     Extent m_extent;
 
     // regular method and no constructor since we would
     // have to rely on template parameter deduction with constructors
-    template <unsigned DIM>
+    template < unsigned DIM >
     static WithWindow< T > init(
         T & data,
-        pmacc::math::UInt64<DIM> offset,
-        pmacc::math::UInt64<DIM> extent
-    );
+        pmacc::math::UInt64< DIM > offset,
+        pmacc::math::UInt64< DIM > extent );
 };
 
 struct ThreadParams

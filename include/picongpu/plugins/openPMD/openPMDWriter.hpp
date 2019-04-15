@@ -1103,10 +1103,10 @@ public:
 
         IdProvider<simDim>::State idProvState;
         ReadNDScalars<uint64_t, uint64_t>()(mThreadParams,
-                "picongpu/idProvider/startId", &idProvState.startId,
+                "picongpu", "idProvider", "startId", &idProvState.startId,
                 "maxNumProc", &idProvState.maxNumProc);
         ReadNDScalars<uint64_t>()(mThreadParams,
-                "picongpu/idProvider/nextId", &idProvState.nextId);
+                "picongpu", "idProvider", "nextId", &idProvState.nextId);
         log<picLog::INPUT_OUTPUT > ("Setting next free id on current rank: %1%") % idProvState.nextId;
         IdProvider<simDim>::setState(idProvState);
 
@@ -1504,8 +1504,8 @@ private:
         log<picLog::INPUT_OUTPUT > ("ADIOS: ( end ) counting particles.");
 
         auto idProviderState = IdProvider<simDim>::getState();
-        WriteNDScalars<uint64_t, uint64_t> writeIdProviderStartId("picongpu/idProvider/startId", "maxNumProc");
-        WriteNDScalars<uint64_t, uint64_t> writeIdProviderNextId("picongpu/idProvider/nextId");
+        WriteNDScalars<uint64_t, uint64_t> writeIdProviderStartId("picongpu", "idProvider", "startId", "maxNumProc");
+        WriteNDScalars<uint64_t, uint64_t> writeIdProviderNextId("picongpu", "idProvider", "nextId");
         writeIdProviderStartId.prepare(*threadParams, idProviderState.maxNumProc);
         writeIdProviderNextId.prepare(*threadParams);
 

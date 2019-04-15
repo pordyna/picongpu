@@ -29,7 +29,8 @@
 #include <pmacc/traits/GetNComponents.hpp>
 #include <pmacc/traits/Resolve.hpp>
 #include <pmacc/assert.hpp>
-
+#include <openPMD/openPMD.hpp>
+#include <memory>
 
 namespace picongpu
 {
@@ -58,11 +59,11 @@ struct LoadParticleAttributesFromADIOS
     HINLINE void operator()(
                             ThreadParams* params,
                             FrameType& frame,
-                            const std::string particlePath,
+                            ::openPMD::ParticleSpecies particleSpecies,
                             const uint64_t particlesOffset,
                             const uint64_t elements)
     {
-
+        std::string particlePath = "";
         typedef T_Identifier Identifier;
         typedef typename pmacc::traits::Resolve<Identifier>::type::type ValueType;
         const uint32_t components = GetNComponents<ValueType>::value;
@@ -83,55 +84,52 @@ struct LoadParticleAttributesFromADIOS
         for (uint32_t n = 0; n < components; ++n)
         {
             OpenPMDName<T_Identifier> openPMDName;
-            std::stringstream datasetName;
-            datasetName << particlePath << openPMDName();
-            if (components > 1)
-                datasetName << "/" << name_lookup[n];
-
+            ::openPMD::Record & record = particleSpecies[openPMDName()];
+            ::openPMD::RecordComponent & rc = components > 1 
+                ? record[name_lookup[n]]
+                : record[::openPMD::RecordComponent::SCALAR];
+            
             ValueType* dataPtr = frame.getIdentifier(Identifier()).getPointer();
-
-            ADIOS_VARINFO* varInfo = adios_inq_var( params->fp, datasetName.str().c_str() );
             // it's possible to aquire the local block with that call again and
             // the local elements to-be-read, but the block-ID must be known (MPI rank?)
             //ADIOS_CMD(adios_inq_var_blockinfo( params->fp, varInfo ));
 
-            ADIOS_SELECTION* sel = adios_selection_boundingbox( 1, &particlesOffset, &elements );
-
             /** Note: adios_schedule_read is not a collective call in any
              *        ADIOS method and can therefore be skipped for empty reads */
+            std::shared_ptr< ComponentType > loadBfr { 
+                new ComponentType[elements],
+                []( ComponentType *ptr ) { delete[] ptr; }
+            };
             if( elements > 0 )
             {
                 // avoid deadlock between not finished pmacc tasks and mpi calls in adios
                 __getTransactionEvent().waitForFinished();
-                ADIOS_CMD(adios_schedule_read( params->fp,
-                                               sel,
-                                               datasetName.str().c_str(),
-                                               0, /* from_step (not used in streams) */
-                                               1, /* nsteps to read (must be 1 for stream) */
-                                               (void*)tmpArray ));
+                rc.loadChunk< ComponentType >(
+                    loadBfr,
+                    ::openPMD::Offset{particlesOffset},
+                    ::openPMD::Extent{elements}
+                );
+                
             }
 
             /** start a blocking read of all scheduled variables
              *  (this is collective call in many ADIOS methods) */
-            ADIOS_CMD(adios_perform_reads( params->fp, 1 ));
+            params->openSeries( ).flush( );
 
-            log<picLog::INPUT_OUTPUT > ("ADIOS:  Did read %1% local of %2% global elements for %3%") %
-                elements % varInfo->dims[0] % datasetName.str();
+            log<picLog::INPUT_OUTPUT > ("openPMD:  Did read %1% local of %2% global elements for %3%") %
+                elements % rc.getDimensionality() % openPMDName();
 
             /* copy component from temporary array to array of structs */
             #pragma omp parallel for
             for (size_t i = 0; i < elements; ++i)
             {
-                ComponentType& ref = ((ComponentType*) dataPtr)[i * components + n];
-                ref = tmpArray[i];
+                ComponentType& ref = 
+                    reinterpret_cast< ComponentType* >( dataPtr )[i * components + n];
+                ref = loadBfr.get()[i];
             }
-
-            adios_selection_delete( sel );
-            adios_free_varinfo( varInfo );
         }
-        __deleteArray(tmpArray);
 
-        log<picLog::INPUT_OUTPUT > ("ADIOS:  ( end ) load species attribute: %1%") %
+        log<picLog::INPUT_OUTPUT > ("openPMD:  ( end ) load species attribute: %1%") %
             Identifier::getName();
     }
 
