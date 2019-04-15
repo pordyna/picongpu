@@ -160,6 +160,34 @@ prepareDataset(
     );
 }
 
+template < unsigned DIM, typename T >
+std::vector< T > asStandardVector( pmacc::math::Vector< T, DIM > v )
+{
+    std::vector< T > res;
+    res.reserve( DIM );
+#pragma omp parallel for
+    for ( unsigned i = 0; i < DIM; ++i )
+    {
+        res[i] = v[i];
+    }
+    return res;
+}
+
+template < typename T >
+template < unsigned DIM >
+WithWindow< T > WithWindow< T >::init(
+    T & data,
+    pmacc::math::UInt64< DIM > offset,
+    pmacc::math::UInt64< DIM > extent )
+{
+    return WithWindow< T > {
+        data,
+        asStandardVector< DIM >( std::move( offset ) ),
+        asStandardVector< DIM >( std::move( extent ) )
+    };
+}
+
+
 /** Writes simulation data to adios files.
  *
  * Implements the IIOBackend interface.

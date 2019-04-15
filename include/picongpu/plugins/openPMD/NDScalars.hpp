@@ -29,7 +29,7 @@
 namespace picongpu {
 namespace openPMD {
 
-/** Functor for writing ND scalar fields with N=simDim
+/** Functor for writing N-dimensional scalar fields with N=simDim
  * In the current implementation each process (of the ND grid of processes) writes 1 scalar value
  * Optionally the processes can also write an attribute for this dataset by using a non-empty attrName
  *

@@ -41,7 +41,7 @@ namespace picongpu
 {
 namespace openPMD
 {
-    using namespace ::openPMD;
+using namespace ::openPMD;
 using namespace pmacc;
 
 namespace writeMeta
@@ -126,7 +126,7 @@ namespace writeMeta
             Series & series = threadParams->openSeries( );
 
             /*
-             * The openPMD API will kindly write the central metadata by itself,
+             * The openPMD API will kindly write the obligatory metadata by itself,
              * so we don't need to do this manually. We give the optional metadata:
              */
 

@@ -90,6 +90,9 @@ namespace po = boost::program_options;
     }                                                                         \
 }
 
+template < unsigned DIM, typename T >
+std::vector< T > asStandardVector( pmacc::math::Vector< T, DIM > );
+
 template <typename T>
 struct WithWindow
 {
@@ -104,23 +107,7 @@ struct WithWindow
         T & data,
         pmacc::math::UInt64<DIM> offset,
         pmacc::math::UInt64<DIM> extent
-    )
-    {
-        Offset offset_v;
-        Extent extent_v;
-        offset_v.reserve(DIM);
-        extent_v.reserve(DIM);
-        for (unsigned i = 0; i < DIM; i++)
-        {
-            offset_v[i] = offset[i];
-            extent_v[i] = extent[i];
-        }
-        return WithWindow< T > {
-            data,
-            std::move( offset_v ),
-            std::move( extent_v )
-        };
-    }
+    );
 };
 
 struct ThreadParams
