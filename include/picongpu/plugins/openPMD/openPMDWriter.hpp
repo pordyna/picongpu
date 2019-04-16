@@ -913,9 +913,9 @@ public:
 
         /* if file name is relative, prepend with common directory */
         if( boost::filesystem::path(filename).has_root_path() )
-            mThreadParams.adiosFilename = filename;
+            mThreadParams.fileName = filename;
         else
-            mThreadParams.adiosFilename = outputDirectory + "/" + filename;
+            mThreadParams.fileName = outputDirectory + "/" + filename;
 
         /* window selection */
         mThreadParams.window = MovingWindow::getInstance().getWindow(currentStep);
@@ -955,9 +955,9 @@ public:
         __getTransactionEvent().waitForFinished();
         /* if file name is relative, prepend with common directory */
         if( boost::filesystem::path(checkpointFilename).has_root_path() )
-            mThreadParams.adiosFilename = checkpointFilename;
+            mThreadParams.fileName = checkpointFilename;
         else
-            mThreadParams.adiosFilename = checkpointDirectory + "/" + checkpointFilename;
+            mThreadParams.fileName = checkpointDirectory + "/" + checkpointFilename;
 
         mThreadParams.window = MovingWindow::getInstance().getDomainAsWindow(currentStep);
         mThreadParams.isCheckpoint = true;
@@ -975,109 +975,44 @@ public:
         // restart is only allowed if the plugin is controlled by the class Checkpoint
         assert(!m_help->selfRegister);
 
-        // allow to modify the restart file name
-        std::string restartFilename{ constRestartFilename };
+        /* if restartFilename is relative, prepend with restartDirectory */
+        if (!boost::filesystem::path(constRestartFilename).has_root_path())
+        {
+            mThreadParams.fileName = restartDirectory + std::string("/") + constRestartFilename;
+        } else {
+            mThreadParams.fileName = constRestartFilename;
+        }
 
-        std::stringstream adiosPathBase;
-        adiosPathBase << ADIOS_PATH_ROOT << restartStep << "/";
-        mThreadParams.adiosBasePath = adiosPathBase.str();
         //mThreadParams.isCheckpoint = isCheckpoint;
         mThreadParams.currentStep = restartStep;
         mThreadParams.cellDescription = m_cellDescription;
 
-        /** one could try ADIOS_READ_METHOD_BP_AGGREGATE too which might
-         *  be beneficial for re-distribution on a different number of GPUs
-         *    would need: - `export chunk_size=SIZE # in MB`
-         *                - `mpiTransportParams.c_str()` in `adios_read_init_method`
-         */
-        ADIOS_CMD(adios_read_init_method(ADIOS_READ_METHOD_BP,
-                                         mThreadParams.adiosComm,
-                                         "verbose=3;abort_on_error;"));
+        mThreadParams.openPMDSeries = std::unique_ptr< ::openPMD::Series >{
+            new ::openPMD::Series{
+                mThreadParams.fileName, 
+                ::openPMD::AccessType::READ_ONLY
+            }
+        };
 
-        /* if restartFilename is relative, prepend with restartDirectory */
-        if (!boost::filesystem::path(restartFilename).has_root_path())
-        {
-            restartFilename = restartDirectory + std::string("/") + restartFilename;
-        }
-
-        std::stringstream strFname;
-        strFname << restartFilename << "_" << mThreadParams.currentStep << ".bp";
-
-        // adios_read_open( fname, method, comm, lock_mode, timeout_sec )
-        log<picLog::INPUT_OUTPUT > ("ADIOS: open file: %1%") % strFname.str();
-
-        // when reading in BG_AGGREGATE mode, adios can not distinguish between
-        // "file does not exist" and "stream is not (yet) available, so we
-        // test it our selves
-        if (!boost::filesystem::exists(strFname.str()))
-            throw std::runtime_error("ADIOS: File does not exist.");
-
-        /* <0 sec: wait forever
-         * >=0 sec: return immediately if stream is not available */
-        float_32 timeout = 0.0f;
-        mThreadParams.fp = adios_read_open(strFname.str().c_str(),
-                        ADIOS_READ_METHOD_BP, mThreadParams.adiosComm,
-                        ADIOS_LOCKMODE_CURRENT, timeout);
-
-        /* stream reading is tricky, see ADIOS manual section 8.11.1 */
-        while (adios_errno == err_file_not_found)
-        {
-            /** \todo add c++11 platform independent sleep */
-#if !defined(_WIN32)
-            /* give the file system 1s of peace and quiet */
-            usleep(1e6);
-#endif
-            mThreadParams.fp = adios_read_open(strFname.str().c_str(),
-                        ADIOS_READ_METHOD_BP, mThreadParams.adiosComm,
-                        ADIOS_LOCKMODE_CURRENT, timeout);
-        }
-        if (adios_errno == err_end_of_stream )
-            /* could not read full stream */
-            throw std::runtime_error("ADIOS: Stream terminated too early: " +
-                                     std::string(adios_errmsg()) );
-        if (mThreadParams.fp == nullptr)
-            throw std::runtime_error("ADIOS: Error opening stream: " +
-                                     std::string(adios_errmsg()) );
-
-        /* ADIOS types */
-        AdiosUInt32Type adiosUInt32Type;
+        ::openPMD::Iteration & iteration = mThreadParams.openPMDSeries->iterations[mThreadParams.currentStep];
 
         /* load number of slides to initialize MovingWindow */
-        log<picLog::INPUT_OUTPUT > ("ADIOS: (begin) read attr (%1% available)") %
-            mThreadParams.fp->nattrs;
-        void* slidesPtr = nullptr;
-        int slideSize;
-        enum ADIOS_DATATYPES slidesType;
-        ADIOS_CMD(adios_get_attr( mThreadParams.fp,
-                                  (mThreadParams.adiosBasePath + std::string("sim_slides")).c_str(),
-                                  &slidesType,
-                                  &slideSize,
-                                  &slidesPtr ));
+        log<picLog::INPUT_OUTPUT > ("openPMD: (begin) read attr (%1% available)") %
+            iteration.numAttributes( );
 
-        uint32_t slides = *( (uint32_t*)slidesPtr );
-        log<picLog::INPUT_OUTPUT > ("ADIOS: value of sim_slides = %1%") %
+        
+        uint32_t slides = iteration.getAttribute("sim_slides").get< uint32_t >( );
+        log<picLog::INPUT_OUTPUT > ("openPMD: value of sim_slides = %1%") %
             slides;
 
-        PMACC_ASSERT(slidesType == adiosUInt32Type.type);
-        PMACC_ASSERT(slideSize == sizeof(uint32_t)); // uint32_t in bytes
-
-        void* lastStepPtr = nullptr;
-        int lastStepSize;
-        enum ADIOS_DATATYPES lastStepType;
-        ADIOS_CMD(adios_get_attr( mThreadParams.fp,
-                                  (mThreadParams.adiosBasePath + std::string("iteration")).c_str(),
-                                  &lastStepType,
-                                  &lastStepSize,
-                                  &lastStepPtr ));
-        uint32_t lastStep = *( (uint32_t*)lastStepPtr );
-        log<picLog::INPUT_OUTPUT > ("ADIOS: value of iteration = %1%") %
+        uint32_t lastStep = iteration.getAttribute("iteration").get< uint32_t >( );
+        log<picLog::INPUT_OUTPUT > ("openPMD: value of iteration = %1%") %
             lastStep;
 
-        PMACC_ASSERT(lastStepType == adiosUInt32Type.type);
         PMACC_ASSERT(lastStep == restartStep);
 
         /* apply slides to set gpus to last/written configuration */
-        log<picLog::INPUT_OUTPUT > ("ADIOS: Setting slide count for moving window to %1%") % slides;
+        log<picLog::INPUT_OUTPUT > ("openPMD: Setting slide count for moving window to %1%") % slides;
         MovingWindow::getInstance().setSlideCounter(slides, restartStep);
 
         /* re-distribute the local offsets in y-direction
@@ -1110,17 +1045,11 @@ public:
         log<picLog::INPUT_OUTPUT > ("Setting next free id on current rank: %1%") % idProvState.nextId;
         IdProvider<simDim>::setState(idProvState);
 
-        /* free memory allocated in ADIOS calls */
-        free(slidesPtr);
-        free(lastStepPtr);
-
         // avoid deadlock between not finished pmacc tasks and mpi calls in adios
         __getTransactionEvent().waitForFinished();
 
-        /* clean shut down: close file and finalize */
-        adios_release_step( mThreadParams.fp );
-        ADIOS_CMD(adios_read_close( mThreadParams.fp ));
-        ADIOS_CMD(adios_read_finalize_method(ADIOS_READ_METHOD_BP));
+        // Finalize the openPMD Series by calling its destructor
+        mThreadParams.openPMDSeries.reset( );
     }
 
 private:
@@ -1195,7 +1124,7 @@ private:
 #endif
         }
 
-        beginAdios(mThreadParams.adiosFilename);
+        beginAdios(mThreadParams.fileName);
 
         writeAdios(&mThreadParams, mpiTransportParams);
 
@@ -1280,7 +1209,7 @@ private:
 
             if( containsDataSource )
             {
-                ADIOSCountParticles<
+                openPMDCountParticles<
                     T_ParticleFilter
                 > count;
                 count(params);
@@ -1472,7 +1401,7 @@ private:
         {
             ForEach<
                 FileCheckpointParticles,
-                ADIOSCountParticles<
+                openPMDCountParticles<
                     plugins::misc::UnfilteredSpecies< bmpl::_1 >
                 >
             > adiosCountParticles;
@@ -1486,7 +1415,7 @@ private:
                 // move over all species defined in FileOutputParticles
                 ForEach<
                     FileOutputParticles,
-                    ADIOSCountParticles<
+                    openPMDCountParticles<
                         plugins::misc::UnfilteredSpecies< bmpl::_1 >
                     >
                 > adiosCountParticles;

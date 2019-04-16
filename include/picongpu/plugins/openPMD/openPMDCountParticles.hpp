@@ -65,7 +65,7 @@ using namespace pmacc;
  *
  */
 template< typename T_SpeciesFilter >
-struct ADIOSCountParticles
+struct openPMDCountParticles
 {
 public:
 

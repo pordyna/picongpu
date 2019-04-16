@@ -114,7 +114,7 @@ public:
            particlesInfo is (part-count, scalar pos, x, y, z) */
 
         uint64_t start = 5 * gc.getGlobalRank();
-        uint64_t count = 5; // ADIOSCountParticles: uint64_t
+        uint64_t count = 5; // openPMDCountParticles: uint64_t
 
         // avoid deadlock between not finished pmacc tasks and mpi calls in adios
         __getTransactionEvent().waitForFinished();
@@ -142,7 +142,7 @@ public:
         {
             /* this comparison is potentially harmful, since the order of ranks
                is not necessarily the same in subsequent MPI jobs.
-               But due to the wrong sorting by rank in `ADIOSCountParticles.hpp`
+               But due to the wrong sorting by rank in `openPMDCountParticles.hpp`
                while calculating the `myParticleOffset` we have to immitate that. */
             if( i < gc.getGlobalRank() )
                 particleOffset += fullParticlesInfo[i];

@@ -112,7 +112,6 @@ struct WithWindow
 struct ThreadParams
 {
     uint32_t currentStep;                   /** current simulation step */
-    std::string adiosFilename;              /* e.g., simData */
     std::string fullFilename;               /* e.g., simData_1000.bp */
 
     std::unique_ptr<Series> openPMDSeries;
@@ -132,6 +131,7 @@ struct ThreadParams
     std::string adiosTransportParams;       /* additional transport params */
     std::string adiosBasePath;              /* base path for the current step */
     std::string adiosCompression;           /* ADIOS data transform compression method */
+    std::string fileName;                   /* Name of the openPMDSeries */
 
     pmacc::math::UInt64<simDim> fieldsSizeDims;
     pmacc::math::UInt64<simDim> fieldsGlobalSizeDims;
@@ -155,7 +155,8 @@ struct ThreadParams
     {
         if (!openPMDSeries) 
         {
-            openPMDSeries = std::unique_ptr<Series>(new Series("FIXME", AccessType::READ_WRITE));
+            log<picLog::INPUT_OUTPUT > ("openPMD: open file: %1%") % fileName;
+            openPMDSeries = std::unique_ptr<Series>(new Series(fileName, AccessType::READ_WRITE));
         }
         return *openPMDSeries;
     }
