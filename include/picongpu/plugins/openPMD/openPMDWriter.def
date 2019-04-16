@@ -137,6 +137,7 @@ struct ThreadParams
     pmacc::math::UInt64<simDim> fieldsGlobalSizeDims;
     pmacc::math::UInt64<simDim> fieldsOffsetDims;
 
+    std::list<WithWindow<RecordComponent>> fieldRecords;
     std::list<int64_t> adiosFieldVarIds;        /* var IDs for fields in order of appearance */
     std::list<WithWindow<RecordComponent>> particleAttributes; /* var IDs for particle attributes in order of appearance */
     std::list<int64_t> adiosSpeciesIndexVarIds; /* var IDs for species index tables in order of appearance */
@@ -145,7 +146,8 @@ struct ThreadParams
     GridLayout<simDim> gridLayout;
     MappingDesc *cellDescription;
 
-    float_X *fieldBfr;                              /* temp. buffer for fields */
+    //float_X *fieldBfr;                              /* temp. buffer for fields */
+    std::shared_ptr< float_X > fieldBuffer;
 
     Window window;                                  /* window describing the volume to be dumped */
 
@@ -158,7 +160,9 @@ struct ThreadParams
             log<picLog::INPUT_OUTPUT > ("openPMD: open file: %1%") % fileName;
             openPMDSeries = std::unique_ptr<Series>(new Series(fileName, at/*, adiosComm*/)); // TODO
             return *openPMDSeries;
-        } else {
+        } 
+        else 
+        {
             throw std::runtime_error(
                 "openPMD: Tried opening a Series while old Series was still active"
             );
