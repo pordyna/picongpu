@@ -98,7 +98,7 @@ public:
         uint64_t mpiRank = gc.getGlobalRank();
 
         const std::string speciesGroup( T_SpeciesFilter::getName() );
-        Series & series = params->openSeries();
+        Series & series = *params->openPMDSeries;
         Iteration & iteration = series.iterations[params->currentStep];
         Container< Record > & particleSpecies = iteration.particles[speciesGroup];
         

@@ -83,7 +83,7 @@ struct ParticleAttribute
                 window.m_offset,
                 window.m_extent
             );
-            params->openSeries().flush();
+            params->openPMDSeries->flush();
             params->particleAttributes.pop_front();
         }
 

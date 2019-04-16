@@ -987,12 +987,7 @@ public:
         mThreadParams.currentStep = restartStep;
         mThreadParams.cellDescription = m_cellDescription;
 
-        mThreadParams.openPMDSeries = std::unique_ptr< ::openPMD::Series >{
-            new ::openPMD::Series{
-                mThreadParams.fileName, 
-                ::openPMD::AccessType::READ_ONLY
-            }
-        };
+        mThreadParams.openSeries( ::openPMD::AccessType::READ_ONLY );
 
         ::openPMD::Iteration & iteration = mThreadParams.openPMDSeries->iterations[mThreadParams.currentStep];
 
@@ -1049,7 +1044,7 @@ public:
         __getTransactionEvent().waitForFinished();
 
         // Finalize the openPMD Series by calling its destructor
-        mThreadParams.openPMDSeries.reset( );
+        mThreadParams.closeSeries( );
     }
 
 private:

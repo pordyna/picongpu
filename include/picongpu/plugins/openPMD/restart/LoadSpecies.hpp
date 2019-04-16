@@ -97,7 +97,7 @@ public:
         DataConnector &dc = Environment<>::get().DataConnector();
         GridController<simDim> &gc = Environment<simDim>::get().GridController();
         
-        ::openPMD::Series & series = params->openSeries();
+        ::openPMD::Series & series = *params->openPMDSeries;
         ::openPMD::ParticleSpecies & particleSpecies = 
             series.iterations[params->currentStep].particles[speciesName];
 

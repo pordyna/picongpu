@@ -151,14 +151,32 @@ struct ThreadParams
 
     DataSpace<simDim> localWindowToDomainOffset;    /** offset from local moving window to local domain */
 
-    Series & openSeries() 
+    Series & openSeries(AccessType at) 
     {
         if (!openPMDSeries) 
         {
             log<picLog::INPUT_OUTPUT > ("openPMD: open file: %1%") % fileName;
-            openPMDSeries = std::unique_ptr<Series>(new Series(fileName, AccessType::READ_WRITE));
+            openPMDSeries = std::unique_ptr<Series>(new Series(fileName, at/*, adiosComm*/)); // TODO
+            return *openPMDSeries;
+        } else {
+            throw std::runtime_error(
+                "openPMD: Tried opening a Series while old Series was still active"
+            );
         }
-        return *openPMDSeries;
+    }
+
+    void closeSeries()
+    {
+        if (openPMDSeries) 
+        {
+            openPMDSeries.reset( );
+        } 
+        else
+        {
+            throw std::runtime_error(
+                "openPMD: Tried closing a Series that was not active"
+            );
+        }
     }
 };
 

@@ -114,7 +114,7 @@ struct LoadParticleAttributesFromADIOS
 
             /** start a blocking read of all scheduled variables
              *  (this is collective call in many ADIOS methods) */
-            params->openSeries( ).flush( );
+            params->openPMDSeries->flush( );
 
             log<picLog::INPUT_OUTPUT > ("openPMD:  Did read %1% local of %2% global elements for %3%") %
                 elements % rc.getDimensionality() % openPMDName();

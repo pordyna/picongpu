@@ -215,7 +215,7 @@ public:
                 dataset.m_extent
             );
             params->speciesIndices.pop_front( );
-            params->openSeries( ).flush( );
+            params->openPMDSeries->flush( );
         }
         log<picLog::INPUT_OUTPUT > ("openPMD: ( end ) writing particle index table for %1%") % T_SpeciesFilter::getName();
     }

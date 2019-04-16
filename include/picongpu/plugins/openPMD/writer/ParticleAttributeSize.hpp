@@ -68,7 +68,7 @@ struct ParticleAttributeSize
         const std::string name_lookup[] = {"x", "y", "z"};
 
         OpenPMDName<T_Identifier> openPMDName;
-        Series & series = params->openSeries();
+        Series & series = *params->openPMDSeries;
         Iteration & iteration = series.iterations[params->currentStep];
         Record & record = iteration.particles[speciesGroup][openPMDName()];
 

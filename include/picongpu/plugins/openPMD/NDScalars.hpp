@@ -105,7 +105,7 @@ struct WriteNDScalars
                                            .getPosition( )[d];
             }
 
-            ::openPMD::Series & series = params.openSeries( );
+            ::openPMD::Series & series = *params.openPMDSeries;
             ::openPMD::MeshRecordComponent & mrc =
                 series.iterations[params.currentStep].meshes[group][dataset];
 
@@ -129,7 +129,7 @@ struct WriteNDScalars
             }
         };
 
-        withAlteredMeshesPath( params.openSeries( ), baseName, f );
+        withAlteredMeshesPath( *params.openPMDSeries, baseName, f );
     }
 
     void operator( )( ThreadParams & params, T_Scalar value )
@@ -139,7 +139,7 @@ struct WriteNDScalars
             simDim % name;
 
         withAlteredMeshesPath(
-            params.openSeries( ), baseName, [&value, this]( ) {
+            *params.openPMDSeries, baseName, [&value, this]( ) {
                 preparedDataset->m_data.storeChunk(
                     std::make_shared< T_Scalar >( value ),
                     preparedDataset->m_offset,
@@ -189,7 +189,7 @@ struct ReadNDScalars
                   attribute,
                   &name]( ) {
             auto datasetName = baseName + "/" + group + "/" + dataset;
-            ::openPMD::Series & series = params.openSeries( );
+            ::openPMD::Series & series = *params.openPMDSeries;
             ::openPMD::RecordComponent & rc =
                 series.iterations[params.currentStep].meshes[group][dataset];
             auto ndim = rc.getDimensionality( );
@@ -234,7 +234,7 @@ struct ReadNDScalars
             }
         };
 
-        withAlteredMeshesPath( params.openSeries( ), baseName, f );
+        withAlteredMeshesPath( *params.openPMDSeries, baseName, f );
     }
 };
 

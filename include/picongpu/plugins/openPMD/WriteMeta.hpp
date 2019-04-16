@@ -83,7 +83,7 @@ namespace writeMeta
                 }
             }
 
-            Iteration & iteration = threadParams->openSeries( ).iterations[threadParams->currentStep];
+            Iteration & iteration = threadParams->openPMDSeries->iterations[threadParams->currentStep];
             iteration.setAttribute(
                 "particleBoundary",
                 listParticleBoundary
@@ -123,7 +123,7 @@ namespace writeMeta
             traits::PICToAdios<uint32_t> adiosUInt32Type;
             traits::PICToAdios<float_X> adiosFloatXType;
             traits::PICToAdios<float_64> adiosDoubleType;
-            Series & series = threadParams->openSeries( );
+            Series & series = *threadParams->openPMDSeries;
 
             /*
              * The openPMD API will kindly write the obligatory metadata by itself,

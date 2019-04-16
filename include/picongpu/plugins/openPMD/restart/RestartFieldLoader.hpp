@@ -67,7 +67,7 @@ public:
         DataSpace<simDim> domain_offset = localDomain.offset;
 
         DataSpace<simDim> local_domain_size = params->window.localDimensions.size;
-        ::openPMD::Series & series = params->openSeries();
+        ::openPMD::Series & series = *params->openPMDSeries;
         ::openPMD::Container<::openPMD::Mesh> & meshes = series.iterations[params->currentStep].meshes;
 
         auto destBox = field.getHostBuffer().getDataBox();
