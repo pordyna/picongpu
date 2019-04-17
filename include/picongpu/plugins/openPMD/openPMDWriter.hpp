@@ -219,7 +219,7 @@ public:
 
         plugins::multi::Option< std::string > notifyPeriod = {
             "period",
-            "enable ADIOS IO [for each n-th step]"
+            "enable openPMD IO [for each n-th step]"
         };
 
         plugins::multi::Option< std::string > source = {
@@ -230,7 +230,7 @@ public:
 
         plugins::multi::Option< std::string > fileName = {
             "file",
-            "ADIOS output filename (prefix)"
+            "openPMD Series pattern"
         };
 
         std::vector< std::string > allowedDataSources = {
@@ -240,26 +240,26 @@ public:
 
         plugins::multi::Option< uint32_t > numAggregators = {
             "aggregators",
-            "Number of aggregators [0 == number of MPI processes]",
+            "Number of aggregators [0 == number of MPI processes] (currently controlled by backend-specific environment variables)",
             0u
         };
 
         plugins::multi::Option< uint32_t > numOSTs = {
             "ost",
-            "Number of OST",
+            "Number of OST (currently controlled by backend-specific environment variables)",
             1u
         };
 
         plugins::multi::Option< uint32_t > disableMeta = {
             "disable-meta",
-            "Disable online gather and write of a global meta file, can be time consuming (use `bpmeta` post-mortem)",
+            "Disable online gather and write of a global meta file, can be time consuming (use `bpmeta` post-mortem) (currently controlled by backend-specific environment variables)",
             0u
         };
 
         /* select MPI method, #OSTs and #aggregators */
         plugins::multi::Option< std::string > transportParams = {
             "transport-params",
-            "additional transport parameters, see ADIOS manual chapter 6.1.5, e.g., 'random_offset=1;stripe_count=4'",
+            "additional transport parameters, see ADIOS manual chapter 6.1.5, e.g., 'random_offset=1;stripe_count=4' (currently controlled by backend-specific environment variables)",
             ""
         };
 
@@ -437,9 +437,9 @@ public:
 
         std::string const name = "openPMDWriter";
         //! short description of the plugin
-        std::string const description = "dump simulation data with ADIOS";
+        std::string const description = "dump simulation data with openPMD";
         //! prefix used for command line arguments
-        std::string const prefix = "adios";
+        std::string const prefix = "openPMD";
     };
 
     //! must be implemented by the user

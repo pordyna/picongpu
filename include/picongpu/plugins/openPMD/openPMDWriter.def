@@ -158,7 +158,7 @@ struct ThreadParams
         if (!openPMDSeries) 
         {
             log<picLog::INPUT_OUTPUT > ("openPMD: open file: %1%") % fileName;
-            openPMDSeries = std::unique_ptr<Series>(new Series(fileName, at/*, adiosComm*/)); // TODO
+            openPMDSeries = std::unique_ptr<Series>(new Series(fileName, at, adiosComm)); // TODO
             return *openPMDSeries;
         } 
         else 

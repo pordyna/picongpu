@@ -253,12 +253,12 @@ endif(ADIOS_FOUND)
 ################################################################################
 
 # find openPMD installation
-find_package(openPMD 1.13.1)
+find_package(openPMD 0.8.0)
 
 if(openPMD_FOUND)
     add_definitions(-DENABLE_OPENPMD=1)
     include_directories(SYSTEM ${openPMD_INCLUDE_DIRS})
-    set(LIBS ${LIBS} ${openPMD_LIBRARIES})
+    set(LIBS ${LIBS} openPMD::openPMD)
 endif(openPMD_FOUND)
 
 
