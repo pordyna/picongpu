@@ -42,6 +42,7 @@ list(APPEND CMAKE_PREFIX_PATH "$ENV{CUDA_ROOT}")
 list(APPEND CMAKE_PREFIX_PATH "$ENV{BOOST_ROOT}")
 list(APPEND CMAKE_PREFIX_PATH "$ENV{HDF5_ROOT}")
 list(APPEND CMAKE_PREFIX_PATH "$ENV{ADIOS_ROOT}")
+list(APPEND CMAKE_PREFIX_PATH "$ENV{OPENPMD_ROOT}")
 # Add from environment after specific env vars
 list(APPEND CMAKE_PREFIX_PATH "$ENV{CMAKE_PREFIX_PATH}")
 
@@ -246,6 +247,19 @@ if(ADIOS_FOUND)
     include_directories(SYSTEM ${ADIOS_INCLUDE_DIRS})
     set(LIBS ${LIBS} ${ADIOS_LIBRARIES})
 endif(ADIOS_FOUND)
+
+################################################################################
+# openPMD
+################################################################################
+
+# find openPMD installation
+find_package(openPMD 1.13.1)
+
+if(openPMD_FOUND)
+    add_definitions(-DENABLE_OPENPMD=1)
+    include_directories(SYSTEM ${openPMD_INCLUDE_DIRS})
+    set(LIBS ${LIBS} ${openPMD_LIBRARIES})
+endif(openPMD_FOUND)
 
 
 ################################################################################
