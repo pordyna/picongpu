@@ -38,6 +38,9 @@
 #if( PIC_ENABLE_PNG == 1 )
 #   include <pngwriter.h>
 #endif
+#if( ENABLE_OPENPMD == 1 )
+#   include <openPMD/openPMD.hpp>
+#endif
 
 #include <sstream>
 
@@ -138,6 +141,20 @@ namespace picongpu
         adios << versionNotFound;
 #endif
 
+        std::stringstream openPMD;
+#if( ENABLE_OPENPMD == 1 )
+        openPMD << OPENPMDAPI_VERSION_MAJOR 
+                << "." 
+                << OPENPMDAPI_VERSION_MINOR
+                << "."
+                << OPENPMDAPI_VERSION_PATCH
+                << " ("
+                << OPENPMDAPI_VERSION_LABEL
+                << ")";
+#else
+        openPMD << versionNotFound;
+#endif
+
         // CLI Formatting
         cliText << "PIConGPU: " << picongpu.str() << std::endl;
         cliText << "  Build-Type: " << buildType.str() << std::endl
@@ -181,6 +198,8 @@ namespace picongpu
             software.push_back( std::string( "libSplash/" ) + splash.str() );
         if( adios.str().compare( versionNotFound ) != 0 )
             software.push_back( std::string( "ADIOS/" ) + adios.str() );
+        if( openPMD.str().compare( versionNotFound ) != 0 )
+            software.push_back( std::string( "openPMD/" ) + openPMD.str() );
 
         return software;
     }
