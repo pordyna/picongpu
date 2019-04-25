@@ -72,14 +72,19 @@ struct LoadParticleAttributesFromADIOS
         log<picLog::INPUT_OUTPUT > ("ADIOS: ( begin ) load species attribute: %1%") % Identifier::getName();
 
         const std::string name_lookup[] = {"x", "y", "z"};
-
-        ComponentType* tmpArray = nullptr;
+        
+        std::shared_ptr< ComponentType > loadBfr;
         if( elements > 0 )
-            tmpArray = new ComponentType[elements];
+        {
+            loadBfr = std::shared_ptr< ComponentType > { 
+                new ComponentType[elements],
+                []( ComponentType *ptr ) { delete[] ptr; }
+            };
+        }
 
         // dev assert!
-        if( elements > 0 )
-            PMACC_ASSERT(tmpArray);
+//        if( elements > 0 )
+//            PMACC_ASSERT(tmpArray);
 
         for (uint32_t n = 0; n < components; ++n)
         {
@@ -94,12 +99,7 @@ struct LoadParticleAttributesFromADIOS
             // the local elements to-be-read, but the block-ID must be known (MPI rank?)
             //ADIOS_CMD(adios_inq_var_blockinfo( params->fp, varInfo ));
 
-            /** Note: adios_schedule_read is not a collective call in any
-             *        ADIOS method and can therefore be skipped for empty reads */
-            std::shared_ptr< ComponentType > loadBfr { 
-                new ComponentType[elements],
-                []( ComponentType *ptr ) { delete[] ptr; }
-            };
+       
             if( elements > 0 )
             {
                 // avoid deadlock between not finished pmacc tasks and mpi calls in adios

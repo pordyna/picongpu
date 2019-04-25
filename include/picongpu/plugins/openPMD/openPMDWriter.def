@@ -118,18 +118,18 @@ struct ThreadParams
 
     /** current dump is a checkpoint */
     bool isCheckpoint;
-    ADIOS_FILE* fp;                          /* file pointer for checkpoint file */
+    //ADIOS_FILE* fp;                          /* file pointer for checkpoint file */
 
     MPI_Comm adiosComm;                     /* MPI communicator for adios lib */
     bool adiosBufferInitialized;            /* set if ADIOS buffer has been allocated */
-    int64_t adiosFileHandle;                /* ADIOS file handle */
-    int64_t adiosGroupHandle;               /* ADIOS group handle */
+    //int64_t adiosFileHandle;                /* ADIOS file handle */
+    //int64_t adiosGroupHandle;               /* ADIOS group handle */
     uint64_t openPMDGroupSize;                /* size of ADIOS group in bytes */
-    uint32_t adiosAggregators;              /* number of ADIOS aggregators for MPI_AGGREGATE */
-    uint32_t adiosOST;                      /* number of ADIOS OST for MPI_AGGREGATE */
+    //uint32_t adiosAggregators;              /* number of ADIOS aggregators for MPI_AGGREGATE */
+    //uint32_t adiosOST;                      /* number of ADIOS OST for MPI_AGGREGATE */
     bool adiosDisableMeta;                  /* disable online gather and write of a meta file */
     std::string adiosTransportParams;       /* additional transport params */
-    std::string adiosBasePath;              /* base path for the current step */
+    //std::string adiosBasePath;              /* base path for the current step */
     std::string adiosCompression;           /* ADIOS data transform compression method */
     std::string fileName;                   /* Name of the openPMDSeries */
 
@@ -138,9 +138,9 @@ struct ThreadParams
     pmacc::math::UInt64<simDim> fieldsOffsetDims;
 
     std::list<WithWindow<::openPMD::RecordComponent>> fieldRecords;
-    std::list<int64_t> adiosFieldVarIds;        /* var IDs for fields in order of appearance */
+    //std::list<int64_t> adiosFieldVarIds;        /* var IDs for fields in order of appearance */
     std::list<WithWindow<::openPMD::RecordComponent>> particleAttributes; /* var IDs for particle attributes in order of appearance */
-    std::list<int64_t> adiosSpeciesIndexVarIds; /* var IDs for species index tables in order of appearance */
+    //std::list<int64_t> adiosSpeciesIndexVarIds; /* var IDs for species index tables in order of appearance */
     std::list<WithWindow<::openPMD::RecordComponent>> speciesIndices;
 
     GridLayout<simDim> gridLayout;

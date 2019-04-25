@@ -569,7 +569,7 @@ private:
     };
 
     static void defineFieldVar(ThreadParams* params,
-        uint32_t nComponents, Datatype openPMDType, const std::string name,
+        uint32_t nComponents, ::openPMD::Datatype openPMDType, const std::string name,
         std::vector<float_64> unit, std::vector<float_64> unitDimension,
         std::vector<std::vector<float_X> > inCellPosition, float_X timeOffset)
     {
@@ -581,20 +581,16 @@ private:
         for( uint32_t n = 0; n < nComponents; ++n )
             PMACC_ASSERT( inCellPosition.at(n).size() == simDim );
         PMACC_ASSERT(unitDimension.size() == 7); // seven openPMD base units
-
-        const std::string recordName( params->adiosBasePath +
-            std::string(ADIOS_PATH_FIELDS) + name );
-        Iteration & iteration = params->openPMDSeries->iterations[params->currentStep];
-        Mesh & mesh = iteration.meshes[name];
+        
+        ::openPMD::Iteration & iteration = params->openPMDSeries->iterations[params->currentStep];
+        ::openPMD::Mesh & mesh = iteration.meshes[name];
 
         for( uint32_t c = 0; c < nComponents; c++ )
         {
-            std::stringstream datasetName;
-            datasetName << recordName;
-            MeshRecordComponent & mrc = mesh[
+            ::openPMD::MeshRecordComponent & mrc = mesh[
                 nComponents > 1
                 ? name_lookup_tpl[c]
-                : RecordComponent::SCALAR
+                : ::openPMD::RecordComponent::SCALAR
             ];
             params->fieldRecords.push_back(
                 prepareDataset<simDim>(
@@ -627,9 +623,10 @@ private:
         }
 
         mesh.setUnitDimension(unitMap);
-        mesh.setTimeOffset(timeOffset);
-        mesh.setGeometry(Mesh::Geometry::cartesian);
-        mesh.setDataOrder(Mesh::DataOrder::C);
+        //TODO linker error?
+        //mesh.setTimeOffset(timeOffset);
+        mesh.setGeometry(::openPMD::Mesh::Geometry::cartesian);
+        mesh.setDataOrder(::openPMD::Mesh::DataOrder::C);
 
         if( simDim == DIM2 )
         {
@@ -814,8 +811,6 @@ public:
     lastSpeciesSyncStep(pmacc::traits::limits::Max<uint32_t>::value)
     {
 
-        mThreadParams.adiosAggregators = m_help->numAggregators.get( id );
-        mThreadParams.adiosOST = m_help->numOSTs.get( id );
         mThreadParams.adiosDisableMeta = m_help->disableMeta.get( id );
         mThreadParams.adiosTransportParams = m_help->transportParams.get( id );
         mThreadParams.adiosCompression = m_help->compression.get( id );
@@ -828,10 +823,6 @@ public:
          */
         mpi_pos = gc.getPosition();
         mpi_size = gc.getGpuNodes();
-
-        /* if number of aggregators is not set we use all mpi process as aggregator*/
-        if( mThreadParams.adiosAggregators == 0 )
-           mThreadParams.adiosAggregators=mpi_size.productOfComponents();
 
         if( m_help->selfRegister )
         {
@@ -853,19 +844,7 @@ public:
         MPI_CHECK(MPI_Comm_dup(gc.getCommunicator().getMPIComm(), &(mThreadParams.adiosComm)));
         mThreadParams.adiosBufferInitialized = false;
 
-        /* select MPI method, #OSTs and #aggregators */
-        std::stringstream strMPITransportParams;
-        strMPITransportParams << "num_aggregators=" << mThreadParams.adiosAggregators
-                              << ";num_ost=" << mThreadParams.adiosOST;
-        /* create meta file offline/post-mortem with bpmeta */
-        if( mThreadParams.adiosDisableMeta )
-            strMPITransportParams << ";have_metadata_file=0";
-        /* additional, uncovered transport parameters, e.g.,
-         * use system-defaults for striping per aggregated file */
-        if( ! mThreadParams.adiosTransportParams.empty() )
-            strMPITransportParams << ";" << mThreadParams.adiosTransportParams;
-
-        mpiTransportParams = strMPITransportParams.str();
+        /* TODO: select MPI method, #OSTs and #aggregators */
     }
 
     virtual ~openPMDWriter()
@@ -1306,7 +1285,7 @@ private:
          * field variables
          */
         log<picLog::INPUT_OUTPUT > ("openPMD: (begin) collecting fields.");
-        threadParams->adiosFieldVarIds.clear();
+        threadParams->fieldRecords.clear();
         if (threadParams->isCheckpoint)
         {
             ForEach<

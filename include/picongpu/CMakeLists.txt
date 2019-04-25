@@ -253,7 +253,7 @@ endif(ADIOS_FOUND)
 ################################################################################
 
 # find openPMD installation
-find_package(openPMD 0.8.0)
+find_package(openPMD 0.6.2)
 
 if(openPMD_FOUND)
     add_definitions(-DENABLE_OPENPMD=1)

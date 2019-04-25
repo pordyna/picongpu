@@ -289,13 +289,6 @@ namespace writeMeta
 
 
             /* write physical constants */
-            log<picLog::INPUT_OUTPUT > ("ADIOS: meta: mue0/eps0");
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                      "mue0", threadParams->adiosBasePath.c_str(),
-                      adiosFloatXType.type, 1, (void*)&MUE0 ));
-            ADIOS_CMD(adios_define_attribute_byvalue(threadParams->adiosGroupHandle,
-                      "eps0", threadParams->adiosBasePath.c_str(),
-                      adiosFloatXType.type, 1, (void*)&EPS0 ));
             iteration.setAttribute(
                 "mue0",
                 MUE0
