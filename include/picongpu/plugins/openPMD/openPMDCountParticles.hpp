@@ -98,9 +98,9 @@ public:
         uint64_t mpiRank = gc.getGlobalRank();
 
         const std::string speciesGroup( T_SpeciesFilter::getName() );
-        Series & series = *params->openPMDSeries;
-        Iteration & iteration = series.iterations[params->currentStep];
-        Container< Record > & particleSpecies = iteration.particles[speciesGroup];
+        ::openPMD::Series & series = *params->openPMDSeries;
+        ::openPMD::Iteration & iteration = series.iterations[params->currentStep];
+        Container< ::openPMD::Record > & particleSpecies = iteration.particles[speciesGroup];
         
 
         /* load particle without copy particle data to host */
@@ -164,8 +164,8 @@ public:
         /* define openPMD dataset for species index/info table */
         {
             const uint64_t localTableSize = 5;
-            Datatype datatype = determineDatatype< uint64_t >( );
-            RecordComponent & recordComponent = particleSpecies["particles_info"][RecordComponent::SCALAR];
+            ::openPMD::Datatype datatype = ::openPMD::determineDatatype< uint64_t >( );
+            ::openPMD::RecordComponent & recordComponent = particleSpecies["particles_info"][RecordComponent::SCALAR];
             params->speciesIndices.push_back(
                 prepareDataset< DIM1 >(
                     recordComponent,

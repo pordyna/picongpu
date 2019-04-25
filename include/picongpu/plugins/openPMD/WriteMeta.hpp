@@ -83,7 +83,7 @@ namespace writeMeta
                 }
             }
 
-            Iteration & iteration = threadParams->openPMDSeries->iterations[threadParams->currentStep];
+            ::openPMD::Iteration & iteration = threadParams->openPMDSeries->iterations[threadParams->currentStep];
             iteration.setAttribute(
                 "particleBoundary",
                 listParticleBoundary
@@ -123,7 +123,7 @@ namespace writeMeta
             traits::PICToAdios<uint32_t> adiosUInt32Type;
             traits::PICToAdios<float_X> adiosFloatXType;
             traits::PICToAdios<float_64> adiosDoubleType;
-            Series & series = *threadParams->openPMDSeries;
+            ::openPMD::Series & series = *threadParams->openPMDSeries;
 
             /*
              * The openPMD API will kindly write the obligatory metadata by itself,
@@ -138,7 +138,7 @@ namespace writeMeta
             }
 
             const std::string software( "PIConGPU" );
-            series.setSoftware( "PIConGPU" );
+            series.setSoftware( software );
 
             std::stringstream softwareVersion;
             softwareVersion << PICONGPU_VERSION_MAJOR << "."
@@ -152,8 +152,8 @@ namespace writeMeta
             series.setDate( date );
             series.setMeshesPath( ADIOS_PATH_FIELDS );
 
-            Iteration & iteration = series.iterations[threadParams->currentStep];
-            Container< Mesh > & meshes = iteration.meshes;
+            ::openPMD::Iteration & iteration = series.iterations[threadParams->currentStep];
+            ::openPMD::Container< ::openPMD::Mesh > & meshes = iteration.meshes;
 
             GetStringProperties<fields::Solver> fieldSolverProps;
             const std::string fieldSolver( fieldSolverProps["name"].value );

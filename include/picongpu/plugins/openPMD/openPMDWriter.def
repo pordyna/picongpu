@@ -97,8 +97,8 @@ template < typename T >
 struct WithWindow
 {
     T m_data;
-    Offset m_offset;
-    Extent m_extent;
+    ::openPMD::Offset m_offset;
+    ::openPMD::Extent m_extent;
 
     // regular method and no constructor since we would
     // have to rely on template parameter deduction with constructors
@@ -114,7 +114,7 @@ struct ThreadParams
     uint32_t currentStep;                   /** current simulation step */
     std::string fullFilename;               /* e.g., simData_1000.bp */
 
-    std::unique_ptr<Series> openPMDSeries;
+    std::unique_ptr<::openPMD::Series> openPMDSeries;
 
     /** current dump is a checkpoint */
     bool isCheckpoint;
@@ -137,11 +137,11 @@ struct ThreadParams
     pmacc::math::UInt64<simDim> fieldsGlobalSizeDims;
     pmacc::math::UInt64<simDim> fieldsOffsetDims;
 
-    std::list<WithWindow<RecordComponent>> fieldRecords;
+    std::list<WithWindow<::openPMD::RecordComponent>> fieldRecords;
     std::list<int64_t> adiosFieldVarIds;        /* var IDs for fields in order of appearance */
-    std::list<WithWindow<RecordComponent>> particleAttributes; /* var IDs for particle attributes in order of appearance */
+    std::list<WithWindow<::openPMD::RecordComponent>> particleAttributes; /* var IDs for particle attributes in order of appearance */
     std::list<int64_t> adiosSpeciesIndexVarIds; /* var IDs for species index tables in order of appearance */
-    std::list<WithWindow<RecordComponent>> speciesIndices;
+    std::list<WithWindow<::openPMD::RecordComponent>> speciesIndices;
 
     GridLayout<simDim> gridLayout;
     MappingDesc *cellDescription;
@@ -153,12 +153,12 @@ struct ThreadParams
 
     DataSpace<simDim> localWindowToDomainOffset;    /** offset from local moving window to local domain */
 
-    Series & openSeries(AccessType at) 
+    ::openPMD::Series & openSeries(::openPMD::AccessType at) 
     {
         if (!openPMDSeries) 
         {
             log<picLog::INPUT_OUTPUT > ("openPMD: open file: %1%") % fileName;
-            openPMDSeries = std::unique_ptr<Series>(new Series(fileName, at, adiosComm)); // TODO
+            openPMDSeries = std::unique_ptr<::openPMD::Series>(new ::openPMD::Series(fileName, at, adiosComm)); // TODO
             return *openPMDSeries;
         } 
         else 
@@ -224,10 +224,10 @@ int64_t defineAdiosVar(int64_t group_id,
                        std::string compressionMethod);
 
 template <unsigned DIM>
-WithWindow< RecordComponent >
+WithWindow< ::openPMD::RecordComponent >
 prepareDataset(
-    RecordComponent & recordComponent,
-    Datatype datatype,
+    ::openPMD::RecordComponent & recordComponent,
+    ::openPMD::Datatype datatype,
     pmacc::math::UInt64<DIM> globalDimensions,
     pmacc::math::UInt64<DIM> localDimensions,
     pmacc::math::UInt64<DIM> offset,

@@ -68,9 +68,9 @@ struct ParticleAttributeSize
         const std::string name_lookup[] = {"x", "y", "z"};
 
         OpenPMDName<T_Identifier> openPMDName;
-        Series & series = *params->openPMDSeries;
-        Iteration & iteration = series.iterations[params->currentStep];
-        Record & record = iteration.particles[speciesGroup][openPMDName()];
+        ::openPMD::Series & series = *params->openPMDSeries;
+        ::openPMD::Iteration & iteration = series.iterations[params->currentStep];
+        ::openPMD::Record & record = iteration.particles[speciesGroup][openPMDName()];
 
         // get the SI scaling, dimensionality and weighting of the attribute
         OpenPMDUnit<T_Identifier> openPMDUnit;
@@ -86,10 +86,10 @@ struct ParticleAttributeSize
 
         for (uint32_t d = 0; d < components; d++)
         {
-            RecordComponent & recordComponent = components > 1 
+            ::openPMD::RecordComponent & recordComponent = components > 1 
                 ? record[name_lookup[d]]
-                : record[MeshRecordComponent::SCALAR];
-            Datatype openPMDType = determineDatatype< ComponentType >();
+                : record[::openPMD::MeshRecordComponent::SCALAR];
+            ::openPMD::Datatype openPMDType = ::openPMD::determineDatatype< ComponentType >();
             
             params->particleAttributes.push_back(
                 prepareDataset<DIM1>(

@@ -23,6 +23,7 @@
 #include <pmacc/types.hpp>
 #include <stdexcept>
 #include "picongpu/plugins/openPMD/openPMDWriter.def"
+#include <utility>
 
 namespace picongpu
 {
@@ -109,8 +110,8 @@ struct WriteNDScalars
             ::openPMD::MeshRecordComponent & mrc =
                 series.iterations[params.currentStep].meshes[group][dataset];
 
-            preparedDataset = std::unique_ptr< WithWindow< RecordComponent > >{
-                new WithWindow< RecordComponent >{prepareDataset< simDim >(
+            preparedDataset = std::unique_ptr< WithWindow< ::openPMD::RecordComponent > >{
+                new WithWindow< ::openPMD::RecordComponent >{prepareDataset< simDim >(
                     mrc,
                     openPMDScalarType,
                     globalDomainSize,
@@ -150,7 +151,7 @@ struct WriteNDScalars
 private:
     const std::string baseName, group, dataset, attrName;
     int64_t varId;
-    std::unique_ptr< WithWindow< RecordComponent > > preparedDataset;
+    std::unique_ptr< WithWindow< ::openPMD::RecordComponent > > preparedDataset;
 };
 
 /** Functor for reading ND scalar fields with N=simDim
