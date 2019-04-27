@@ -91,7 +91,7 @@ namespace po = boost::program_options;
 }
 
 template < unsigned DIM, typename T >
-std::vector< T > asStandardVector( pmacc::math::Vector< T, DIM > );
+std::vector< T > asStandardVector( pmacc::math::Vector< T, DIM > const & );
 
 template < typename T >
 struct WithWindow
@@ -158,7 +158,11 @@ struct ThreadParams
         if (!openPMDSeries) 
         {
             log<picLog::INPUT_OUTPUT > ("openPMD: open file: %1%") % fileName;
-            openPMDSeries = std::unique_ptr<::openPMD::Series>(new ::openPMD::Series(fileName, at, adiosComm)); // TODO
+            openPMDSeries = std::unique_ptr<::openPMD::Series>(new ::openPMD::Series(fileName, at, adiosComm)); 
+            if (at == ::openPMD::AccessType::CREATE)
+            {
+                openPMDSeries->setMeshesPath( ADIOS_PATH_FIELDS );
+            }
             return *openPMDSeries;
         } 
         else 

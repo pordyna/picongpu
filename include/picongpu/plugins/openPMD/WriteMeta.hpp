@@ -150,7 +150,6 @@ namespace writeMeta
 
             const std::string date = helper::getDateString( "%F %T %z" );
             series.setDate( date );
-            series.setMeshesPath( ADIOS_PATH_FIELDS );
 
             ::openPMD::Iteration & iteration = series.iterations[threadParams->currentStep];
             ::openPMD::Container< ::openPMD::Mesh > & meshes = iteration.meshes;

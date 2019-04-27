@@ -214,8 +214,8 @@ public:
                 dataset.m_offset,
                 dataset.m_extent
             );
-            params->speciesIndices.pop_front( );
             params->openPMDSeries->flush( );
+            params->speciesIndices.pop_front( );
         }
         log<picLog::INPUT_OUTPUT > ("openPMD: ( end ) writing particle index table for %1%") % T_SpeciesFilter::getName();
     }

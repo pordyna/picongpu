@@ -131,29 +131,24 @@ int64_t defineAdiosVar(int64_t group_id,
 }
 
 template <unsigned DIM>
-WithWindow< RecordComponent >
+WithWindow< ::openPMD::RecordComponent >
 prepareDataset(
-    RecordComponent & recordComponent,
-    Datatype datatype,
+    ::openPMD::RecordComponent & recordComponent,
+    ::openPMD::Datatype datatype,
     pmacc::math::UInt64<DIM> globalDimensions,
     pmacc::math::UInt64<DIM> localDimensions,
     pmacc::math::UInt64<DIM> offset,
     bool compression,
     std::string compressionMethod
 ) {
-    std::vector<uint64_t> v;
-    v.reserve(DIM);
-    for (unsigned i = 0; i < DIM; i++) 
-    {
-        v[i] = globalDimensions[i];
-    }
-    Dataset dataset{datatype, std::move(v)};
+    std::vector<uint64_t> v = asStandardVector< DIM >( globalDimensions );
+    ::openPMD::Dataset dataset{datatype, std::move(v)};
     if (compression)
     {
         dataset.compression = compressionMethod;
     }
     recordComponent.resetDataset(std::move(dataset));
-    return WithWindow< RecordComponent >::init< DIM >(
+    return WithWindow< ::openPMD::RecordComponent >::init< DIM >(
         recordComponent,
         offset,
         localDimensions
@@ -161,14 +156,13 @@ prepareDataset(
 }
 
 template < unsigned DIM, typename T >
-std::vector< T > asStandardVector( pmacc::math::Vector< T, DIM > v )
+std::vector< T > asStandardVector( pmacc::math::Vector< T, DIM > const & v )
 {
     std::vector< T > res;
     res.reserve( DIM );
-#pragma omp parallel for
     for ( unsigned i = 0; i < DIM; ++i )
     {
-        res[i] = v[i];
+        res.push_back( v[i] );
     }
     return res;
 }
@@ -1125,13 +1119,13 @@ private:
             if (params->fieldRecords.empty())
                 throw std::runtime_error("Cannot write field (var id list is empty)");
 
-            WithWindow< RecordComponent > & ww = params->fieldRecords.front( );
+            WithWindow< ::openPMD::RecordComponent > & ww = params->fieldRecords.front( );
             ww.m_data.storeChunk< ComponentType >(
                 params->fieldBuffer, ww.m_offset, ww.m_extent
             );
 
-            params->fieldRecords.pop_front();
             params->openPMDSeries->flush( );
+            params->fieldRecords.pop_front();
         }
     }
 
@@ -1278,8 +1272,8 @@ private:
             "fields_all"
         );
 
-        log<picLog::INPUT_OUTPUT > ("openPMD: opening Series %") % threadParams->fileName;
-        threadParams->openSeries( AccessType::READ_WRITE );
+        log<picLog::INPUT_OUTPUT > ("openPMD: opening Series %1%") % threadParams->fileName;
+        threadParams->openSeries( ::openPMD::AccessType::CREATE );
 
         /* collect size information for each field to be written and define
          * field variables
