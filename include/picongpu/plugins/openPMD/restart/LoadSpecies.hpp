@@ -19,175 +19,211 @@
 
 #pragma once
 
-#include "picongpu/simulation_defines.hpp"
-
-#include "picongpu/plugins/openPMD/openPMDWriter.def"
 #include "picongpu/plugins/ISimulationPlugin.hpp"
+#include "picongpu/plugins/openPMD/openPMDWriter.def"
+#include "picongpu/plugins/openPMD/restart/LoadParticleAttributesFromADIOS.hpp"
+#include "picongpu/plugins/output/WriteSpeciesCommon.hpp"
+#include "picongpu/simulation_defines.hpp"
 
 #include <pmacc/compileTime/conversion/MakeSeq.hpp>
 #include <pmacc/compileTime/conversion/RemoveFromSeq.hpp>
+#include <pmacc/dataManagement/DataConnector.hpp>
 #include <pmacc/mappings/kernel/AreaMapping.hpp>
 #include <pmacc/particles/ParticleDescription.hpp>
 #include <pmacc/particles/operations/splitIntoListOfFrames.kernel>
 
-#include "picongpu/plugins/output/WriteSpeciesCommon.hpp"
-#include "picongpu/plugins/openPMD/restart/LoadParticleAttributesFromADIOS.hpp"
-
-#include <pmacc/dataManagement/DataConnector.hpp>
-#include <openPMD/openPMD.hpp>
-
-#include <boost/mpl/vector.hpp>
-#include <boost/mpl/pair.hpp>
-#include <boost/type_traits/is_same.hpp>
-#include <boost/mpl/size.hpp>
 #include <boost/mpl/at.hpp>
 #include <boost/mpl/begin_end.hpp>
 #include <boost/mpl/find.hpp>
+#include <boost/mpl/pair.hpp>
+#include <boost/mpl/size.hpp>
+#include <boost/mpl/vector.hpp>
 #include <boost/type_traits.hpp>
+#include <boost/type_traits/is_same.hpp>
+
+#include <openPMD/openPMD.hpp>
 
 
 namespace picongpu
 {
-
 namespace openPMD
 {
-using namespace pmacc;
-
-/** Load species from ADIOS checkpoint file
- *
- * @tparam T_Species type of species
- *
- */
-template< typename T_Species >
-struct LoadSpecies
-{
-public:
-
-    typedef T_Species ThisSpecies;
-    typedef typename ThisSpecies::FrameType FrameType;
-    typedef typename FrameType::ParticleDescription ParticleDescription;
-    typedef typename FrameType::ValueTypeSeq ParticleAttributeList;
-
-
-    /* delete multiMask and localCellIdx in adios particle*/
-    typedef bmpl::vector2<multiMask, localCellIdx> TypesToDelete;
-    typedef typename RemoveFromSeq<ParticleAttributeList, TypesToDelete>::type ParticleCleanedAttributeList;
-
-    /* add totalCellIdx for adios particle*/
-    typedef typename MakeSeq<
-        ParticleCleanedAttributeList,
-        totalCellIdx
-    >::type ParticleNewAttributeList;
-
-    typedef
-    typename ReplaceValueTypeSeq<ParticleDescription, ParticleNewAttributeList>::type
-    NewParticleDescription;
-
-    typedef Frame<OperatorCreateVectorBox, NewParticleDescription> openPMDFrameType;
+    using namespace pmacc;
 
     /** Load species from ADIOS checkpoint file
      *
-     * @param params thread params with ADIOS_FILE, ...
-     * @param restartChunkSize number of particles processed in one kernel call
+     * @tparam T_Species type of species
+     *
      */
-    HINLINE void operator()(ThreadParams* params, const uint32_t restartChunkSize)
+    template< typename T_Species >
+    struct LoadSpecies
     {
-        std::string const speciesName = FrameType::getName();
-        log<picLog::INPUT_OUTPUT > ("openPMD: (begin) load species: %1%") % speciesName;
-        DataConnector &dc = Environment<>::get().DataConnector();
-        GridController<simDim> &gc = Environment<simDim>::get().GridController();
-        
-        ::openPMD::Series & series = *params->openPMDSeries;
-        ::openPMD::ParticleSpecies & particleSpecies = 
-            series.iterations[params->currentStep].particles[speciesName];
+    public:
+        typedef T_Species ThisSpecies;
+        typedef typename ThisSpecies::FrameType FrameType;
+        typedef typename FrameType::ParticleDescription ParticleDescription;
+        typedef typename FrameType::ValueTypeSeq ParticleAttributeList;
 
-        const pmacc::Selection<simDim>& localDomain = Environment<simDim>::get().SubGrid().getLocalDomain();
 
-        /* load particle without copying particle data to host */
-        auto speciesTmp = dc.get< ThisSpecies >( FrameType::getName(), true );
+        /* delete multiMask and localCellIdx in adios particle*/
+        typedef bmpl::vector2< multiMask, localCellIdx > TypesToDelete;
+        typedef
+            typename RemoveFromSeq< ParticleAttributeList, TypesToDelete >::type
+                ParticleCleanedAttributeList;
 
-        /* count total number of particles on the device */
-        uint64_t totalNumParticles = 0;
+        /* add totalCellIdx for adios particle*/
+        typedef
+            typename MakeSeq< ParticleCleanedAttributeList, totalCellIdx >::type
+                ParticleNewAttributeList;
 
-        /* load particles info table entry for ONE process
-           (note: this is NOT necessarily THIS process!) :uniaku:
-           particlesInfo is (part-count, scalar pos, x, y, z) */
+        typedef typename ReplaceValueTypeSeq< ParticleDescription,
+            ParticleNewAttributeList >::type NewParticleDescription;
 
-        uint64_t start = 5 * gc.getGlobalRank();
-        uint64_t count = 5; // openPMDCountParticles: uint64_t
+        typedef Frame< OperatorCreateVectorBox, NewParticleDescription >
+            openPMDFrameType;
 
-        // avoid deadlock between not finished pmacc tasks and mpi calls in adios
-        __getTransactionEvent().waitForFinished();
-        std::shared_ptr< uint64_t > particlesInfo =
-            particleSpecies["particles_info"][::openPMD::RecordComponent::SCALAR].loadChunk< uint64_t >(
-            ::openPMD::Offset{start}, ::openPMD::Extent{count}
-        );
-        series.flush( );
-
-        /* Run a prefix sum over the numParticles[0] element in particlesInfo
-         * to retreive the offset of particles before gc.getGlobalRank() */
-        uint64_t particleOffset = 0;
-
-        uint64_t fullParticlesInfo[gc.getGlobalSize()];
-
-        auto particlesInfoPtr = particlesInfo.get( );
-
-        // avoid deadlock between not finished pmacc tasks and mpi blocking collectives
-        __getTransactionEvent().waitForFinished();
-        MPI_CHECK(MPI_Allgather( particlesInfoPtr, 1, MPI_UINT64_T,
-                                 fullParticlesInfo, 1, MPI_UINT64_T,
-                                 gc.getCommunicator().getMPIComm() ));
-
-        for (size_t i = 0; i < gc.getGlobalSize(); ++i)
+        /** Load species from ADIOS checkpoint file
+         *
+         * @param params thread params with ADIOS_FILE, ...
+         * @param restartChunkSize number of particles processed in one kernel
+         * call
+         */
+        HINLINE void
+        operator()( ThreadParams * params, const uint32_t restartChunkSize )
         {
-            /* this comparison is potentially harmful, since the order of ranks
-               is not necessarily the same in subsequent MPI jobs.
-               But due to the wrong sorting by rank in `openPMDCountParticles.hpp`
-               while calculating the `myParticleOffset` we have to immitate that. */
-            if( i < gc.getGlobalRank() )
-                particleOffset += fullParticlesInfo[i];
-            if( i == gc.getGlobalRank() )
-                totalNumParticles = fullParticlesInfo[i];
+            std::string const speciesName = FrameType::getName();
+            log< picLog::INPUT_OUTPUT >(
+                "openPMD: (begin) load species: %1%" ) %
+                speciesName;
+            DataConnector & dc = Environment<>::get().DataConnector();
+            GridController< simDim > & gc =
+                Environment< simDim >::get().GridController();
+
+            ::openPMD::Series & series = *params->openPMDSeries;
+            ::openPMD::ParticleSpecies & particleSpecies =
+                series.iterations[ params->currentStep ]
+                    .particles[ speciesName ];
+
+            const pmacc::Selection< simDim > & localDomain =
+                Environment< simDim >::get().SubGrid().getLocalDomain();
+
+            /* load particle without copying particle data to host */
+            auto speciesTmp =
+                dc.get< ThisSpecies >( FrameType::getName(), true );
+
+            /* count total number of particles on the device */
+            uint64_t totalNumParticles = 0;
+
+            /* load particles info table entry for ONE process
+               (note: this is NOT necessarily THIS process!) :uniaku:
+               particlesInfo is (part-count, scalar pos, x, y, z) */
+
+            uint64_t start = 5 * gc.getGlobalRank();
+            uint64_t count = 5; // openPMDCountParticles: uint64_t
+
+            // avoid deadlock between not finished pmacc tasks and mpi calls in
+            // adios
+            __getTransactionEvent().waitForFinished();
+            std::shared_ptr< uint64_t > particlesInfo =
+                particleSpecies[ "particles_info" ]
+                               [::openPMD::RecordComponent::SCALAR ]
+                                   .loadChunk< uint64_t >(
+                                       ::openPMD::Offset{ start },
+                                       ::openPMD::Extent{ count } );
+            series.flush();
+
+            /* Run a prefix sum over the numParticles[0] element in
+             * particlesInfo to retreive the offset of particles before
+             * gc.getGlobalRank() */
+            uint64_t particleOffset = 0;
+
+            uint64_t fullParticlesInfo[ gc.getGlobalSize() ];
+
+            auto particlesInfoPtr = particlesInfo.get();
+
+            // avoid deadlock between not finished pmacc tasks and mpi blocking
+            // collectives
+            __getTransactionEvent().waitForFinished();
+            MPI_CHECK( MPI_Allgather( particlesInfoPtr,
+                1,
+                MPI_UINT64_T,
+                fullParticlesInfo,
+                1,
+                MPI_UINT64_T,
+                gc.getCommunicator().getMPIComm() ) );
+
+            for( size_t i = 0; i < gc.getGlobalSize(); ++i )
+            {
+                /* this comparison is potentially harmful, since the order of
+                   ranks is not necessarily the same in subsequent MPI jobs. But
+                   due to the wrong sorting by rank in
+                   `openPMDCountParticles.hpp` while calculating the
+                   `myParticleOffset` we have to immitate that. */
+                if( i < gc.getGlobalRank() )
+                    particleOffset += fullParticlesInfo[ i ];
+                if( i == gc.getGlobalRank() )
+                    totalNumParticles = fullParticlesInfo[ i ];
+            }
+
+            log< picLog::INPUT_OUTPUT >(
+                "openPMD: Loading %1% particles from offset %2%" ) %
+                ( long long unsigned )totalNumParticles %
+                ( long long unsigned )particleOffset;
+
+            openPMDFrameType hostFrame;
+            log< picLog::INPUT_OUTPUT >(
+                "openPMD: malloc mapped memory: %1%" ) %
+                speciesName;
+            /*malloc mapped memory*/
+            ForEach
+                < typename openPMDFrameType::ValueTypeSeq,
+                    MallocMemory< bmpl::_1 > > mallocMem;
+            mallocMem( forward( hostFrame ),
+                totalNumParticles ); // TODO vllt amol angucken
+
+            log< picLog::INPUT_OUTPUT >(
+                "openPMD: get mapped memory device pointer: %1%" ) %
+                speciesName;
+            /*load device pointer of mapped memory*/
+            openPMDFrameType deviceFrame;
+            ForEach
+                < typename openPMDFrameType::ValueTypeSeq,
+                    GetDevicePtr< bmpl::_1 > > getDevicePtr;
+            getDevicePtr( forward( deviceFrame ), forward( hostFrame ) );
+
+            ForEach
+                < typename openPMDFrameType::ValueTypeSeq,
+                    LoadParticleAttributesFromADIOS<
+                        bmpl::_1 > > loadAttributes;
+            loadAttributes( forward( params ),
+                forward( hostFrame ),
+                particleSpecies,
+                particleOffset,
+                totalNumParticles );
+
+            if( totalNumParticles != 0 )
+            {
+                pmacc::particles::operations::splitIntoListOfFrames(
+                    *speciesTmp,
+                    deviceFrame,
+                    totalNumParticles,
+                    restartChunkSize,
+                    localDomain.offset,
+                    totalCellIdx_,
+                    *( params->cellDescription ),
+                    picLog::INPUT_OUTPUT() );
+
+                /*free host memory*/
+                ForEach
+                    < typename openPMDFrameType::ValueTypeSeq,
+                        FreeMemory< bmpl::_1 > > freeMem;
+                freeMem( forward( hostFrame ) );
+            }
+            log< picLog::INPUT_OUTPUT >(
+                "openPMD: ( end ) load species: %1%" ) %
+                speciesName;
         }
-
-        log<picLog::INPUT_OUTPUT > ("openPMD: Loading %1% particles from offset %2%") %
-            (long long unsigned) totalNumParticles % (long long unsigned) particleOffset;
-
-        openPMDFrameType hostFrame;
-        log<picLog::INPUT_OUTPUT > ("openPMD: malloc mapped memory: %1%") % speciesName;
-        /*malloc mapped memory*/
-        ForEach<typename openPMDFrameType::ValueTypeSeq, MallocMemory<bmpl::_1> > mallocMem;
-        mallocMem(forward(hostFrame), totalNumParticles); //TODO vllt amol angucken
-
-        log<picLog::INPUT_OUTPUT > ("openPMD: get mapped memory device pointer: %1%") % speciesName;
-        /*load device pointer of mapped memory*/
-        openPMDFrameType deviceFrame;
-        ForEach<typename openPMDFrameType::ValueTypeSeq, GetDevicePtr<bmpl::_1> > getDevicePtr;
-        getDevicePtr(forward(deviceFrame), forward(hostFrame));
-
-        ForEach<typename openPMDFrameType::ValueTypeSeq, LoadParticleAttributesFromADIOS<bmpl::_1> > loadAttributes;
-        loadAttributes(forward(params), forward(hostFrame), particleSpecies, particleOffset, totalNumParticles);
-
-        if (totalNumParticles != 0)
-        {
-            pmacc::particles::operations::splitIntoListOfFrames(
-                *speciesTmp,
-                deviceFrame,
-                totalNumParticles,
-                restartChunkSize,
-                localDomain.offset,
-                totalCellIdx_,
-                *(params->cellDescription),
-                picLog::INPUT_OUTPUT()
-            );
-
-            /*free host memory*/
-            ForEach<typename openPMDFrameType::ValueTypeSeq, FreeMemory<bmpl::_1> > freeMem;
-            freeMem(forward(hostFrame));
-        }
-        log<picLog::INPUT_OUTPUT > ("openPMD: ( end ) load species: %1%") % speciesName;
-    }
-};
+    };
 
 
 } /* namespace openPMD */

@@ -19,125 +19,131 @@
 
 #pragma once
 
-#include <iostream>  // std::cerr
-#include <limits>
-#include <list>
-#include <sstream>
-#include <stdexcept>  // throw std::runtime_error
-#include <string>
+#include "picongpu/simulationControl/MovingWindow.hpp"
+#include "picongpu/simulation_defines.hpp"
 
 #include <pmacc/math/Vector.hpp>
 #include <pmacc/particles/frame_types.hpp>
 #include <pmacc/types.hpp>
-#include "picongpu/simulationControl/MovingWindow.hpp"
-#include "picongpu/simulation_defines.hpp"
 
 #include <openPMD/openPMD.hpp>
+
+#include <iostream> // std::cerr
+#include <limits>
+#include <list>
+#include <sstream>
+#include <stdexcept> // throw std::runtime_error
+#include <string>
 
 namespace picongpu
 {
 namespace openPMD
 {
-using namespace pmacc;
-using namespace ::openPMD;
+    using namespace pmacc;
+    using namespace ::openPMD;
 
 
-namespace po = boost::program_options;
+    namespace po = boost::program_options;
 
 
 #define MESHES_PATH "fields"
 
-template < unsigned DIM, typename T >
-std::vector< T > asStandardVector( pmacc::math::Vector< T, DIM > const & );
+    template< unsigned DIM, typename T >
+    std::vector< T >
+    asStandardVector( pmacc::math::Vector< T, DIM > const & );
 
-template < typename T >
-struct WithWindow
-{
-    T m_data;
-    ::openPMD::Offset m_offset;
-    ::openPMD::Extent m_extent;
+    template< typename T >
+    struct WithWindow
+    {
+        T m_data;
+        ::openPMD::Offset m_offset;
+        ::openPMD::Extent m_extent;
 
-    // regular method and no constructor since we would
-    // have to rely on template parameter deduction with constructors
-    template < unsigned DIM >
-    static WithWindow< T > init(
-        T & data,
+        // regular method and no constructor since we would
+        // have to rely on template parameter deduction with constructors
+        template< unsigned DIM >
+        static WithWindow< T >
+        init( T & data,
+            pmacc::math::UInt64< DIM > offset,
+            pmacc::math::UInt64< DIM > extent );
+    };
+
+    struct ThreadParams
+    {
+        uint32_t currentStep;     /** current simulation step */
+        std::string fullFilename; /* e.g., simData_1000.bp */
+
+
+        std::unique_ptr<::openPMD::Series >
+            openPMDSeries; /* is null iff there is no series currently open */
+
+        /** current dump is a checkpoint */
+        bool isCheckpoint;
+
+        MPI_Comm communicator; /* MPI communicator for openPMD API */
+        std::string
+            compressionMethod; /* openPMD data transform compression method */
+        std::string fileName;  /* Name of the openPMDSeries */
+
+        pmacc::math::UInt64< simDim > fieldsSizeDims;
+        pmacc::math::UInt64< simDim > fieldsGlobalSizeDims;
+        pmacc::math::UInt64< simDim > fieldsOffsetDims;
+
+        std::list< WithWindow<::openPMD::RecordComponent > >
+            fieldRecords; /* fields in order of appearance */
+        std::list< WithWindow<::openPMD::RecordComponent > >
+            particleAttributes; /* particle attributes in order of appearance */
+        std::list< WithWindow<::openPMD::RecordComponent > >
+            speciesIndices; /* species index tables in order of appearance */
+
+        GridLayout< simDim > gridLayout;
+        MappingDesc * cellDescription;
+
+        // float_X *fieldBfr;
+        std::shared_ptr< float_X > fieldBuffer; /* temp. buffer for fields */
+
+        Window window; /* window describing the volume to be dumped */
+
+        DataSpace< simDim >
+            localWindowToDomainOffset; /** offset from local moving
+                                          window to local domain */
+
+        ::openPMD::Series &
+        openSeries( ::openPMD::AccessType at );
+
+        void
+        closeSeries();
+    };
+
+    /**
+     * Writes simulation data to openPMD series.
+     * Implements the ILightweightPlugin interface.
+     */
+
+    class openPMDWriter;
+
+    /**
+     * Wrapper for ::openPMD::resetDataset, set dataset parameters
+     * @tparam DIM number of variable dimensions
+     * @param recordComponent Location of the dataset within the openPMD Series
+     * @param datatype Variable type
+     * @param globalDimensions Dataset global dimensions
+     * @param localDimensions Dataset local dimensions
+     * @param offset Dataset local offset
+     * @param compression Enable compression data transform
+     * @param compressionMethod String denoting the data transform to use
+     * @return The recordComponent, wrapped with the local offset and extent
+     * since those are needed when calling RecordComponent::storeChunk
+     */
+    template< unsigned DIM >
+    WithWindow<::openPMD::RecordComponent >
+    prepareDataset( ::openPMD::RecordComponent & recordComponent,
+        ::openPMD::Datatype datatype,
+        pmacc::math::UInt64< DIM > globalDimensions,
+        pmacc::math::UInt64< DIM > localDimensions,
         pmacc::math::UInt64< DIM > offset,
-        pmacc::math::UInt64< DIM > extent );
-};
+        bool compression,
+        std::string compressionMethod );
 
-struct ThreadParams
-{
-    uint32_t currentStep;     /** current simulation step */
-    std::string fullFilename; /* e.g., simData_1000.bp */
-
-
-    std::unique_ptr<::openPMD::Series >
-        openPMDSeries; /* is null iff there is no series currently open */
-
-    /** current dump is a checkpoint */
-    bool isCheckpoint;
-
-    MPI_Comm communicator;           /* MPI communicator for openPMD API */
-    std::string compressionMethod; /* openPMD data transform compression method */
-    std::string fileName;         /* Name of the openPMDSeries */
-
-    pmacc::math::UInt64< simDim > fieldsSizeDims;
-    pmacc::math::UInt64< simDim > fieldsGlobalSizeDims;
-    pmacc::math::UInt64< simDim > fieldsOffsetDims;
-
-    std::list< WithWindow<::openPMD::RecordComponent > >
-        fieldRecords; /* fields in order of appearance */
-    std::list< WithWindow<::openPMD::RecordComponent > >
-        particleAttributes; /* particle attributes in order of appearance */
-    std::list< WithWindow<::openPMD::RecordComponent > >
-        speciesIndices; /* species index tables in order of appearance */
-
-    GridLayout< simDim > gridLayout;
-    MappingDesc * cellDescription;
-
-    // float_X *fieldBfr;
-    std::shared_ptr< float_X > fieldBuffer; /* temp. buffer for fields */
-
-    Window window; /* window describing the volume to be dumped */
-
-    DataSpace< simDim > localWindowToDomainOffset; /** offset from local moving
-                                                      window to local domain */
-
-    ::openPMD::Series & openSeries( ::openPMD::AccessType at );
-
-    void closeSeries( );
-};
-
-/**
- * Writes simulation data to openPMD series.
- * Implements the ILightweightPlugin interface.
- */
-
-class openPMDWriter;
-
-/**
- * Wrapper for ::openPMD::resetDataset, set dataset parameters
- * @tparam DIM number of variable dimensions
- * @param recordComponent Location of the dataset within the openPMD Series
- * @param datatype Variable type
- * @param globalDimensions Dataset global dimensions
- * @param localDimensions Dataset local dimensions
- * @param offset Dataset local offset
- * @param compression Enable compression data transform
- * @param compressionMethod String denoting the data transform to use
- * @return The recordComponent, wrapped with the local offset and extent since
- * those are needed when calling RecordComponent::storeChunk
- */
-template < unsigned DIM >
-WithWindow<::openPMD::RecordComponent > prepareDataset(
-    ::openPMD::RecordComponent & recordComponent,
-    ::openPMD::Datatype datatype,
-    pmacc::math::UInt64< DIM > globalDimensions,
-    pmacc::math::UInt64< DIM > localDimensions,
-    pmacc::math::UInt64< DIM > offset,
-    bool compression,
-    std::string compressionMethod );
-
-}  // namespace openPMD
-}  // namespace picongpu
+} // namespace openPMD
+} // namespace picongpu

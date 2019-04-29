@@ -19,192 +19,196 @@
 
 #pragma once
 
+#include "picongpu/plugins/openPMD/openPMDWriter.def"
+
 #include <pmacc/Environment.hpp>
 #include <pmacc/types.hpp>
+
 #include <stdexcept>
 #include <utility>
-#include "picongpu/plugins/openPMD/openPMDWriter.def"
 
 namespace picongpu
 {
 namespace openPMD
 {
-/** Functor for writing N-dimensional scalar fields with N=simDim
- * In the current implementation each process (of the ND grid of processes)
- * writes 1 scalar value Optionally the processes can also write an attribute
- * for this dataset by using a non-empty attrName
- *
- * @tparam T_Scalar    Type of the scalar value to write
- * @tparam T_Attribute Type of the attribute (can be omitted if attribute is not
- * written, defaults to uint64_t)
- */
-template < typename T_Scalar, typename T_Attribute = uint64_t >
-struct WriteNDScalars
-{
-    WriteNDScalars(
-        const std::string & baseName,
-        const std::string & group,
-        const std::string & dataset,
-        const std::string & attrName = "" )
-    : baseName( baseName )
-    , group( group )
-    , dataset( dataset )
-    , attrName( attrName )
-    {
-    }
-
-    /** Prepare the write operation:
-     *  Define openPMD dataset and write
-     * attribute (if attrName is non-empty)
+    /** Functor for writing N-dimensional scalar fields with N=simDim
+     * In the current implementation each process (of the ND grid of processes)
+     * writes 1 scalar value Optionally the processes can also write an
+     * attribute for this dataset by using a non-empty attrName
      *
-     *  Must be called before executing the functor
+     * @tparam T_Scalar    Type of the scalar value to write
+     * @tparam T_Attribute Type of the attribute (can be omitted if attribute is
+     * not written, defaults to uint64_t)
      */
-    void prepare(
-        ThreadParams & params, T_Attribute attribute = T_Attribute( ) )
+    template< typename T_Scalar, typename T_Attribute = uint64_t >
+    struct WriteNDScalars
     {
-        auto name = baseName + "/" + group + "/" + dataset;
-        const auto openPMDScalarType =
-            ::openPMD::determineDatatype< T_Scalar >( );
-        typedef pmacc::math::UInt64< simDim > Dimensions;
-
-        log< picLog::INPUT_OUTPUT >(
-            "openPMD: prepare write %1%D scalars: %2%" ) %
-            simDim % name;
-
-        // Size over all processes
-        Dimensions globalDomainSize = Dimensions::create( 1 );
-        // Offset for this process
-        Dimensions localDomainOffset = Dimensions::create( 0 );
-
-        for ( uint32_t d = 0; d < simDim; ++d )
+        WriteNDScalars( const std::string & baseName,
+            const std::string & group,
+            const std::string & dataset,
+            const std::string & attrName = "" ) :
+            baseName( baseName ),
+            group( group ),
+            dataset( dataset ),
+            attrName( attrName )
         {
-            globalDomainSize[d] = Environment< simDim >::get( )
-                                      .GridController( )
-                                      .getGpuNodes( )[d];
-            localDomainOffset[d] = Environment< simDim >::get( )
-                                       .GridController( )
-                                       .getPosition( )[d];
         }
 
-        ::openPMD::Series & series = *params.openPMDSeries;
-        ::openPMD::MeshRecordComponent & mrc =
-            series.iterations[params.currentStep]
-                .meshes[baseName + "_" + group][dataset];
-
-        preparedDataset =
-            std::unique_ptr< WithWindow< ::openPMD::RecordComponent > >{
-                new WithWindow< ::openPMD::RecordComponent >{
-                    prepareDataset< simDim >(
-                        mrc,
-                        openPMDScalarType,
-                        globalDomainSize,
-                        Dimensions::create( 1 ),
-                        localDomainOffset,
-                        true,
-                        params.compressionMethod )}};
-
-        if ( !attrName.empty( ) )
+        /** Prepare the write operation:
+         *  Define openPMD dataset and write
+         * attribute (if attrName is non-empty)
+         *
+         *  Must be called before executing the functor
+         */
+        void
+        prepare( ThreadParams & params, T_Attribute attribute = T_Attribute() )
         {
+            auto name = baseName + "/" + group + "/" + dataset;
+            const auto openPMDScalarType =
+                ::openPMD::determineDatatype< T_Scalar >();
+            typedef pmacc::math::UInt64< simDim > Dimensions;
+
             log< picLog::INPUT_OUTPUT >(
-                "openPMD: write attribute %1% of %2%D scalars: %3%" ) %
-                attrName % simDim % name;
+                "openPMD: prepare write %1%D scalars: %2%" ) %
+                simDim % name;
 
-            mrc.setAttribute( attrName, attribute );
+            // Size over all processes
+            Dimensions globalDomainSize = Dimensions::create( 1 );
+            // Offset for this process
+            Dimensions localDomainOffset = Dimensions::create( 0 );
+
+            for( uint32_t d = 0; d < simDim; ++d )
+            {
+                globalDomainSize[ d ] = Environment< simDim >::get()
+                                            .GridController()
+                                            .getGpuNodes()[ d ];
+                localDomainOffset[ d ] = Environment< simDim >::get()
+                                             .GridController()
+                                             .getPosition()[ d ];
+            }
+
+            ::openPMD::Series & series = *params.openPMDSeries;
+            ::openPMD::MeshRecordComponent & mrc =
+                series.iterations[ params.currentStep ]
+                    .meshes[ baseName + "_" + group ][ dataset ];
+
+            preparedDataset =
+                std::unique_ptr< WithWindow<::openPMD::RecordComponent > >{
+                    new WithWindow<::openPMD::RecordComponent >{
+                        prepareDataset< simDim >( mrc,
+                            openPMDScalarType,
+                            globalDomainSize,
+                            Dimensions::create( 1 ),
+                            localDomainOffset,
+                            true,
+                            params.compressionMethod ) }
+                };
+
+            if( !attrName.empty() )
+            {
+                log< picLog::INPUT_OUTPUT >(
+                    "openPMD: write attribute %1% of %2%D scalars: %3%" ) %
+                    attrName % simDim % name;
+
+                mrc.setAttribute( attrName, attribute );
+            }
         }
-    }
 
-    void operator( )( ThreadParams & params, T_Scalar value )
+        void
+        operator()( ThreadParams & params, T_Scalar value )
+        {
+            auto name = baseName + "/" + group + "/" + dataset;
+            log< picLog::INPUT_OUTPUT >( "openPMD: write %1%D scalars: %2%" ) %
+                simDim % name;
+
+            preparedDataset->m_data.storeChunk(
+                std::make_shared< T_Scalar >( value ),
+                preparedDataset->m_offset,
+                preparedDataset->m_extent );
+            params.openPMDSeries->flush();
+        }
+
+    private:
+        const std::string baseName, group, dataset, attrName;
+        int64_t varId;
+        std::unique_ptr< WithWindow<::openPMD::RecordComponent > >
+            preparedDataset;
+    };
+
+    /** Functor for reading ND scalar fields with N=simDim
+     * In the current implementation each process (of the ND grid of processes)
+     * reads 1 scalar value Optionally the processes can also read an attribute
+     * for this dataset by using a non-empty attrName
+     *
+     * @tparam T_Scalar    Type of the scalar value to read
+     * @tparam T_Attribute Type of the attribute (can be omitted if attribute is
+     * not read, defaults to uint64_t)
+     */
+    template< typename T_Scalar, typename T_Attribute = uint64_t >
+    struct ReadNDScalars
     {
-        auto name = baseName + "/" + group + "/" + dataset;
-        log< picLog::INPUT_OUTPUT >( "openPMD: write %1%D scalars: %2%" ) %
-            simDim % name;
-
-        preparedDataset->m_data.storeChunk(
-            std::make_shared< T_Scalar >( value ),
-            preparedDataset->m_offset,
-            preparedDataset->m_extent );
-        params.openPMDSeries->flush( );
-    }
-
-private:
-    const std::string baseName, group, dataset, attrName;
-    int64_t varId;
-    std::unique_ptr< WithWindow< ::openPMD::RecordComponent > > preparedDataset;
-};
-
-/** Functor for reading ND scalar fields with N=simDim
- * In the current implementation each process (of the ND grid of processes)
- * reads 1 scalar value Optionally the processes can also read an attribute for
- * this dataset by using a non-empty attrName
- *
- * @tparam T_Scalar    Type of the scalar value to read
- * @tparam T_Attribute Type of the attribute (can be omitted if attribute is not
- * read, defaults to uint64_t)
- */
-template < typename T_Scalar, typename T_Attribute = uint64_t >
-struct ReadNDScalars
-{
-    /** Read the skalar field and optionally the attribute into the values
-     * referenced by the pointers */
-    void operator( )(
-        ThreadParams & params,
-        const std::string & baseName,
-        const std::string & group,
-        const std::string & dataset,
-        T_Scalar * value,
-        const std::string & attrName = "",
-        T_Attribute * attribute = nullptr )
-    {
-        auto name = baseName + "/" + group + "/" + dataset;
-        log< picLog::INPUT_OUTPUT >( "openPMD: read %1%D scalars: %2%" ) %
-            simDim % name;
-
-
-        auto datasetName = baseName + "/" + group + "/" + dataset;
-        ::openPMD::Series & series = *params.openPMDSeries;
-        ::openPMD::RecordComponent & rc =
-            series.iterations[params.currentStep]
-                .meshes[baseName + "_" + group][dataset];
-        auto ndim = rc.getDimensionality( );
-        if ( ndim != simDim )
+        /** Read the skalar field and optionally the attribute into the values
+         * referenced by the pointers */
+        void
+        operator()( ThreadParams & params,
+            const std::string & baseName,
+            const std::string & group,
+            const std::string & dataset,
+            T_Scalar * value,
+            const std::string & attrName = "",
+            T_Attribute * attribute = nullptr )
         {
-            throw std::runtime_error(
-                std::string( "Invalid dimensionality for " ) + name );
-        }
+            auto name = baseName + "/" + group + "/" + dataset;
+            log< picLog::INPUT_OUTPUT >( "openPMD: read %1%D scalars: %2%" ) %
+                simDim % name;
 
-        DataSpace< simDim > gridPos =
-            Environment< simDim >::get( ).GridController( ).getPosition( );
-        ::openPMD::Offset start;  //[varInfo->ndim];
-        ::openPMD::Extent count;  //[varInfo->ndim];
-        start.reserve( ndim );
-        count.reserve( ndim );
-        for ( int d = 0; d < ndim; ++d )
-        {
-            start[d] = gridPos.revert( )[d];
-            count[d] = 1;
-        }
 
-        __getTransactionEvent( ).waitForFinished( );
+            auto datasetName = baseName + "/" + group + "/" + dataset;
+            ::openPMD::Series & series = *params.openPMDSeries;
+            ::openPMD::RecordComponent & rc =
+                series.iterations[ params.currentStep ]
+                    .meshes[ baseName + "_" + group ][ dataset ];
+            auto ndim = rc.getDimensionality();
+            if( ndim != simDim )
+            {
+                throw std::runtime_error(
+                    std::string( "Invalid dimensionality for " ) + name );
+            }
 
-        log< picLog::INPUT_OUTPUT >( "openPMD: Schedule read skalar %1%)" ) %
-            datasetName;
+            DataSpace< simDim > gridPos =
+                Environment< simDim >::get().GridController().getPosition();
+            ::openPMD::Offset start; //[varInfo->ndim];
+            ::openPMD::Extent count; //[varInfo->ndim];
+            start.reserve( ndim );
+            count.reserve( ndim );
+            for( int d = 0; d < ndim; ++d )
+            {
+                start[ d ] = gridPos.revert()[ d ];
+                count[ d ] = 1;
+            }
 
-        std::shared_ptr< T_Scalar > readValue =
-            rc.loadChunk< T_Scalar >( start, count );
+            __getTransactionEvent().waitForFinished();
 
-        series.flush( );
-
-        *value = *readValue;
-
-        if ( !attrName.empty( ) )
-        {
             log< picLog::INPUT_OUTPUT >(
-                "openPMD: read attribute %1% for scalars: %2%" ) %
-                attrName % name;
-            *attribute = rc.getAttribute( name ).get< T_Attribute >( );
-        }
-    }
-};
+                "openPMD: Schedule read skalar %1%)" ) %
+                datasetName;
 
-}  // namespace openPMD
-}  // namespace picongpu
+            std::shared_ptr< T_Scalar > readValue =
+                rc.loadChunk< T_Scalar >( start, count );
+
+            series.flush();
+
+            *value = *readValue;
+
+            if( !attrName.empty() )
+            {
+                log< picLog::INPUT_OUTPUT >(
+                    "openPMD: read attribute %1% for scalars: %2%" ) %
+                    attrName % name;
+                *attribute = rc.getAttribute( name ).get< T_Attribute >();
+            }
+        }
+    };
+
+} // namespace openPMD
+} // namespace picongpu
