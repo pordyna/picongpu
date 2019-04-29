@@ -54,7 +54,7 @@ struct WriteNDScalars
     }
 
     /** Prepare the write operation:
-     *  Define ADIOS variable, increase params.openPMDGroupSize and write
+     *  Define openPMD dataset and write
      * attribute (if attrName is non-empty)
      *
      *  Must be called before executing the functor
@@ -70,10 +70,6 @@ struct WriteNDScalars
         log< picLog::INPUT_OUTPUT >(
             "openPMD: prepare write %1%D scalars: %2%" ) %
             simDim % name;
-
-        params.openPMDGroupSize += sizeof( T_Scalar );
-        if ( !attrName.empty( ) )
-            params.openPMDGroupSize += sizeof( T_Attribute );
 
         // Size over all processes
         Dimensions globalDomainSize = Dimensions::create( 1 );
@@ -105,7 +101,7 @@ struct WriteNDScalars
                         Dimensions::create( 1 ),
                         localDomainOffset,
                         true,
-                        params.adiosCompression )}};
+                        params.compressionMethod )}};
 
         if ( !attrName.empty( ) )
         {
@@ -184,7 +180,6 @@ struct ReadNDScalars
         count.reserve( ndim );
         for ( int d = 0; d < ndim; ++d )
         {
-            /* \see adios_define_var: z,y,x in C-order */
             start[d] = gridPos.revert( )[d];
             count[d] = 1;
         }

@@ -28,7 +28,6 @@
 
 #include "picongpu/plugins/output/WriteSpeciesCommon.hpp"
 #include "picongpu/particles/traits/GetSpeciesFlagName.hpp"
-#include "picongpu/traits/PICToAdios.hpp"
 
 #include <pmacc/mappings/kernel/AreaMapping.hpp>
 #include <pmacc/math/Vector.hpp>
@@ -74,11 +73,11 @@ public:
     typedef typename FrameType::ParticleDescription ParticleDescription;
     typedef typename FrameType::ValueTypeSeq ParticleAttributeList;
 
-    /* delete multiMask and localCellIdx in adios particle*/
+    /* delete multiMask and localCellIdx in openPMD particle*/
     typedef bmpl::vector<multiMask,localCellIdx> TypesToDelete;
     typedef typename RemoveFromSeq<ParticleAttributeList, TypesToDelete>::type ParticleCleanedAttributeList;
 
-    /* add totalCellIdx for adios particle*/
+    /* add totalCellIdx for openPMD particle*/
     typedef typename MakeSeq<
             ParticleCleanedAttributeList,
             totalCellIdx
@@ -174,17 +173,15 @@ public:
                     pmacc::math::UInt64<DIM1>(localTableSize),
                     pmacc::math::UInt64<DIM1>(localTableSize * uint64_t(gc.getGlobalRank()) ),
                     true,
-                    params->adiosCompression
+                    params->compressionMethod
                 )
             );
-
-            params->openPMDGroupSize += sizeof(uint64_t) * localTableSize * gc.getGlobalSize(); // TODO
         }
         series.flush();    
     }
 };
 
 
-} //namspace adios
+} //namspace openPMD
 
 } //namespace picongpu

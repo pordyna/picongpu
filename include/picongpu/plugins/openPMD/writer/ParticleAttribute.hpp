@@ -32,7 +32,7 @@ namespace openPMD
 {
 using namespace pmacc;
 
-/** write attribute of a particle to adios file
+/** write attribute of a particle to openPMD series
  *
  * @tparam T_Identifier identifier of a particle attribute
  */
@@ -40,7 +40,7 @@ template< typename T_Identifier>
 struct ParticleAttribute
 {
 
-    /** write attribute to adios file
+    /** write attribute to openPMD series
      *
      * @param params wrapped params
      * @param elements elements of this attribute
@@ -93,7 +93,7 @@ struct ParticleAttribute
 
 };
 
-} //namspace adios
+} //namspace openPMD
 
 } //namespace picongpu
 

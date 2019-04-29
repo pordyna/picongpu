@@ -58,7 +58,7 @@ namespace openPMD
 {
 using namespace pmacc;
 
-/** Write copy particle to host memory and dump to ADIOS file
+/** Write copy particle to host memory and dump to openPMD file
  *
  * @tparam T_Species type of species
  *
@@ -73,11 +73,11 @@ public:
     typedef typename FrameType::ParticleDescription ParticleDescription;
     typedef typename FrameType::ValueTypeSeq ParticleAttributeList;
 
-    /* delete multiMask and localCellIdx in adios particle*/
+    /* delete multiMask and localCellIdx in openPMD particle*/
     typedef bmpl::vector<multiMask,localCellIdx> TypesToDelete;
     typedef typename RemoveFromSeq<ParticleAttributeList, TypesToDelete>::type ParticleCleanedAttributeList;
 
-    /* add totalCellIdx for adios particle*/
+    /* add totalCellIdx for openPMD particle*/
     typedef typename MakeSeq<
         ParticleCleanedAttributeList,
         totalCellIdx
@@ -222,6 +222,6 @@ public:
 };
 
 
-} //namspace adios
+} //namspace openPMD
 
 } //namespace picongpu

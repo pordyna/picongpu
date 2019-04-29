@@ -28,7 +28,6 @@
 #include "picongpu/fields/currentInterpolation/CurrentInterpolation.hpp"
 
 #include "picongpu/traits/SIBaseUnits.hpp"
-#include "picongpu/traits/PICToAdios.hpp"
 
 #include <openPMD/openPMD.hpp>
 
@@ -55,7 +54,7 @@ namespace writeMeta
     {
         /** write meta data for species
          *
-         * @param threadParams context of the adios plugin
+         * @param threadParams context of the openPMD plugin
          * @param fullMeshesPath path to mesh entry
          */
         void operator()(
@@ -101,7 +100,7 @@ namespace writeMeta
     {
         /** write meta data for species
          *
-         * @param threadParams context of the adios plugin
+         * @param threadParams context of the openPMD plugin
          * @param fullMeshesPath path to mesh entry
          */
         void operator()(
@@ -118,11 +117,8 @@ namespace writeMeta
     {
         void operator()(ThreadParams *threadParams)
         {
-            log<picLog::INPUT_OUTPUT > ("ADIOS: (begin) write meta attributes.");
+            log<picLog::INPUT_OUTPUT > ("openPMD: (begin) write meta attributes.");
 
-            traits::PICToAdios<uint32_t> adiosUInt32Type;
-            traits::PICToAdios<float_X> adiosFloatXType;
-            traits::PICToAdios<float_64> adiosDoubleType;
             ::openPMD::Series & series = *threadParams->openPMDSeries;
 
             /*
@@ -218,14 +214,14 @@ namespace writeMeta
             );
 
             /* write current iteration */
-            log<picLog::INPUT_OUTPUT > ("ADIOS: meta: iteration");
+            log<picLog::INPUT_OUTPUT > ("openPMD: meta: iteration");
             iteration.setAttribute(
                 "iteration",
                 threadParams->currentStep
             ); // openPMD API will not write this automatically
 
             /* write number of slides */
-            log<picLog::INPUT_OUTPUT > ("ADIOS: meta: sim_slides");
+            log<picLog::INPUT_OUTPUT > ("openPMD: meta: sim_slides");
             uint32_t slides = MovingWindow::getInstance().getSlideCounter(threadParams->currentStep);
             iteration.setAttribute(
                 "sim_slides",
@@ -252,7 +248,7 @@ namespace writeMeta
 
 
             /* write base units */
-            log<picLog::INPUT_OUTPUT > ("ADIOS: meta: units");
+            log<picLog::INPUT_OUTPUT > ("openPMD: meta: units");
             iteration.setAttribute(
                 "unit_energy",
                 UNIT_ENERGY

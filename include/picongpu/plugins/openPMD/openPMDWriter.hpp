@@ -61,9 +61,6 @@
 #include "picongpu/plugins/openPMD/NDScalars.hpp"
 #include "picongpu/plugins/misc/SpeciesFilter.hpp"
 
-#include <adios.h>
-#include <adios_read.h>
-#include <adios_error.h>
 #include <openPMD/openPMD.hpp>
 
 #include <boost/mpl/vector.hpp>
@@ -98,37 +95,6 @@ using namespace pmacc;
 
 
 namespace po = boost::program_options;
-
-template <unsigned DIM>
-int64_t defineAdiosVar(int64_t group_id,
-                       const char * name,
-                       const char * path,
-                       enum ADIOS_DATATYPES type,
-                       pmacc::math::UInt64<DIM> dimensions,
-                       pmacc::math::UInt64<DIM> globalDimensions,
-                       pmacc::math::UInt64<DIM> offset,
-                       bool compression,
-                       std::string compressionMethod)
-{
-    int64_t var_id = 0;
-
-    var_id = adios_define_var(
-        group_id, name, path, type,
-        dimensions.revert().toString(",", "").c_str(),
-        globalDimensions.revert().toString(",", "").c_str(),
-        offset.revert().toString(",", "").c_str()
-    );
-
-    if(compression)
-    {
-        /* enable adios transform layer for variable */
-        adios_set_transform(var_id, compressionMethod.c_str());
-    }
-
-    log<picLog::INPUT_OUTPUT > ("ADIOS: Defined varID=%1% for '%2%' at %3% for %4%/%5% elements") %
-                var_id % std::string(name) % offset.toString() % dimensions.toString() % globalDimensions.toString();
-    return var_id;
-}
 
 template <unsigned DIM>
 WithWindow< ::openPMD::RecordComponent >
@@ -181,8 +147,44 @@ WithWindow< T > WithWindow< T >::init(
     };
 }
 
+::openPMD::Series & 
+ThreadParams::openSeries( ::openPMD::AccessType at )
+{
+    if ( !openPMDSeries )
+    {
+        log< picLog::INPUT_OUTPUT >( "openPMD: open file: %1%" ) % fileName;
+        openPMDSeries = std::unique_ptr<::openPMD::Series >(
+            new ::openPMD::Series( fileName, at, communicator ) );
+        if ( at == ::openPMD::AccessType::CREATE )
+        {
+            openPMDSeries->setMeshesPath( MESHES_PATH );
+        }
+        return *openPMDSeries;
+    }
+    else
+    {
+        throw std::runtime_error(
+            "openPMD: Tried opening a Series while old Series was still "
+            "active" );
+    }
+}
 
-/** Writes simulation data to adios files.
+void 
+ThreadParams::closeSeries( )
+{
+    if ( openPMDSeries )
+    {
+        openPMDSeries.reset( );
+    }
+    else
+    {
+        throw std::runtime_error(
+            "openPMD: Tried closing a Series that was not active" );
+    }
+}
+
+
+/** Writes simulation data to openPMD.
  *
  * Implements the IIOBackend interface.
  */
@@ -259,7 +261,7 @@ public:
 
         plugins::multi::Option< std::string > compression = {
             "compression",
-            "ADIOS compression method, e.g., zlib (see `adios_config -m` for help)",
+            "Backend-specific openPMD compression method, e.g., zlib (see `adios_config -m` for help)",
             "none"
         };
 
@@ -453,7 +455,7 @@ private:
     }
 
     /**
-     * Write calculated fields to adios file.
+     * Write calculated fields to openPMD.
      */
     template< typename T >
     struct GetFields
@@ -486,9 +488,9 @@ private:
     };
 
     /** Calculate FieldTmp with given solver and particle species
-     * and write them to adios.
+     * and write them to openPMD.
      *
-     * FieldTmp is calculated on device and than dumped to adios.
+     * FieldTmp is calculated on device and then dumped to openPMD.
      */
     template< typename Solver, typename Species >
     struct GetFields<FieldTmpOperation<Solver, Species> >
@@ -512,7 +514,7 @@ private:
         typedef typename FieldTmp::ValueType ValueType;
         typedef typename GetComponentsType<ValueType>::type ComponentType;
 
-        /** Create a name for the adios identifier.
+        /** Create a name for the openPMD identifier.
          */
         static std::string getName()
         {
@@ -548,8 +550,9 @@ private:
             const uint32_t components = GetNComponents<ValueType>::value;
 
             params->gridLayout = fieldTmp->getGridLayout();
-            /*write data to ADIOS file*/
-            openPMDWriter::template writeField<ComponentType>(params,
+            /*write data to openPMD Series*/
+            openPMDWriter::template writeField<ComponentType>(
+                       params,
                        sizeof(ComponentType),
                        ::openPMD::determineDatatype< ComponentType >( ),
                        components,
@@ -594,7 +597,7 @@ private:
                     params->fieldsSizeDims,
                     params->fieldsOffsetDims,
                     true,
-                    params->adiosCompression
+                    params->compressionMethod
                 )
             );
             mrc.setPosition(inCellPosition.at(c));
@@ -663,7 +666,7 @@ private:
     }
 
     /**
-     * Collect field sizes to set adios group size.
+     * Collect field sizes
      */
     template< typename T >
     struct CollectFieldsSizes
@@ -684,14 +687,6 @@ private:
 #ifndef __CUDA_ARCH__
             const uint32_t components = T::numComponents;
 
-            // adios buffer size for this dataset (all components)
-            uint64_t localGroupSize =
-                    params->window.localDimensions.size.productOfComponents() *
-                    sizeof(ComponentType) *
-                    components;
-
-            params->openPMDGroupSize += localGroupSize;
-
             // convert in a std::vector of std::vector format for writeField API
             const traits::FieldPosition<typename fields::Solver::NummericalCellType, T> fieldPos;
 
@@ -709,8 +704,7 @@ private:
             const float_X timeOffset = 0.0;
 
 
-            PICToAdios<ComponentType> adiosType;
-            Datatype dt = determineDatatype< ComponentType >();
+            Datatype dt = ::openPMD::determineDatatype< ComponentType >();
             defineFieldVar(params, components, dt, T::getName(), getUnit(),
                 T::getUnitDimension(), inCellPosition, timeOffset);
 #endif
@@ -718,8 +712,7 @@ private:
     };
 
     /**
-     * Collect field sizes to set adios group size.
-     * Specialization.
+     * Collect field sizes, Specialization.
      */
     template< typename Solver, typename Species >
     struct CollectFieldsSizes<FieldTmpOperation<Solver, Species> >
@@ -737,7 +730,7 @@ private:
         typedef typename FieldTmp::UnitValueType UnitType;
         typedef typename GetComponentsType<ValueType>::type ComponentType;
 
-        /** Create a name for the adios identifier.
+        /** Create a name for the openPMD identifier.
          */
         static std::string getName()
         {
@@ -756,13 +749,6 @@ private:
         {
             const uint32_t components = GetNComponents<ValueType>::value;
 
-            // adios buffer size for this dataset (all components)
-            uint64_t localGroupSize =
-                    params->window.localDimensions.size.productOfComponents() *
-                    sizeof(ComponentType) *
-                    components;
-
-            params->openPMDGroupSize += localGroupSize;
 
             /*wrap in a one-component vector for writeField API*/
             const traits::FieldPosition<typename fields::Solver::NummericalCellType, FieldTmp>
@@ -805,9 +791,7 @@ public:
     lastSpeciesSyncStep(pmacc::traits::limits::Max<uint32_t>::value)
     {
 
-        mThreadParams.adiosDisableMeta = m_help->disableMeta.get( id );
-        mThreadParams.adiosTransportParams = m_help->transportParams.get( id );
-        mThreadParams.adiosCompression = m_help->compression.get( id );
+        mThreadParams.compressionMethod = m_help->compression.get( id );
 
         GridController<simDim> &gc = Environment<simDim>::get().GridController();
         /* It is important that we never change the mpi_pos after this point
@@ -833,21 +817,19 @@ public:
 
         // avoid deadlock between not finished pmacc tasks and mpi blocking collectives
         __getTransactionEvent().waitForFinished();
-        /* Initialize adios library */
-        mThreadParams.adiosComm = MPI_COMM_NULL;
-        MPI_CHECK(MPI_Comm_dup(gc.getCommunicator().getMPIComm(), &(mThreadParams.adiosComm)));
-        mThreadParams.adiosBufferInitialized = false;
+        mThreadParams.communicator = MPI_COMM_NULL;
+        MPI_CHECK(MPI_Comm_dup(gc.getCommunicator().getMPIComm(), &(mThreadParams.communicator)));
 
         /* TODO: select MPI method, #OSTs and #aggregators */
     }
 
     virtual ~openPMDWriter()
     {
-        if (mThreadParams.adiosComm != MPI_COMM_NULL)
+        if (mThreadParams.communicator != MPI_COMM_NULL)
         {
             // avoid deadlock between not finished pmacc tasks and mpi blocking collectives
             __getTransactionEvent().waitForFinished();
-            MPI_CHECK_NO_EXCEPT(MPI_Comm_free(&(mThreadParams.adiosComm)));
+            MPI_CHECK_NO_EXCEPT(MPI_Comm_free(&(mThreadParams.communicator)));
         }
     }
 
@@ -989,7 +971,7 @@ public:
         log<picLog::INPUT_OUTPUT > ("Setting next free id on current rank: %1%") % idProvState.nextId;
         IdProvider<simDim>::setState(idProvState);
 
-        // avoid deadlock between not finished pmacc tasks and mpi calls in adios
+        // avoid deadlock between not finished pmacc tasks and mpi calls in openPMD
         __getTransactionEvent().waitForFinished();
 
         // Finalize the openPMD Series by calling its destructor
@@ -998,12 +980,12 @@ public:
 
 private:
 
-    void endAdios()
+    void endWrite()
     {
         mThreadParams.fieldBuffer.reset( );
     }
 
-    void beginAdios()
+    void initWrite()
     {
         mThreadParams.fieldBuffer = std::shared_ptr< float_X >{
             new float_X[mThreadParams.window.localDimensions.size.productOfComponents()],
@@ -1055,11 +1037,11 @@ private:
 #endif
         }
 
-        beginAdios();
+        initWrite();
 
-        writeAdios(&mThreadParams, mpiTransportParams);
+        write(&mThreadParams, mpiTransportParams);
 
-        endAdios();
+        endWrite();
     }
 
     template<typename ComponentType>
@@ -1231,10 +1213,8 @@ private:
         }
     };
 
-    void writeAdios(ThreadParams *threadParams, std::string mpiTransportParams)
+    void write(ThreadParams *threadParams, std::string mpiTransportParams)
     {
-        threadParams->openPMDGroupSize = 0;
-
         /* y direction can be negative for first gpu */
         const pmacc::Selection<simDim>& localDomain = Environment<simDim>::get().SubGrid().getLocalDomain();
         DataSpace<simDim> particleOffset(localDomain.offset);
@@ -1439,15 +1419,15 @@ private:
         writeIdProviderStartId(*threadParams, idProviderState.startId);
         writeIdProviderNextId(*threadParams, idProviderState.nextId);
 
-        // avoid deadlock between not finished pmacc tasks and mpi calls in adios
+        // avoid deadlock between not finished pmacc tasks and mpi calls in openPMD
         __getTransactionEvent().waitForFinished();
 
-        /* close adios file, most likely the actual write point */
+        /* close openPMD Series, most likely the actual write point */
         log<picLog::INPUT_OUTPUT > ("openPMD: closing series: %1%") % threadParams->fileName;
         threadParams->closeSeries( );
 
-        /*\todo: copied from adios example, we might not need this ? */
-        MPI_CHECK(MPI_Barrier(threadParams->adiosComm));
+        // TODO: copied from ADIOS plugin, do we need this?
+        MPI_CHECK(MPI_Barrier(threadParams->communicator));
 
         return;
     }

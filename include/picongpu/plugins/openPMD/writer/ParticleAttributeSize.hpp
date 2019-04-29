@@ -21,7 +21,6 @@
 
 #include "picongpu/simulation_defines.hpp"
 #include "picongpu/plugins/openPMD/openPMDWriter.def"
-#include "picongpu/traits/PICToAdios.hpp"
 #include "picongpu/traits/PICToOpenPMD.hpp"
 #include <pmacc/traits/GetComponentsType.hpp>
 #include <pmacc/traits/GetNComponents.hpp>
@@ -63,8 +62,6 @@ struct ParticleAttributeSize
         const uint32_t components = GetNComponents<ValueType>::value;
         typedef typename GetComponentsType<ValueType>::type ComponentType;
 
-        params->openPMDGroupSize += elements * components * sizeof(ComponentType);
-
         const std::string name_lookup[] = {"x", "y", "z"};
 
         OpenPMDName<T_Identifier> openPMDName;
@@ -99,17 +96,15 @@ struct ParticleAttributeSize
                     pmacc::math::UInt64<DIM1>(elements),
                     pmacc::math::UInt64<DIM1>(globalOffset),
                     true,
-                    params->adiosCompression 
+                    params->compressionMethod 
                 )
             );
 
-            /* already add the unitSI and further attribute so `adios_group_size`
-             * calculates the reservation for the buffer correctly */
 
             /* check if this attribute actually has a unit (unit.size() == 0 is no unit) */
             if (unit.size() >= (d + 1))
             {
-                record.setAttribute( "unitSI", unit.at( d ) );
+                recordComponent.setUnitSI( unit.at( d ) );
             }
         }
 
@@ -144,7 +139,7 @@ struct ParticleAttributeSize
     }
 };
 
-} //namspace adios
+} //namspace openPMD
 
 } //namespace picongpu
 
