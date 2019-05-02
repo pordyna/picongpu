@@ -70,7 +70,6 @@ namespace openPMD
     struct ThreadParams
     {
         uint32_t currentStep;     /** current simulation step */
-        std::string fullFilename; /* e.g., simData_1000.bp */
 
 
         std::unique_ptr<::openPMD::Series >

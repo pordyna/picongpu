@@ -213,7 +213,14 @@ namespace openPMD
                 "species_all, fields_all" };
 
             plugins::multi::Option< std::string > fileName = { "file",
-                "openPMD Series pattern" };
+                "openPMD file basename" };
+            
+            plugins::multi::Option< std::string > fileNameExtension = {
+                "ext",
+                "openPMD filename extension (this controls the"
+                "backend picked by the openPMD API)",
+                "bp"
+            };
 
             std::vector< std::string > allowedDataSources = { "species_all",
                 "fields_all" };
@@ -312,6 +319,7 @@ namespace openPMD
                     masterPrefix + prefix,
                     std::string( "[" ) + concatenatedSourceNames + "]" );
                 fileName.registerHelp( desc, masterPrefix + prefix );
+                fileNameExtension.registerHelp( desc, masterPrefix + prefix );
 
                 expandHelp( desc, "" );
                 selfRegister = true;
@@ -842,7 +850,9 @@ namespace openPMD
 
             __getTransactionEvent().waitForFinished();
 
-            std::string filename = m_help->fileName.get( m_id );
+            std::string filename = 
+                    m_help->fileName.get( m_id ) + "_%T." + 
+                    m_help->fileNameExtension.get( m_id );
 
             /* if file name is relative, prepend with common directory */
             if( boost::filesystem::path( filename ).has_root_path() )
