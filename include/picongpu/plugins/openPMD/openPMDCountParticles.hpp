@@ -188,17 +188,17 @@ namespace openPMD
                     ::openPMD::determineDatatype< uint64_t >();
                 ::openPMD::RecordComponent & recordComponent =
                     particleSpecies[ "particles_info" ]
-                                   [ ::openPMD::RecordComponent::SCALAR ];
-                params->speciesIndices.push_back(
-                    prepareDataset< DIM1 >( recordComponent,
-                        datatype,
-                        pmacc::math::UInt64< DIM1 >(
-                            localTableSize * uint64_t( gc.getGlobalSize() ) ),
-                        pmacc::math::UInt64< DIM1 >( localTableSize ),
-                        pmacc::math::UInt64< DIM1 >(
-                            localTableSize * uint64_t( gc.getGlobalRank() ) ),
-                        true,
-                        params->compressionMethod ) );
+                                   [::openPMD::RecordComponent::SCALAR ];
+                pushDataset< DIM1 >( recordComponent,
+                    datatype,
+                    pmacc::math::UInt64< DIM1 >(
+                        localTableSize * uint64_t( gc.getGlobalSize() ) ),
+                    pmacc::math::UInt64< DIM1 >( localTableSize ),
+                    pmacc::math::UInt64< DIM1 >(
+                        localTableSize * uint64_t( gc.getGlobalRank() ) ),
+                    true,
+                    params->compressionMethod,
+                    params->speciesIndices );
             }
             series.flush();
         }

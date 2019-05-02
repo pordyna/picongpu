@@ -93,14 +93,14 @@ namespace openPMD
                 ::openPMD::Datatype openPMDType =
                     ::openPMD::determineDatatype< ComponentType >();
 
-                params->particleAttributes.push_back(
-                    prepareDataset< DIM1 >( recordComponent,
+                pushDataset< DIM1 >( recordComponent,
                         openPMDType,
                         pmacc::math::UInt64< DIM1 >( globalElements ),
                         pmacc::math::UInt64< DIM1 >( elements ),
                         pmacc::math::UInt64< DIM1 >( globalOffset ),
                         true,
-                        params->compressionMethod ) );
+                        params->compressionMethod,
+                        params->particleAttributes);
 
 
                 /* check if this attribute actually has a unit (unit.size() == 0

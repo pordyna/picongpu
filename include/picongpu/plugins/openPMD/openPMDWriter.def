@@ -69,7 +69,7 @@ namespace openPMD
 
     struct ThreadParams
     {
-        uint32_t currentStep;     /** current simulation step */
+        uint32_t currentStep; /** current simulation step */
 
 
         std::unique_ptr<::openPMD::Series >
@@ -137,11 +137,22 @@ namespace openPMD
     WithWindow<::openPMD::RecordComponent >
     prepareDataset( ::openPMD::RecordComponent & recordComponent,
         ::openPMD::Datatype datatype,
-        pmacc::math::UInt64< DIM > globalDimensions,
-        pmacc::math::UInt64< DIM > localDimensions,
-        pmacc::math::UInt64< DIM > offset,
+        pmacc::math::UInt64< DIM > const & globalDimensions,
+        pmacc::math::UInt64< DIM > const & localDimensions,
+        pmacc::math::UInt64< DIM > const & offset,
         bool compression,
-        std::string compressionMethod );
+        std::string const & compressionMethod );
+
+    template< unsigned DIM >
+    void
+    pushDataset( ::openPMD::RecordComponent & recordComponent,
+        ::openPMD::Datatype datatype,
+        pmacc::math::UInt64< DIM > const & globalDimensions,
+        pmacc::math::UInt64< DIM > const & localDimensions,
+        pmacc::math::UInt64< DIM > const & offset,
+        bool compression,
+        std::string const & compressionMethod,
+        std::list< WithWindow<::openPMD::RecordComponent > > & push_to );
 
 } // namespace openPMD
 } // namespace picongpu

@@ -74,6 +74,7 @@
 #    include <unistd.h>
 #endif
 
+#include <algorithm>
 #include <list>
 #include <pthread.h>
 #include <sstream>
@@ -94,11 +95,11 @@ namespace openPMD
     WithWindow<::openPMD::RecordComponent >
     prepareDataset( ::openPMD::RecordComponent & recordComponent,
         ::openPMD::Datatype datatype,
-        pmacc::math::UInt64< DIM > globalDimensions,
-        pmacc::math::UInt64< DIM > localDimensions,
-        pmacc::math::UInt64< DIM > offset,
+        pmacc::math::UInt64< DIM > const & globalDimensions,
+        pmacc::math::UInt64< DIM > const & localDimensions,
+        pmacc::math::UInt64< DIM > const & offset,
         bool compression,
-        std::string compressionMethod )
+        std::string const & compressionMethod )
     {
         std::vector< uint64_t > v = asStandardVector< DIM >( globalDimensions );
         ::openPMD::Dataset dataset{ datatype, std::move( v ) };
@@ -109,6 +110,31 @@ namespace openPMD
         recordComponent.resetDataset( std::move( dataset ) );
         return WithWindow<::openPMD::RecordComponent >::init< DIM >(
             recordComponent, offset, localDimensions );
+    }
+
+    template< unsigned DIM >
+    void
+    pushDataset( ::openPMD::RecordComponent & recordComponent,
+        ::openPMD::Datatype datatype,
+        pmacc::math::UInt64< DIM > const & globalDimensions,
+        pmacc::math::UInt64< DIM > const & localDimensions,
+        pmacc::math::UInt64< DIM > const & offset,
+        bool compression,
+        std::string const & compressionMethod,
+        std::list< WithWindow<::openPMD::RecordComponent > > & push_to )
+    {
+        if( std::all_of( &globalDimensions[ 0 ],
+                &globalDimensions[ 0 ] + DIM,
+                []( uint64_t i ) { return i > 0; } ) )
+        {
+            push_to.push_back( prepareDataset< DIM >( recordComponent,
+                datatype,
+                globalDimensions,
+                localDimensions,
+                offset,
+                compression,
+                compressionMethod ) );
+        }
     }
 
     template< unsigned DIM, typename T >
@@ -214,13 +240,11 @@ namespace openPMD
 
             plugins::multi::Option< std::string > fileName = { "file",
                 "openPMD file basename" };
-            
-            plugins::multi::Option< std::string > fileNameExtension = {
-                "ext",
+
+            plugins::multi::Option< std::string > fileNameExtension = { "ext",
                 "openPMD filename extension (this controls the"
                 "backend picked by the openPMD API)",
-                "bp"
-            };
+                "bp" };
 
             std::vector< std::string > allowedDataSources = { "species_all",
                 "fields_all" };
@@ -562,13 +586,14 @@ namespace openPMD
                 ::openPMD::MeshRecordComponent & mrc = mesh[ nComponents > 1
                         ? name_lookup_tpl[ c ]
                         : ::openPMD::RecordComponent::SCALAR ];
-                params->fieldRecords.push_back( prepareDataset< simDim >( mrc,
+                pushDataset< simDim >( mrc,
                     openPMDType,
                     params->fieldsGlobalSizeDims,
                     params->fieldsSizeDims,
                     params->fieldsOffsetDims,
                     true,
-                    params->compressionMethod ) );
+                    params->compressionMethod,
+                    params->fieldRecords );
                 mrc.setPosition( inCellPosition.at( c ) );
                 mrc.setUnitSI( unit.at( c ) );
             }
@@ -850,9 +875,8 @@ namespace openPMD
 
             __getTransactionEvent().waitForFinished();
 
-            std::string filename = 
-                    m_help->fileName.get( m_id ) + "_%T." + 
-                    m_help->fileNameExtension.get( m_id );
+            std::string filename = m_help->fileName.get( m_id ) + "_%T." +
+                m_help->fileNameExtension.get( m_id );
 
             /* if file name is relative, prepend with common directory */
             if( boost::filesystem::path( filename ).has_root_path() )
