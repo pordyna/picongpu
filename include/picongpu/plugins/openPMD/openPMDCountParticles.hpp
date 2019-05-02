@@ -1,4 +1,4 @@
-/* Copyright 2014-2018 Felix Schmitt, Axel Huebl
+/* Copyright 2014-2019 Felix Schmitt, Axel Huebl, Franz Pöschel
  *
  * This file is part of PIConGPU.
  *
@@ -98,7 +98,7 @@ namespace openPMD
             ::openPMD::Series & series = *params->openPMDSeries;
             ::openPMD::Iteration & iteration =
                 series.iterations[ params->currentStep ];
-            Container<::openPMD::Record > & particleSpecies =
+            ::openPMD::Container<::openPMD::Record > & particleSpecies =
                 iteration.particles[ speciesGroup ];
 
 
@@ -188,7 +188,7 @@ namespace openPMD
                     ::openPMD::determineDatatype< uint64_t >();
                 ::openPMD::RecordComponent & recordComponent =
                     particleSpecies[ "particles_info" ]
-                                   [ RecordComponent::SCALAR ];
+                                   [ ::openPMD::RecordComponent::SCALAR ];
                 params->speciesIndices.push_back(
                     prepareDataset< DIM1 >( recordComponent,
                         datatype,

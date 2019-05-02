@@ -1,5 +1,5 @@
-/* Copyright 2014-2018 Axel Huebl, Felix Schmitt, Heiko Burau, Rene Widera,
- *                     Benjamin Worpitz, Alexander Grund
+/* Copyright 2014-2019 Axel Huebl, Felix Schmitt, Heiko Burau, Rene Widera,
+ *                     Benjamin Worpitz, Alexander Grund, Franz Pöschel
  *
  * This file is part of PIConGPU.
  *
@@ -582,7 +582,8 @@ namespace openPMD
 
             mesh.setUnitDimension( unitMap );
             // TODO linker error?
-            mesh.setTimeOffset(timeOffset);
+            // mesh.setTimeOffset(timeOffset);
+            mesh.setAttribute( "timeOffset", timeOffset );
             mesh.setGeometry( ::openPMD::Mesh::Geometry::cartesian );
             mesh.setDataOrder( ::openPMD::Mesh::DataOrder::C );
 
@@ -678,7 +679,8 @@ namespace openPMD
                 const float_X timeOffset = 0.0;
 
 
-                Datatype dt = ::openPMD::determineDatatype< ComponentType >();
+                ::openPMD::Datatype dt =
+                    ::openPMD::determineDatatype< ComponentType >();
                 defineFieldVar( params,
                     components,
                     dt,

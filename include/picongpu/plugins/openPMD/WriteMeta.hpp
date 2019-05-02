@@ -1,4 +1,4 @@
-/* Copyright 2013-2018 Axel Huebl
+/* Copyright 2013-2019 Axel Huebl, Franz Pöschel
  *
  * This file is part of PIConGPU.
  *
@@ -38,7 +38,6 @@ namespace picongpu
 {
 namespace openPMD
 {
-    using namespace ::openPMD;
     using namespace pmacc;
 
     namespace writeMeta
