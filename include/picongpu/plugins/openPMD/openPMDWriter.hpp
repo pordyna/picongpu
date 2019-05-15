@@ -614,9 +614,7 @@ namespace openPMD
             }
 
             mesh.setUnitDimension( unitMap );
-            // TODO linker error?
-            // mesh.setTimeOffset(timeOffset);
-            mesh.setAttribute( "timeOffset", timeOffset );
+            mesh.setTimeOffset(timeOffset);
             mesh.setGeometry( ::openPMD::Mesh::Geometry::cartesian );
             mesh.setDataOrder( ::openPMD::Mesh::DataOrder::C );
 
