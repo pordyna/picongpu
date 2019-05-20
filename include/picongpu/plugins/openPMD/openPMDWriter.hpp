@@ -616,7 +616,7 @@ namespace openPMD
             }
 
             mesh.setUnitDimension( unitMap );
-            mesh.setTimeOffset(timeOffset);
+            mesh.setTimeOffset< float_X >(timeOffset);
             mesh.setGeometry( ::openPMD::Mesh::Geometry::cartesian );
             mesh.setDataOrder( ::openPMD::Mesh::DataOrder::C );
 
@@ -924,6 +924,8 @@ namespace openPMD
             else
                 mThreadParams.fileName =
                     checkpointDirectory + "/" + checkpointFilename;
+            mThreadParams.fileName +=
+                    "_%T." + m_help->fileNameExtension.get( m_id );
 
             mThreadParams.window =
                 MovingWindow::getInstance().getDomainAsWindow( currentStep );
@@ -953,6 +955,9 @@ namespace openPMD
             {
                 mThreadParams.fileName = constRestartFilename;
             }
+
+            mThreadParams.fileName +=
+                    "_%T." + m_help->fileNameExtension.get( m_id );
 
             // mThreadParams.isCheckpoint = isCheckpoint;
             mThreadParams.currentStep = restartStep;

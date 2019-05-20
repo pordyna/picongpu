@@ -165,10 +165,10 @@ namespace openPMD
 
             auto datasetName = baseName + "/" + group + "/" + dataset;
             ::openPMD::Series & series = *params.openPMDSeries;
-            ::openPMD::RecordComponent & rc =
+            ::openPMD::MeshRecordComponent & mrc =
                 series.iterations[ params.currentStep ]
                     .meshes[ baseName + "_" + group ][ dataset ];
-            auto ndim = rc.getDimensionality();
+            auto ndim = mrc.getDimensionality();
             if( ndim != simDim )
             {
                 throw std::runtime_error(
@@ -183,18 +183,18 @@ namespace openPMD
             count.reserve( ndim );
             for( int d = 0; d < ndim; ++d )
             {
-                start[ d ] = gridPos.revert()[ d ];
-                count[ d ] = 1;
+                start.push_back( gridPos.revert()[ d ] );
+                count.push_back( 1 );
             }
 
             __getTransactionEvent().waitForFinished();
 
             log< picLog::INPUT_OUTPUT >(
-                "openPMD: Schedule read skalar %1%)" ) %
+                "openPMD: Schedule read scalar %1%)" ) %
                 datasetName;
 
             std::shared_ptr< T_Scalar > readValue =
-                rc.loadChunk< T_Scalar >( start, count );
+                mrc.loadChunk< T_Scalar >( start, count );
 
             series.flush();
 
@@ -205,7 +205,7 @@ namespace openPMD
                 log< picLog::INPUT_OUTPUT >(
                     "openPMD: read attribute %1% for scalars: %2%" ) %
                     attrName % name;
-                *attribute = rc.getAttribute( name ).get< T_Attribute >();
+                *attribute = mrc.getAttribute( attrName ).get< T_Attribute >();
             }
         }
     };
