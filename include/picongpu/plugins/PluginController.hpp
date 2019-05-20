@@ -44,7 +44,7 @@
 #   include "picongpu/plugins/adios/ADIOSWriter.hpp"
 #endif
 
-#if (ENABLE_OPENPMD == 1) || true // hehehe
+#if (ENABLE_OPENPMD == 1)
 #   include "picongpu/plugins/openPMD/openPMDWriter.hpp"
 #endif
 

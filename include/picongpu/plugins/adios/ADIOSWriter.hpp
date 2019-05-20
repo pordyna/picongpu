@@ -930,7 +930,7 @@ public:
         mThreadParams.adiosBasePath = adiosPathBase.str();
         //mThreadParams.isCheckpoint = isCheckpoint;
         mThreadParams.currentStep = restartStep;
-        mThreadParams.cellDescription = m_cellDescription; // koi ahnig
+        mThreadParams.cellDescription = m_cellDescription;
 
         /** one could try ADIOS_READ_METHOD_BP_AGGREGATE too which might
          *  be beneficial for re-distribution on a different number of GPUs
