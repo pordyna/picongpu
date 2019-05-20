@@ -1,4 +1,4 @@
-/* Copyright 2013-2019 Axel Huebl, Felix Schmitt, Rene Widera, Franz Pöschel
+/* Copyright 2013-2019 Axel Huebl, Felix Schmitt, Rene Widera, Franz Poeschel
  *
  * This file is part of PIConGPU.
  *

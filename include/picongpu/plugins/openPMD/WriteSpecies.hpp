@@ -1,5 +1,5 @@
 /* Copyright 2014-2019 Rene Widera, Felix Schmitt, Axel Huebl,
- *                     Alexander Grund, Franz Pöschel
+ *                     Alexander Grund, Franz Poeschel
  *
  * This file is part of PIConGPU.
  *
