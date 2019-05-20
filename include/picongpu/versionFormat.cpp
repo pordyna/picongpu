@@ -143,8 +143,8 @@ namespace picongpu
 
         std::stringstream openPMD;
 #if( ENABLE_OPENPMD == 1 )
-        openPMD << OPENPMDAPI_VERSION_MAJOR 
-                << "." 
+        openPMD << OPENPMDAPI_VERSION_MAJOR
+                << "."
                 << OPENPMDAPI_VERSION_MINOR
                 << "."
                 << OPENPMDAPI_VERSION_PATCH
