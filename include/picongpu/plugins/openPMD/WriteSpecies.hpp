@@ -126,7 +126,7 @@ namespace openPMD
             ForEach
                 < typename openPMDFrameType::ValueTypeSeq,
                     MallocHostMemory< bmpl::_1 > > mallocMem;
-            mallocMem( forward( hostFrame ), totalNumParticles );
+            mallocMem( hostFrame, totalNumParticles );
             log< picLog::INPUT_OUTPUT >(
                 "openPMD:   ( end ) malloc host memory: %1%" ) %
                 T_SpeciesFilter::getName();
@@ -202,13 +202,13 @@ namespace openPMD
             ForEach
                 < typename openPMDFrameType::ValueTypeSeq,
                     openPMD::ParticleAttribute< bmpl::_1 > > writeToOpenPMD;
-            writeToOpenPMD( params, forward( hostFrame ), totalNumParticles );
+            writeToOpenPMD( params, hostFrame, totalNumParticles );
 
             /* free host memory */
             ForEach
                 < typename openPMDFrameType::ValueTypeSeq,
                     FreeHostMemory< bmpl::_1 > > freeMem;
-            freeMem( forward( hostFrame ) );
+            freeMem( hostFrame );
             log< picLog::INPUT_OUTPUT >(
                 "openPMD: ( end ) writing species: %1%" ) %
                 T_SpeciesFilter::getName();

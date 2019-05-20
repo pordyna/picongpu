@@ -178,8 +178,7 @@ namespace openPMD
             ForEach
                 < typename openPMDFrameType::ValueTypeSeq,
                     MallocMemory< bmpl::_1 > > mallocMem;
-            mallocMem( forward( hostFrame ),
-                totalNumParticles ); // TODO vllt amol angucken
+            mallocMem( hostFrame , totalNumParticles ); // TODO 
 
             log< picLog::INPUT_OUTPUT >(
                 "openPMD: get mapped memory device pointer: %1%" ) %
@@ -189,14 +188,14 @@ namespace openPMD
             ForEach
                 < typename openPMDFrameType::ValueTypeSeq,
                     GetDevicePtr< bmpl::_1 > > getDevicePtr;
-            getDevicePtr( forward( deviceFrame ), forward( hostFrame ) );
+            getDevicePtr( deviceFrame, hostFrame );
 
             ForEach
                 < typename openPMDFrameType::ValueTypeSeq,
                     LoadParticleAttributesFromADIOS<
                         bmpl::_1 > > loadAttributes;
-            loadAttributes( forward( params ),
-                forward( hostFrame ),
+            loadAttributes( params ,
+                hostFrame,
                 particleSpecies,
                 particleOffset,
                 totalNumParticles );
@@ -217,7 +216,7 @@ namespace openPMD
                 ForEach
                     < typename openPMDFrameType::ValueTypeSeq,
                         FreeMemory< bmpl::_1 > > freeMem;
-                freeMem( forward( hostFrame ) );
+                freeMem( hostFrame );
             }
             log< picLog::INPUT_OUTPUT >(
                 "openPMD: ( end ) load species: %1%" ) %

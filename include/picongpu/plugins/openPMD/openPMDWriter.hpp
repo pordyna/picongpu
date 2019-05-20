@@ -325,13 +325,13 @@ namespace openPMD
                     < AllEligibleSpeciesSources,
                         plugins::misc::AppendName<
                             bmpl::_1 > > getEligibleDataSourceNames;
-                getEligibleDataSourceNames( forward( allowedDataSources ) );
+                getEligibleDataSourceNames( allowedDataSources );
 
                 ForEach
                     < AllFieldSources,
                         plugins::misc::AppendName<
                             bmpl::_1 > > appendFieldSourceNames;
-                appendFieldSourceNames( forward( allowedDataSources ) );
+                appendFieldSourceNames( allowedDataSources );
 
                 // string list with all possible particle sources
                 std::string concatenatedSourceNames =
@@ -342,8 +342,6 @@ namespace openPMD
                 source.registerHelp( desc,
                     masterPrefix + prefix,
                     std::string( "[" ) + concatenatedSourceNames + "]" );
-                fileName.registerHelp( desc, masterPrefix + prefix );
-                fileNameExtension.registerHelp( desc, masterPrefix + prefix );
 
                 expandHelp( desc, "" );
                 selfRegister = true;
@@ -358,6 +356,10 @@ namespace openPMD
                 disableMeta.registerHelp( desc, masterPrefix + prefix );
                 transportParams.registerHelp( desc, masterPrefix + prefix );
                 compression.registerHelp( desc, masterPrefix + prefix );
+                //fileName.registerHelp( desc, masterPrefix + prefix );
+                //fileNameExtension.registerHelp( desc, masterPrefix + prefix );
+                fileName.registerHelp( desc, masterPrefix + prefix );
+                fileNameExtension.registerHelp( desc, masterPrefix + prefix );
             }
 
             void
@@ -1353,7 +1355,7 @@ namespace openPMD
                 ForEach
                     < typename Help::AllFieldSources,
                         CallCollectFieldsSizes< bmpl::_1 > >{}(
-                        vectorOfDataSourceNames, forward( threadParams ) );
+                        vectorOfDataSourceNames, threadParams );
             }
             log< picLog::INPUT_OUTPUT >(
                 "openPMD: ( end ) collecting fields." );
@@ -1375,7 +1377,7 @@ namespace openPMD
                     < FileCheckpointParticles,
                         openPMDCountParticles< plugins::misc::UnfilteredSpecies<
                             bmpl::_1 > > > countParticles;
-                countParticles( forward( threadParams ) );
+                countParticles( threadParams );
             }
             else
             {
@@ -1395,7 +1397,7 @@ namespace openPMD
                 ForEach
                     < typename Help::AllEligibleSpeciesSources,
                         CallCountParticles< bmpl::_1 > >{}(
-                        vectorOfDataSourceNames, forward( threadParams ) );
+                        vectorOfDataSourceNames, threadParams );
             }
             log< picLog::INPUT_OUTPUT >(
                 "openPMD: ( end ) counting particles." );
@@ -1436,7 +1438,7 @@ namespace openPMD
                 ForEach
                     < typename Help::AllFieldSources,
                         CallGetFields< bmpl::_1 > >{}(
-                        vectorOfDataSourceNames, forward( threadParams ) );
+                        vectorOfDataSourceNames, threadParams );
             }
             log< picLog::INPUT_OUTPUT >( "openPMD: ( end ) writing fields." );
 
@@ -1461,7 +1463,7 @@ namespace openPMD
                         < FileOutputParticles,
                             WriteSpecies< plugins::misc::UnfilteredSpecies<
                                 bmpl::_1 > > > writeSpecies;
-                    writeSpecies( forward( threadParams ), particleOffset );
+                    writeSpecies( threadParams, particleOffset );
                 }
 
                 // move over all species data sources
@@ -1469,7 +1471,7 @@ namespace openPMD
                     < typename Help::AllEligibleSpeciesSources,
                         CallWriteSpecies< bmpl::_1 > >{}(
                         vectorOfDataSourceNames,
-                        forward( threadParams ),
+                        threadParams,
                         particleOffset );
             }
             log< picLog::INPUT_OUTPUT >(
