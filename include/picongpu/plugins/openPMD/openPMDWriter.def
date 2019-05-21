@@ -120,6 +120,14 @@ namespace openPMD
 
     class openPMDWriter;
 
+    template< unsigned DIM >
+    ::openPMD::RecordComponent &
+    initDataset( ::openPMD::RecordComponent & recordComponent,
+        ::openPMD::Datatype datatype,
+        pmacc::math::UInt64< DIM > const & globalDimensions,
+        bool compression,
+        std::string const & compressionMethod );
+
     /**
      * Wrapper for ::openPMD::resetDataset, set dataset parameters
      * @tparam DIM number of variable dimensions

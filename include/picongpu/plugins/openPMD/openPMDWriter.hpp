@@ -90,6 +90,24 @@ namespace openPMD
 
 
     namespace po = boost::program_options;
+    
+    template< unsigned DIM >
+    ::openPMD::RecordComponent &
+    initDataset( ::openPMD::RecordComponent & recordComponent,
+        ::openPMD::Datatype datatype,
+        pmacc::math::UInt64< DIM > const & globalDimensions,
+        bool compression,
+        std::string const & compressionMethod )
+    {
+        std::vector< uint64_t > v = asStandardVector< DIM >( globalDimensions );
+        ::openPMD::Dataset dataset{ datatype, std::move( v ) };
+        if( compression )
+        {
+            dataset.compression = compressionMethod;
+        }
+        recordComponent.resetDataset( std::move( dataset ) );
+        return recordComponent;
+    }
 
     template< unsigned DIM >
     WithWindow<::openPMD::RecordComponent >
@@ -453,8 +471,16 @@ namespace openPMD
         private:
             typedef typename T::ValueType ValueType;
             typedef typename GetComponentsType< ValueType >::type ComponentType;
+            typedef typename T::UnitValueType UnitType;
 
         public:
+            static std::vector< float_64 >
+            getUnit()
+            {
+                UnitType unit = T::getUnit();
+                return createUnit( unit, T::numComponents );
+            }
+            
             HDINLINE void
             operator()( ThreadParams * params )
             {
@@ -464,13 +490,36 @@ namespace openPMD
 
                 auto field = dc.get< T >( T::getName() );
                 params->gridLayout = field->getGridLayout();
+                
+                const traits::FieldPosition<
+                    typename fields::Solver::NummericalCellType,
+                    T >
+                    fieldPos;
+
+                std::vector< std::vector< float_X > > inCellPosition;
+                for( uint32_t n = 0; n < T::numComponents; ++n )
+                {
+                    std::vector< float_X > inCellPositonComponent;
+                    for( uint32_t d = 0; d < simDim; ++d )
+                        inCellPositonComponent.push_back(
+                            fieldPos()[ n ][ d ] );
+                    inCellPosition.push_back( inCellPositonComponent );
+                }
+                
+                /** \todo check if always correct at this point, depends on
+                 * solver implementation */
+                const float_X timeOffset = 0.0;
 
                 openPMDWriter::template writeField< ComponentType >( params,
                     sizeof( ComponentType ),
                     ::openPMD::determineDatatype< ComponentType >(),
                     GetNComponents< ValueType >::value,
                     T::getName(),
-                    field->getHostDataBox().getPointer() );
+                    field->getHostDataBox().getPointer(),
+                    getUnit(),
+                    T::getUnitDimension(),
+                    std::move( inCellPosition ),
+                    timeOffset );
 
                 dc.releaseData( T::getName() );
 #endif
@@ -502,8 +551,18 @@ namespace openPMD
             }
 
         private:
+            typedef typename FieldTmp::UnitValueType UnitType;
             typedef typename FieldTmp::ValueType ValueType;
             typedef typename GetComponentsType< ValueType >::type ComponentType;
+
+            /** Get the unit for the result from the solver*/
+            static std::vector< float_64 >
+            getUnit()
+            {
+                UnitType unit = FieldTmp::getUnit< Solver >();
+                const uint32_t components = GetNComponents< ValueType >::value;
+                return createUnit( unit, components );
+            }
 
             /** Create a name for the openPMD identifier.
              */
@@ -545,229 +604,7 @@ namespace openPMD
                 /*## finish update field ##*/
 
                 const uint32_t components = GetNComponents< ValueType >::value;
-
-                params->gridLayout = fieldTmp->getGridLayout();
-                /*write data to openPMD Series*/
-                openPMDWriter::template writeField< ComponentType >( params,
-                    sizeof( ComponentType ),
-                    ::openPMD::determineDatatype< ComponentType >(),
-                    components,
-                    getName(),
-                    fieldTmp->getHostDataBox().getPointer() );
-
-                dc.releaseData( FieldTmp::getUniqueId( 0 ) );
-            }
-        };
-
-        static void
-        defineFieldVar( ThreadParams * params,
-            uint32_t nComponents,
-            ::openPMD::Datatype openPMDType,
-            const std::string name,
-            std::vector< float_64 > unit,
-            std::vector< float_64 > unitDimension,
-            std::vector< std::vector< float_X > > inCellPosition,
-            float_X timeOffset )
-        {
-            const std::string name_lookup_tpl[] = { "x", "y", "z", "w" };
-
-            /* parameter checking */
-            PMACC_ASSERT( unit.size() == nComponents );
-            PMACC_ASSERT( inCellPosition.size() == nComponents );
-            for( uint32_t n = 0; n < nComponents; ++n )
-                PMACC_ASSERT( inCellPosition.at( n ).size() == simDim );
-            PMACC_ASSERT(
-                unitDimension.size() == 7 ); // seven openPMD base units
-
-            ::openPMD::Iteration & iteration =
-                params->openPMDSeries->iterations[ params->currentStep ];
-            ::openPMD::Mesh & mesh = iteration.meshes[ name ];
-
-            for( uint32_t c = 0; c < nComponents; c++ )
-            {
-                ::openPMD::MeshRecordComponent & mrc = mesh[ nComponents > 1
-                        ? name_lookup_tpl[ c ]
-                        : ::openPMD::RecordComponent::SCALAR ];
-                pushDataset< simDim >( mrc,
-                    openPMDType,
-                    params->fieldsGlobalSizeDims,
-                    params->fieldsSizeDims,
-                    params->fieldsOffsetDims,
-                    true,
-                    params->compressionMethod,
-                    params->fieldRecords );
-                mrc.setPosition( inCellPosition.at( c ) );
-                mrc.setUnitSI( unit.at( c ) );
-            }
-
-            static constexpr ::openPMD::UnitDimension unitDimensions[ 7 ] = {
-                ::openPMD::UnitDimension::L,
-                ::openPMD::UnitDimension::M,
-                ::openPMD::UnitDimension::T,
-                ::openPMD::UnitDimension::I,
-                ::openPMD::UnitDimension::theta,
-                ::openPMD::UnitDimension::N,
-                ::openPMD::UnitDimension::J
-            };
-            std::map<::openPMD::UnitDimension, double > unitMap;
-            for( unsigned i = 0; i < 7; ++i )
-            {
-                unitMap[ unitDimensions[ i ] ] = unitDimension[ i ];
-            }
-
-            mesh.setUnitDimension( unitMap );
-            mesh.setTimeOffset< float_X >(timeOffset);
-            mesh.setGeometry( ::openPMD::Mesh::Geometry::cartesian );
-            mesh.setDataOrder( ::openPMD::Mesh::DataOrder::C );
-
-            if( simDim == DIM2 )
-            {
-                std::vector< std::string > axisLabels = { "y",
-                    "x" }; // 2D: F[y][x]
-                mesh.setAxisLabels( axisLabels );
-            }
-            if( simDim == DIM3 )
-            {
-                std::vector< std::string > axisLabels = {
-                    "z", "y", "x"
-                }; // 3D: F[z][y][x]
-                mesh.setAxisLabels( axisLabels );
-            }
-
-            // cellSize is {x, y, z} but fields are F[z][y][x]
-            std::vector< float_X > gridSpacing( simDim, 0.0 );
-            for( uint32_t d = 0; d < simDim; ++d )
-                gridSpacing.at( simDim - 1 - d ) = cellSize[ d ];
-
-            mesh.setGridSpacing( gridSpacing );
-
-            /* globalSlideOffset due to gpu slides between origin at time step 0
-             * and origin at current time step
-             * ATTENTION: splash offset are globalSlideOffset + picongpu offsets
-             */
-            DataSpace< simDim > globalSlideOffset;
-            const pmacc::Selection< simDim > & localDomain =
-                Environment< simDim >::get().SubGrid().getLocalDomain();
-            const uint32_t numSlides =
-                MovingWindow::getInstance().getSlideCounter(
-                    params->currentStep );
-            globalSlideOffset.y() += numSlides * localDomain.size.y();
-
-            // globalDimensions is {x, y, z} but fields are F[z][y][x]
-            std::vector< float_64 > gridGlobalOffset( simDim, 0.0 );
-            for( uint32_t d = 0; d < simDim; ++d )
-                gridGlobalOffset.at( simDim - 1 - d ) =
-                    float_64( cellSize[ d ] ) *
-                    float_64( params->window.globalDimensions.offset[ d ] +
-                        globalSlideOffset[ d ] );
-
-            mesh.setGridGlobalOffset( gridGlobalOffset );
-            mesh.setGridUnitSI( UNIT_LENGTH );
-            mesh.setAttribute( "fieldSmoothing", "none" );
-        }
-
-        /**
-         * Collect field sizes
-         */
-        template< typename T >
-        struct CollectFieldsSizes
-        {
-        public:
-            typedef typename T::ValueType ValueType;
-            typedef typename T::UnitValueType UnitType;
-            typedef typename GetComponentsType< ValueType >::type ComponentType;
-
-            static std::vector< float_64 >
-            getUnit()
-            {
-                UnitType unit = T::getUnit();
-                return createUnit( unit, T::numComponents );
-            }
-
-            HDINLINE void
-            operator()( ThreadParams * params )
-            {
-#ifndef __CUDA_ARCH__
-                const uint32_t components = T::numComponents;
-
-                // convert in a std::vector of std::vector format for writeField
-                // API
-                const traits::FieldPosition<
-                    typename fields::Solver::NummericalCellType,
-                    T >
-                    fieldPos;
-
-                std::vector< std::vector< float_X > > inCellPosition;
-                for( uint32_t n = 0; n < T::numComponents; ++n )
-                {
-                    std::vector< float_X > inCellPositonComponent;
-                    for( uint32_t d = 0; d < simDim; ++d )
-                        inCellPositonComponent.push_back(
-                            fieldPos()[ n ][ d ] );
-                    inCellPosition.push_back( inCellPositonComponent );
-                }
-
-                /** \todo check if always correct at this point, depends on
-                 * solver implementation */
-                const float_X timeOffset = 0.0;
-
-
-                ::openPMD::Datatype dt =
-                    ::openPMD::determineDatatype< ComponentType >();
-                defineFieldVar( params,
-                    components,
-                    dt,
-                    T::getName(),
-                    getUnit(),
-                    T::getUnitDimension(),
-                    inCellPosition,
-                    timeOffset );
-#endif
-            }
-        };
-
-        /**
-         * Collect field sizes, Specialization.
-         */
-        template< typename Solver, typename Species >
-        struct CollectFieldsSizes< FieldTmpOperation< Solver, Species > >
-        {
-        public:
-            PMACC_NO_NVCC_HDWARNING
-            HDINLINE void
-            operator()( ThreadParams * tparam )
-            {
-                this->operator_impl( tparam );
-            }
-
-        private:
-            typedef typename FieldTmp::ValueType ValueType;
-            typedef typename FieldTmp::UnitValueType UnitType;
-            typedef typename GetComponentsType< ValueType >::type ComponentType;
-
-            /** Create a name for the openPMD identifier.
-             */
-            static std::string
-            getName()
-            {
-                return FieldTmpOperation< Solver, Species >::getName();
-            }
-
-            /** Get the unit for the result from the solver*/
-            static std::vector< float_64 >
-            getUnit()
-            {
-                UnitType unit = FieldTmp::getUnit< Solver >();
-                const uint32_t components = GetNComponents< ValueType >::value;
-                return createUnit( unit, components );
-            }
-
-            HINLINE void
-            operator_impl( ThreadParams * params )
-            {
-                const uint32_t components = GetNComponents< ValueType >::value;
-
-
+                
                 /*wrap in a one-component vector for writeField API*/
                 const traits::FieldPosition<
                     typename fields::Solver::NummericalCellType,
@@ -784,16 +621,20 @@ namespace openPMD
                  * solver implementation */
                 const float_X timeOffset = 0.0;
 
-                ::openPMD::Datatype dt =
-                    ::openPMD::determineDatatype< ComponentType >();
-                defineFieldVar( params,
+                params->gridLayout = fieldTmp->getGridLayout();
+                /*write data to openPMD Series*/
+                openPMDWriter::template writeField< ComponentType >( params,
+                    sizeof( ComponentType ),
+                    ::openPMD::determineDatatype< ComponentType >(),
                     components,
-                    dt,
                     getName(),
+                    fieldTmp->getHostDataBox().getPointer(),
                     getUnit(),
                     FieldTmp::getUnitDimension< Solver >(),
-                    inCellPosition,
+                    std::move( inCellPosition ),
                     timeOffset );
+
+                dc.releaseData( FieldTmp::getUniqueId( 0 ) );
             }
         };
 
@@ -1123,6 +964,79 @@ namespace openPMD
             endWrite();
         }
 
+        static void writeFieldAttributes(
+            ThreadParams* params, 
+            std::vector<float_64> const & unitDimension, 
+            float_X timeOffset, 
+            ::openPMD::Mesh& mesh
+        ){
+            static constexpr ::openPMD::UnitDimension openPMDUnitDimensions[ 7 ] 
+                = {
+                ::openPMD::UnitDimension::L,
+                ::openPMD::UnitDimension::M,
+                ::openPMD::UnitDimension::T,
+                ::openPMD::UnitDimension::I,
+                ::openPMD::UnitDimension::theta,
+                ::openPMD::UnitDimension::N,
+                ::openPMD::UnitDimension::J
+            };
+            std::map<::openPMD::UnitDimension, double > unitMap;
+            for( unsigned i = 0; i < 7; ++i )
+            {
+                unitMap[ openPMDUnitDimensions[ i ] ] = unitDimension[ i ];
+            }
+            
+            mesh.setUnitDimension( unitMap );
+            mesh.setTimeOffset< float_X >(timeOffset);
+            mesh.setGeometry( ::openPMD::Mesh::Geometry::cartesian );
+            mesh.setDataOrder( ::openPMD::Mesh::DataOrder::C );
+            
+            if( simDim == DIM2 )
+            {
+                std::vector< std::string > axisLabels = { "y",
+                "x" }; // 2D: F[y][x]
+                mesh.setAxisLabels( axisLabels );
+            }
+            if( simDim == DIM3 )
+            {
+                std::vector< std::string > axisLabels = {
+                    "z", "y", "x"
+                }; // 3D: F[z][y][x]
+                mesh.setAxisLabels( axisLabels );
+            }
+            
+            // cellSize is {x, y, z} but fields are F[z][y][x]
+            std::vector< float_X > gridSpacing( simDim, 0.0 );
+            for( uint32_t d = 0; d < simDim; ++d )
+                gridSpacing.at( simDim - 1 - d ) = cellSize[ d ];
+            
+            mesh.setGridSpacing( gridSpacing );
+            
+            /* globalSlideOffset due to gpu slides between origin at time step 0
+             * and origin at current time step
+             * ATTENTION: splash offset are globalSlideOffset + picongpu offsets
+             */
+            DataSpace< simDim > globalSlideOffset;
+            const pmacc::Selection< simDim > & localDomain =
+            Environment< simDim >::get().SubGrid().getLocalDomain();
+            const uint32_t numSlides =
+            MovingWindow::getInstance().getSlideCounter(
+            params->currentStep );
+            globalSlideOffset.y() += numSlides * localDomain.size.y();
+            
+            // globalDimensions is {x, y, z} but fields are F[z][y][x]
+            std::vector< float_64 > gridGlobalOffset( simDim, 0.0 );
+            for( uint32_t d = 0; d < simDim; ++d )
+                gridGlobalOffset.at( simDim - 1 - d ) =
+                    float_64( cellSize[ d ] ) *
+                    float_64( params->window.globalDimensions.offset[ d ] +
+                    globalSlideOffset[ d ] );
+            
+            mesh.setGridGlobalOffset( std::move( gridGlobalOffset ) );
+            mesh.setGridUnitSI( UNIT_LENGTH );
+            mesh.setAttribute( "fieldSmoothing", "none" );
+        }
+
         template< typename ComponentType >
         static void
         writeField( ThreadParams * params,
@@ -1130,8 +1044,22 @@ namespace openPMD
             ::openPMD::Datatype openPMDType,
             const uint32_t nComponents,
             const std::string name,
-            void * ptr )
+            void * ptr,
+            std::vector< float_64 > unit,
+            std::vector< float_64 > unitDimension,
+            std::vector< std::vector< float_X > > inCellPosition,
+            float_X timeOffset )
         {
+            const std::string name_lookup_tpl[] = { "x", "y", "z", "w" };
+            
+            /* parameter checking */
+            PMACC_ASSERT( unit.size() == nComponents );
+            PMACC_ASSERT( inCellPosition.size() == nComponents );
+            for( uint32_t n = 0; n < nComponents; ++n )
+                PMACC_ASSERT( inCellPosition.at( n ).size() == simDim );
+            PMACC_ASSERT(
+                unitDimension.size() == 7 ); // seven openPMD base units
+            
             log< picLog::INPUT_OUTPUT >( "openPMD: write field: %1% %2% %3%" ) %
                 name % nComponents % ptr;
 
@@ -1139,6 +1067,10 @@ namespace openPMD
                 boost::is_same< ComponentType, float_X >::value );
             PMACC_CASSERT_MSG( Precision_mismatch_in_Field_Components__ADIOS,
                 fieldTypeCorrect );
+            
+            ::openPMD::Iteration & iteration =
+                params->openPMDSeries->iterations[ params->currentStep ];
+            ::openPMD::Mesh & mesh = iteration.meshes[ name ];
 
             /* data to describe source buffer */
             GridLayout< simDim > field_layout = params->gridLayout;
@@ -1151,6 +1083,7 @@ namespace openPMD
             /* write the actual field data */
             for( uint32_t d = 0; d < nComponents; d++ )
             {
+                
                 const size_t plane_full_size =
                     field_full[ 1 ] * field_full[ 0 ] * nComponents;
                 const size_t plane_no_guard_size =
@@ -1191,18 +1124,27 @@ namespace openPMD
                 /* Write the actual field data. The id is on the front of the
                  * list.
                  */
-                if( params->fieldRecords.empty() )
-                    throw std::runtime_error(
-                        "Cannot write field (var id list is empty)" );
-
-                WithWindow<::openPMD::RecordComponent > & ww =
-                    params->fieldRecords.front();
-                ww.m_data.storeChunk< ComponentType >(
-                    params->fieldBuffer, ww.m_offset, ww.m_extent );
+                
+                ::openPMD::MeshRecordComponent & mrc = mesh[ nComponents > 1
+                        ? name_lookup_tpl[ d ]
+                        : ::openPMD::RecordComponent::SCALAR ];
+                
+                initDataset< simDim >(
+                    mrc, 
+                    params->fieldsGlobalSizeDims,
+                    true,
+                    params->compressionMethod 
+                ).template storeChunk< ComponentType >(
+                    params->fieldBuffer,
+                    params->fieldsOffsetDims,
+                    params->fieldsSizeDims
+                );
 
                 params->openPMDSeries->flush();
-                params->fieldRecords.pop_front();
             }
+            
+            // set mesh attributes
+            writeFieldAttributes(params, unitDimension, timeOffset, mesh);
         }
 
         template< typename T_ParticleFilter >
@@ -1330,40 +1272,6 @@ namespace openPMD
             log< picLog::INPUT_OUTPUT >( "openPMD: opening Series %1%" ) %
                 threadParams->fileName;
             threadParams->openSeries( ::openPMD::AccessType::CREATE );
-
-            /* collect size information for each field to be written and define
-             * field variables
-             */
-            log< picLog::INPUT_OUTPUT >(
-                "openPMD: (begin) collecting fields." );
-            threadParams->fieldRecords.clear();
-            if( threadParams->isCheckpoint )
-            {
-                ForEach
-                    < FileCheckpointFields,
-                        CollectFieldsSizes<
-                            bmpl::_1 > > forEachCollectFieldsSizes;
-                forEachCollectFieldsSizes( threadParams );
-            }
-            else
-            {
-                if( dumpFields )
-                {
-                    ForEach
-                        < FileOutputFields,
-                            CollectFieldsSizes<
-                                bmpl::_1 > > forEachCollectFieldsSizes;
-                    forEachCollectFieldsSizes( threadParams );
-                }
-
-                // move over all field data sources
-                ForEach
-                    < typename Help::AllFieldSources,
-                        CallCollectFieldsSizes< bmpl::_1 > >{}(
-                        vectorOfDataSourceNames, threadParams );
-            }
-            log< picLog::INPUT_OUTPUT >(
-                "openPMD: ( end ) collecting fields." );
 
             /* collect size information for all attributes of all species and
              * define particle variables
