@@ -86,6 +86,35 @@ namespace openPMD
         typedef Frame< OperatorCreateVectorBox, NewParticleDescription >
             openPMDFrameType;
 
+        void setParticleAttributes(::openPMD::Iteration& iteration)
+        {
+            const float_64 particleShape(
+            GetShape< ThisSpecies >::type::support - 1 );
+            iteration.setAttribute( "particleShape", particleShape );
+            
+            traits::GetSpeciesFlagName< ThisSpecies, current<> >
+            currentDepositionName;
+            const std::string currentDeposition( currentDepositionName() );
+            iteration.setAttribute(
+            "currentDeposition", currentDeposition.c_str() );
+            
+            traits::GetSpeciesFlagName< ThisSpecies, particlePusher<> >
+            particlePushName;
+            const std::string particlePush( particlePushName() );
+            iteration.setAttribute( "particlePush", particlePush.c_str() );
+            
+            traits::GetSpeciesFlagName< ThisSpecies, interpolation<> >
+            particleInterpolationName;
+            const std::string particleInterpolation(
+            particleInterpolationName() );
+            iteration.setAttribute(
+            "particleInterpolation", particleInterpolation.c_str() );
+            
+            const std::string particleSmoothing( "none" );
+            iteration.setAttribute(
+            "particleSmoothing", particleSmoothing.c_str() );
+        }
+
         template< typename Space > // has operator[] -> integer type
         HINLINE void
         operator()( ThreadParams * params, const Space particleOffset )
@@ -94,9 +123,20 @@ namespace openPMD
                 "openPMD: (begin) write species: %1%" ) %
                 T_SpeciesFilter::getName();
             DataConnector & dc = Environment<>::get().DataConnector();
+            GridController< simDim > & gc =
+                Environment< simDim >::get().GridController();
+            uint64_t mpiSize = gc.getGlobalSize();
+            uint64_t mpiRank = gc.getGlobalRank();
             /* load particle without copy particle data to host */
             auto speciesTmp = dc.get< ThisSpecies >(
                 ThisSpecies::FrameType::getName(), true );
+            const std::string speciesGroup( T_SpeciesFilter::getName() );
+            
+            ::openPMD::Series & series = *params->openPMDSeries;
+            ::openPMD::Iteration & iteration =
+                series.iterations[ params->currentStep ];
+            ::openPMD::Container<::openPMD::Record > & particleSpecies =
+                iteration.particles[ speciesGroup ];
 
             /* count total number of particles on the device */
             log< picLog::INPUT_OUTPUT >(
@@ -112,6 +152,28 @@ namespace openPMD
                     params->localWindowToDomainOffset,
                     params->window.localDimensions.size,
                     particleFilter );
+            uint64_t myNumParticles = totalNumParticles;
+            uint64_t allNumParticles[ mpiSize ];
+            uint64_t globalNumParticles = 0;
+            uint64_t myParticleOffset = 0;
+
+            // avoid deadlock between not finished pmacc tasks and mpi blocking
+            // collectives
+            __getTransactionEvent().waitForFinished();
+            MPI_CHECK( MPI_Allgather( &myNumParticles,
+                1,
+                MPI_UNSIGNED_LONG_LONG,
+                allNumParticles,
+                1,
+                MPI_UNSIGNED_LONG_LONG,
+                gc.getCommunicator().getMPIComm() ) );
+
+            for( uint64_t i = 0; i < mpiSize; ++i )
+            {
+                globalNumParticles += allNumParticles[ i ];
+                if( i < mpiRank )
+                    myParticleOffset += allNumParticles[ i ];
+            }
             log< picLog::INPUT_OUTPUT >(
                 "openPMD:   ( end ) count particles: %1% = %2%" ) %
                 T_SpeciesFilter::getName() % totalNumParticles;
@@ -202,7 +264,8 @@ namespace openPMD
             ForEach
                 < typename openPMDFrameType::ValueTypeSeq,
                     openPMD::ParticleAttribute< bmpl::_1 > > writeToOpenPMD;
-            writeToOpenPMD( params, hostFrame, totalNumParticles );
+            writeToOpenPMD( params, hostFrame, particleSpecies, myNumParticles,
+                globalNumParticles, myParticleOffset);
 
             /* free host memory */
             ForEach
@@ -218,6 +281,8 @@ namespace openPMD
                 "openPMD: (begin) writing particle index table for %1%" ) %
                 T_SpeciesFilter::getName();
             {
+                constexpr uint64_t localTableSize = 5;
+                
                 GridController< simDim > & gc =
                     Environment< simDim >::get().GridController();
 
@@ -226,7 +291,7 @@ namespace openPMD
                 /* particlesMetaInfo = (num particles, scalar position, particle
                  * offset x, y, z) */
                 std::shared_ptr< uint64_t > particlesMetaInfo{
-                    new uint64_t[ 5 ]{
+                    new uint64_t[ localTableSize ]{
                         totalNumParticles, gc.getScalarPosition(), 0, 0, 0 },
                     []( uint64_t * ptr ) { delete[] ptr; }
                 };
@@ -244,15 +309,31 @@ namespace openPMD
                 if( particleOffset[ 1 ] < 0 ) // 1 == y
                     particlesMetaInfoPtr[ pos_offset + 1 ] = 0;
 
-                auto & dataset = params->speciesIndices.front();
-                dataset.m_data.storeChunk(
-                    particlesMetaInfo, dataset.m_offset, dataset.m_extent );
+                ::openPMD::Datatype datatype =
+                    ::openPMD::determineDatatype< uint64_t >();
+                ::openPMD::RecordComponent & recordComponent =
+                    particleSpecies[ "particles_info" ]
+                                   [::openPMD::RecordComponent::SCALAR ];
+                
+                initDataset< DIM1 >(
+                    recordComponent,
+                    datatype,
+                    { localTableSize * uint64_t( gc.getGlobalSize() ) },
+                    true,
+                    params->compressionMethod
+                ).template storeChunk(
+                    particlesMetaInfo,
+                    { localTableSize },
+                    { localTableSize * uint64_t( gc.getGlobalRank()) } );
                 params->openPMDSeries->flush();
-                params->speciesIndices.pop_front();
             }
+                
+            /* openPMD ED-PIC: additional attributes */
+            setParticleAttributes(iteration);
+            
             log< picLog::INPUT_OUTPUT >(
-                "openPMD: ( end ) writing particle index table for %1%" ) %
-                T_SpeciesFilter::getName();
+            "openPMD: ( end ) writing particle index table for %1%" ) %
+            T_SpeciesFilter::getName();
         }
     };
 
