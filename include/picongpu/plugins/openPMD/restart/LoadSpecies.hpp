@@ -178,7 +178,7 @@ namespace openPMD
             ForEach
                 < typename openPMDFrameType::ValueTypeSeq,
                     MallocMemory< bmpl::_1 > > mallocMem;
-            mallocMem( hostFrame , totalNumParticles ); // TODO
+            mallocMem( hostFrame, totalNumParticles ); // TODO
 
             log< picLog::INPUT_OUTPUT >(
                 "openPMD: get mapped memory device pointer: %1%" ) %
@@ -194,7 +194,7 @@ namespace openPMD
                 < typename openPMDFrameType::ValueTypeSeq,
                     LoadParticleAttributesFromADIOS<
                         bmpl::_1 > > loadAttributes;
-            loadAttributes( params ,
+            loadAttributes( params,
                 hostFrame,
                 particleSpecies,
                 particleOffset,

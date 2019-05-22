@@ -104,8 +104,8 @@ namespace openPMD
                 for( int d = 0; d < ndim; ++d )
                 {
                     /* \see adios_define_var: z,y,x in C-order */
-                    start.push_back(domain_offset.revert()[ d ]);
-                    count.push_back(local_domain_size.revert()[ d ]);
+                    start.push_back( domain_offset.revert()[ d ] );
+                    count.push_back( local_domain_size.revert()[ d ] );
                 }
 
                 /* specify what we want to read, but start reading at below at

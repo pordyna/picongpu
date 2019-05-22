@@ -86,33 +86,34 @@ namespace openPMD
         typedef Frame< OperatorCreateVectorBox, NewParticleDescription >
             openPMDFrameType;
 
-        void setParticleAttributes(::openPMD::Iteration& iteration)
+        void
+        setParticleAttributes( ::openPMD::Iteration & iteration )
         {
             const float_64 particleShape(
-            GetShape< ThisSpecies >::type::support - 1 );
+                GetShape< ThisSpecies >::type::support - 1 );
             iteration.setAttribute( "particleShape", particleShape );
-            
+
             traits::GetSpeciesFlagName< ThisSpecies, current<> >
-            currentDepositionName;
+                currentDepositionName;
             const std::string currentDeposition( currentDepositionName() );
             iteration.setAttribute(
-            "currentDeposition", currentDeposition.c_str() );
-            
+                "currentDeposition", currentDeposition.c_str() );
+
             traits::GetSpeciesFlagName< ThisSpecies, particlePusher<> >
-            particlePushName;
+                particlePushName;
             const std::string particlePush( particlePushName() );
             iteration.setAttribute( "particlePush", particlePush.c_str() );
-            
+
             traits::GetSpeciesFlagName< ThisSpecies, interpolation<> >
-            particleInterpolationName;
+                particleInterpolationName;
             const std::string particleInterpolation(
-            particleInterpolationName() );
+                particleInterpolationName() );
             iteration.setAttribute(
-            "particleInterpolation", particleInterpolation.c_str() );
-            
+                "particleInterpolation", particleInterpolation.c_str() );
+
             const std::string particleSmoothing( "none" );
             iteration.setAttribute(
-            "particleSmoothing", particleSmoothing.c_str() );
+                "particleSmoothing", particleSmoothing.c_str() );
         }
 
         template< typename Space > // has operator[] -> integer type
@@ -131,7 +132,7 @@ namespace openPMD
             auto speciesTmp = dc.get< ThisSpecies >(
                 ThisSpecies::FrameType::getName(), true );
             const std::string speciesGroup( T_SpeciesFilter::getName() );
-            
+
             ::openPMD::Series & series = *params->openPMDSeries;
             ::openPMD::Iteration & iteration =
                 series.iterations[ params->currentStep ];
@@ -264,8 +265,12 @@ namespace openPMD
             ForEach
                 < typename openPMDFrameType::ValueTypeSeq,
                     openPMD::ParticleAttribute< bmpl::_1 > > writeToOpenPMD;
-            writeToOpenPMD( params, hostFrame, particleSpecies, myNumParticles,
-                globalNumParticles, myParticleOffset);
+            writeToOpenPMD( params,
+                hostFrame,
+                particleSpecies,
+                myNumParticles,
+                globalNumParticles,
+                myParticleOffset );
 
             /* free host memory */
             ForEach
@@ -282,7 +287,7 @@ namespace openPMD
                 T_SpeciesFilter::getName();
             {
                 constexpr uint64_t localTableSize = 5;
-                
+
                 GridController< simDim > & gc =
                     Environment< simDim >::get().GridController();
 
@@ -314,26 +319,24 @@ namespace openPMD
                 ::openPMD::RecordComponent & recordComponent =
                     particleSpecies[ "particles_info" ]
                                    [::openPMD::RecordComponent::SCALAR ];
-                
-                initDataset< DIM1 >(
-                    recordComponent,
+
+                initDataset< DIM1 >( recordComponent,
                     datatype,
                     { localTableSize * uint64_t( gc.getGlobalSize() ) },
                     true,
-                    params->compressionMethod
-                ).template storeChunk(
-                    particlesMetaInfo,
-                    { localTableSize },
-                    { localTableSize * uint64_t( gc.getGlobalRank()) } );
+                    params->compressionMethod )
+                    .template storeChunk( particlesMetaInfo,
+                        { localTableSize },
+                        { localTableSize * uint64_t( gc.getGlobalRank() ) } );
+
+                /* openPMD ED-PIC: additional attributes */
+                setParticleAttributes( iteration );
                 params->openPMDSeries->flush();
             }
-                
-            /* openPMD ED-PIC: additional attributes */
-            setParticleAttributes(iteration);
-            
+
             log< picLog::INPUT_OUTPUT >(
-            "openPMD: ( end ) writing particle index table for %1%" ) %
-            T_SpeciesFilter::getName();
+                "openPMD: ( end ) writing particle index table for %1%" ) %
+                T_SpeciesFilter::getName();
         }
     };
 

@@ -63,8 +63,7 @@ namespace openPMD
             const std::string name_lookup[] = { "x", "y", "z" };
 
             OpenPMDName< T_Identifier > openPMDName;
-            ::openPMD::Record & record =
-                particleSpecies[ openPMDName() ];
+            ::openPMD::Record & record = particleSpecies[ openPMDName() ];
 
             // get the SI scaling, dimensionality and weighting of the attribute
             OpenPMDUnit< T_Identifier > openPMDUnit;
@@ -111,17 +110,13 @@ namespace openPMD
                         dataPtr )[ d + i * components ];
                 }
 
-                initDataset< DIM1 >(
-                    recordComponent,
+                initDataset< DIM1 >( recordComponent,
                     openPMDType,
                     { globalElements },
                     true,
-                    params->compressionMethod
-                ).template storeChunk(
-                    storeBfr,
-                    { elements },
-                    { globalOffset }
-                );
+                    params->compressionMethod )
+                    .template storeChunk(
+                        storeBfr, { elements }, { globalOffset } );
 
                 if( unit.size() >= ( d + 1 ) )
                 {
