@@ -264,6 +264,12 @@ namespace openPMD
             /* dump to openPMD storage */
             ForEach
                 < typename openPMDFrameType::ValueTypeSeq,
+                    openPMD::SetupRecordComponents<
+                        bmpl::_1 > > setupRecordComponents;
+            setupRecordComponents(
+                params, particleSpecies, globalNumParticles );
+            ForEach
+                < typename openPMDFrameType::ValueTypeSeq,
                     openPMD::ParticleAttribute< bmpl::_1 > > writeToOpenPMD;
             writeToOpenPMD( params,
                 hostFrame,

@@ -33,6 +33,47 @@ namespace openPMD
 {
     using namespace pmacc;
 
+    static const std::string name_lookup[] = { "x", "y", "z" };
+
+    /**
+     * openPMD complains if e.g. particle positions are flushed while
+     * positionOffsets have not even be defined yet.
+     * Hence, we first define all record components before filling and
+     * flushing them.
+     */
+    template< typename T_Identifier >
+    struct SetupRecordComponents
+    {
+        void
+        operator()( ThreadParams * params,
+            ::openPMD::Container<::openPMD::Record > & particleSpecies,
+            const size_t globalElements )
+        {
+            typedef T_Identifier Identifier;
+            typedef typename pmacc::traits::Resolve< Identifier >::type::type
+                ValueType;
+            const uint32_t components = GetNComponents< ValueType >::value;
+            typedef typename GetComponentsType< ValueType >::type ComponentType;
+
+            OpenPMDName< T_Identifier > openPMDName;
+            ::openPMD::Record & record = particleSpecies[ openPMDName() ];
+
+            for( uint32_t d = 0; d < components; d++ )
+            {
+                ::openPMD::RecordComponent & recordComponent = components > 1
+                    ? record[ name_lookup[ d ] ]
+                    : record[::openPMD::MeshRecordComponent::SCALAR ];
+                ::openPMD::Datatype openPMDType =
+                    ::openPMD::determineDatatype< ComponentType >();
+                initDataset< DIM1 >( recordComponent,
+                    openPMDType,
+                    { globalElements },
+                    true,
+                    params->compressionMethod );
+            }
+        }
+    };
+
     /** write attribute of a particle to openPMD series
      *
      * @tparam T_Identifier identifier of a particle attribute
@@ -59,8 +100,6 @@ namespace openPMD
                 ValueType;
             const uint32_t components = GetNComponents< ValueType >::value;
             typedef typename GetComponentsType< ValueType >::type ComponentType;
-
-            const std::string name_lookup[] = { "x", "y", "z" };
 
             OpenPMDName< T_Identifier > openPMDName;
             ::openPMD::Record & record = particleSpecies[ openPMDName() ];
@@ -110,13 +149,8 @@ namespace openPMD
                         dataPtr )[ d + i * components ];
                 }
 
-                initDataset< DIM1 >( recordComponent,
-                    openPMDType,
-                    { globalElements },
-                    true,
-                    params->compressionMethod )
-                    .template storeChunk(
-                        storeBfr, { elements }, { globalOffset } );
+                recordComponent.storeChunk(
+                    storeBfr, { elements }, { globalOffset } );
 
                 if( unit.size() >= ( d + 1 ) )
                 {
