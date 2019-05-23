@@ -60,7 +60,7 @@ namespace openPMD
      * @tparam T_Species type of species
      *
      */
-    template< typename T_SpeciesFilter >
+    template< typename T_SpeciesFilter, typename T_Species = T_SpeciesFilter >
     struct WriteSpecies
     {
     public:
@@ -131,7 +131,7 @@ namespace openPMD
             /* load particle without copy particle data to host */
             auto speciesTmp = dc.get< ThisSpecies >(
                 ThisSpecies::FrameType::getName(), true );
-            const std::string speciesGroup( T_SpeciesFilter::getName() );
+            const std::string speciesGroup( T_Species::getName() );
 
             ::openPMD::Series & series = *params->openPMDSeries;
             ::openPMD::Iteration & iteration =

@@ -25,6 +25,7 @@
 #include <pmacc/types.hpp>
 
 #include <stdexcept>
+#include <tuple>
 #include <utility>
 
 namespace picongpu
@@ -54,14 +55,17 @@ namespace openPMD
         {
         }
 
+    private:
         /** Prepare the write operation:
          *  Define openPMD dataset and write
          * attribute (if attrName is non-empty)
          *
          *  Must be called before executing the functor
          */
-        void
-        prepare( ThreadParams & params, T_Attribute attribute = T_Attribute() )
+        std::tuple<::openPMD::RecordComponent *,
+            ::openPMD::Offset,
+            ::openPMD::Extent >
+        prepare( ThreadParams & params, T_Attribute attribute )
         {
             auto name = baseName + "/" + group + "/" + dataset;
             const auto openPMDScalarType =
@@ -74,7 +78,6 @@ namespace openPMD
 
             // Size over all processes
             Dimensions globalDomainSize = Dimensions::create( 1 );
-            // Offset for this process
             Dimensions localDomainOffset = Dimensions::create( 0 );
 
             for( uint32_t d = 0; d < simDim; ++d )
@@ -92,18 +95,6 @@ namespace openPMD
                 series.iterations[ params.currentStep ]
                     .meshes[ baseName + "_" + group ][ dataset ];
 
-            preparedDataset =
-                std::unique_ptr< WithWindow<::openPMD::RecordComponent > >{
-                    new WithWindow<::openPMD::RecordComponent >{
-                        prepareDataset< simDim >( mrc,
-                            openPMDScalarType,
-                            globalDomainSize,
-                            Dimensions::create( 1 ),
-                            localDomainOffset,
-                            true,
-                            params.compressionMethod ) }
-                };
-
             if( !attrName.empty() )
             {
                 log< picLog::INPUT_OUTPUT >(
@@ -112,19 +103,33 @@ namespace openPMD
 
                 mrc.setAttribute( attrName, attribute );
             }
+
+            return std::make_tuple( &initDataset< simDim >( mrc,
+                                        openPMDScalarType,
+                                        std::move( globalDomainSize ),
+                                        true,
+                                        params.compressionMethod ),
+                static_cast< ::openPMD::Offset > (asStandardVector< simDim >( std::move( localDomainOffset ) )),
+                static_cast< ::openPMD::Extent > (asStandardVector< simDim >( Dimensions::create( 1 ) ) ) );
         }
 
+    public:
         void
-        operator()( ThreadParams & params, T_Scalar value )
+        operator()( ThreadParams & params,
+            T_Scalar value,
+            T_Attribute attribute = T_Attribute() )
         {
+            ::openPMD::RecordComponent * rc;
+            ::openPMD::Offset offset;
+            ::openPMD::Extent extent;
+            std::tie( rc, offset, extent ) =
+                prepare( params, std::move( attribute ) );
             auto name = baseName + "/" + group + "/" + dataset;
             log< picLog::INPUT_OUTPUT >( "openPMD: write %1%D scalars: %2%" ) %
                 simDim % name;
 
-            preparedDataset->m_data.storeChunk(
-                std::make_shared< T_Scalar >( value ),
-                preparedDataset->m_offset,
-                preparedDataset->m_extent );
+            rc->storeChunk(
+                std::make_shared< T_Scalar >( value ), std::move( offset ), std::move( extent ) );
             params.openPMDSeries->flush();
         }
 

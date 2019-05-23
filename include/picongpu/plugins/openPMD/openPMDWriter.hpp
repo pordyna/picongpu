@@ -108,56 +108,6 @@ namespace openPMD
         return recordComponent;
     }
 
-    template< unsigned DIM >
-    WithWindow<::openPMD::RecordComponent >
-    prepareDataset( ::openPMD::RecordComponent & recordComponent,
-        ::openPMD::Datatype datatype,
-        pmacc::math::UInt64< DIM > const & globalDimensions,
-        pmacc::math::UInt64< DIM > const & localDimensions,
-        pmacc::math::UInt64< DIM > const & offset,
-        bool compression,
-        std::string const & compressionMethod )
-    {
-        std::vector< uint64_t > v = asStandardVector< DIM >( globalDimensions );
-        ::openPMD::Dataset dataset{ datatype, std::move( v ) };
-        if( compression )
-        {
-            dataset.compression = compressionMethod;
-        }
-        recordComponent.resetDataset( std::move( dataset ) );
-        return WithWindow<::openPMD::RecordComponent >::init< DIM >(
-            recordComponent, offset, localDimensions );
-    }
-
-    template< unsigned DIM >
-    void
-    pushDataset( ::openPMD::RecordComponent & recordComponent,
-        ::openPMD::Datatype datatype,
-        pmacc::math::UInt64< DIM > const & globalDimensions,
-        pmacc::math::UInt64< DIM > const & localDimensions,
-        pmacc::math::UInt64< DIM > const & offset,
-        bool compression,
-        std::string const & compressionMethod,
-        std::list< WithWindow<::openPMD::RecordComponent > > & push_to )
-    {
-        if( std::all_of( &globalDimensions[ 0 ],
-                &globalDimensions[ 0 ] + DIM,
-                []( uint64_t i ) { return i > 0; } ) )
-        {
-            push_to.push_back( prepareDataset< DIM >( recordComponent,
-                datatype,
-                globalDimensions,
-                localDimensions,
-                offset,
-                compression,
-                compressionMethod ) );
-        }
-        else
-        {
-            throw std::runtime_error(
-                "openPMD: empty datasets not permissible." );
-        }
-    }
 
     template< unsigned DIM, typename T >
     std::vector< T >
@@ -1241,15 +1191,6 @@ namespace openPMD
             bool dumpAllParticles = plugins::misc::containsObject(
                 vectorOfDataSourceNames, "species_all" );
 
-            auto idProviderState = IdProvider< simDim >::getState();
-            WriteNDScalars< uint64_t, uint64_t > writeIdProviderStartId(
-                "picongpu", "idProvider", "startId", "maxNumProc" );
-            WriteNDScalars< uint64_t, uint64_t > writeIdProviderNextId(
-                "picongpu", "idProvider", "nextId" );
-            writeIdProviderStartId.prepare(
-                *threadParams, idProviderState.maxNumProc );
-            writeIdProviderNextId.prepare( *threadParams );
-
             /* attributes written here are pure meta data */
             WriteMeta writeMetaAttributes;
             writeMetaAttributes( threadParams );
@@ -1289,7 +1230,7 @@ namespace openPMD
                 ForEach
                     < FileCheckpointParticles,
                         WriteSpecies< plugins::misc::SpeciesFilter<
-                            bmpl::_1 > > > writeSpecies;
+                            bmpl::_1 >, plugins::misc::UnfilteredSpecies< bmpl::_1 > > > writeSpecies;
                 writeSpecies( threadParams, particleOffset );
             }
             else
@@ -1314,12 +1255,20 @@ namespace openPMD
             log< picLog::INPUT_OUTPUT >(
                 "openPMD: ( end ) writing particle species." );
 
+            auto idProviderState = IdProvider< simDim >::getState();
             log< picLog::INPUT_OUTPUT >(
                 "openPMD: Writing IdProvider state (StartId: %1%, NextId: %2%, "
                 "maxNumProc: %3%)" ) %
                 idProviderState.startId % idProviderState.nextId %
                 idProviderState.maxNumProc;
-            writeIdProviderStartId( *threadParams, idProviderState.startId );
+
+            WriteNDScalars< uint64_t, uint64_t > writeIdProviderStartId(
+                "picongpu", "idProvider", "startId", "maxNumProc" );
+            WriteNDScalars< uint64_t, uint64_t > writeIdProviderNextId(
+                "picongpu", "idProvider", "nextId" );
+            writeIdProviderStartId( *threadParams,
+                idProviderState.startId,
+                idProviderState.maxNumProc );
             writeIdProviderNextId( *threadParams, idProviderState.nextId );
 
             // avoid deadlock between not finished pmacc tasks and mpi calls in
