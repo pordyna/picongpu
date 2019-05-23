@@ -141,7 +141,7 @@ namespace openPMD
                 auto storePtr = storeBfr.get();
 
 /* copy strided data from source to temporary buffer */
-#pragma omp parallel for
+#pragma omp parallel for simd
                 for( size_t i = 0; i < elements; ++i )
                 {
                     // TODO wtf?
@@ -150,7 +150,7 @@ namespace openPMD
                 }
 
                 recordComponent.storeChunk(
-                    storeBfr, { elements }, { globalOffset } );
+                    storeBfr, { globalOffset }, { elements } );
 
                 if( unit.size() >= ( d + 1 ) )
                 {

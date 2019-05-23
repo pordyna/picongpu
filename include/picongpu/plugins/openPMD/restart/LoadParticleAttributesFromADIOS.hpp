@@ -126,7 +126,7 @@ namespace openPMD
                     elements % rc.getDimensionality() % openPMDName();
 
 /* copy component from temporary array to array of structs */
-#pragma omp parallel for
+#pragma omp parallel for simd
                 for( size_t i = 0; i < elements; ++i )
                 {
                     ComponentType & ref = reinterpret_cast< ComponentType * >(

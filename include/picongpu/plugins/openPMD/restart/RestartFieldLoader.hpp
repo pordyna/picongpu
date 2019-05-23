@@ -137,7 +137,7 @@ namespace openPMD
                 int elementCount =
                     params->window.localDimensions.size.productOfComponents();
 
-#pragma omp parallel for
+#pragma omp parallel for simd
                 for( int linearId = 0; linearId < elementCount; ++linearId )
                 {
                     /* calculate index inside the moving window domain which is
