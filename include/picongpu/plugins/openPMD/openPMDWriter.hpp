@@ -1229,8 +1229,9 @@ namespace openPMD
             {
                 ForEach
                     < FileCheckpointParticles,
-                        WriteSpecies< plugins::misc::SpeciesFilter<
-                            bmpl::_1 >, plugins::misc::UnfilteredSpecies< bmpl::_1 > > > writeSpecies;
+                        WriteSpecies< plugins::misc::SpeciesFilter< bmpl::_1 >,
+                            plugins::misc::UnfilteredSpecies<
+                                bmpl::_1 > > > writeSpecies;
                 writeSpecies( threadParams, particleOffset );
             }
             else

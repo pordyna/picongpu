@@ -109,8 +109,10 @@ namespace openPMD
                                         std::move( globalDomainSize ),
                                         true,
                                         params.compressionMethod ),
-                static_cast< ::openPMD::Offset > (asStandardVector< simDim >( std::move( localDomainOffset ) )),
-                static_cast< ::openPMD::Extent > (asStandardVector< simDim >( Dimensions::create( 1 ) ) ) );
+                static_cast<::openPMD::Offset >( asStandardVector< simDim >(
+                    std::move( localDomainOffset ) ) ),
+                static_cast<::openPMD::Extent >(
+                    asStandardVector< simDim >( Dimensions::create( 1 ) ) ) );
         }
 
     public:
@@ -128,8 +130,9 @@ namespace openPMD
             log< picLog::INPUT_OUTPUT >( "openPMD: write %1%D scalars: %2%" ) %
                 simDim % name;
 
-            rc->storeChunk(
-                std::make_shared< T_Scalar >( value ), std::move( offset ), std::move( extent ) );
+            rc->storeChunk( std::make_shared< T_Scalar >( value ),
+                std::move( offset ),
+                std::move( extent ) );
             params.openPMDSeries->flush();
         }
 

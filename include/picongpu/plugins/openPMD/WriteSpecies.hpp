@@ -136,8 +136,7 @@ namespace openPMD
             ::openPMD::Series & series = *params->openPMDSeries;
             ::openPMD::Iteration & iteration =
                 series.iterations[ params->currentStep ];
-            ::openPMD::Container<::openPMD::Record > & particleSpecies =
-                iteration.particles[ speciesGroup ];
+
 
             /* count total number of particles on the device */
             log< picLog::INPUT_OUTPUT >(
@@ -179,6 +178,17 @@ namespace openPMD
                 "openPMD:   ( end ) count particles: %1% = %2%" ) %
                 T_SpeciesFilter::getName() % totalNumParticles;
 
+
+            if( totalNumParticles == 0 )
+            {
+                return;
+            }
+            
+            // make sure to create the species only if actual particles are
+            // present
+            ::openPMD::Container<::openPMD::Record > & particleSpecies =
+                iteration.particles[ speciesGroup ];
+
             // copy over particles to host
             openPMDFrameType hostFrame;
 
@@ -194,73 +204,68 @@ namespace openPMD
                 "openPMD:   ( end ) malloc host memory: %1%" ) %
                 T_SpeciesFilter::getName();
 
-            if( totalNumParticles > 0 )
-            {
-                log< picLog::INPUT_OUTPUT >(
-                    "openPMD:   (begin) copy particle host (with hierarchy) to "
-                    "host (without hierarchy): %1%" ) %
-                    T_SpeciesFilter::getName();
-                typedef bmpl::vector<
-                    typename GetPositionFilter< simDim >::type >
-                    usedFilters;
-                typedef typename FilterFactory< usedFilters >::FilterType
-                    MyParticleFilter;
-                MyParticleFilter filter;
-                /* activate filter pipeline if moving window is activated */
-                filter.setStatus(
-                    MovingWindow::getInstance().isSlidingWindowActive(
-                        params->currentStep ) );
-                filter.setWindowPosition( params->localWindowToDomainOffset,
-                    params->window.localDimensions.size );
+            log< picLog::INPUT_OUTPUT >(
+                "openPMD:   (begin) copy particle host (with hierarchy) to "
+                "host (without hierarchy): %1%" ) %
+                T_SpeciesFilter::getName();
+            typedef bmpl::vector< typename GetPositionFilter< simDim >::type >
+                usedFilters;
+            typedef typename FilterFactory< usedFilters >::FilterType
+                MyParticleFilter;
+            MyParticleFilter filter;
+            /* activate filter pipeline if moving window is activated */
+            filter.setStatus( MovingWindow::getInstance().isSlidingWindowActive(
+                params->currentStep ) );
+            filter.setWindowPosition( params->localWindowToDomainOffset,
+                params->window.localDimensions.size );
 
-                DataConnector & dc = Environment<>::get().DataConnector();
+            DataConnector & dc = Environment<>::get().DataConnector();
 #if( PMACC_CUDA_ENABLED == 1 )
-                auto mallocMCBuffer = dc.get< MallocMCBuffer< DeviceHeap > >(
-                    MallocMCBuffer< DeviceHeap >::getName(), true );
+            auto mallocMCBuffer = dc.get< MallocMCBuffer< DeviceHeap > >(
+                MallocMCBuffer< DeviceHeap >::getName(), true );
 #endif
-                int globalParticleOffset = 0;
-                AreaMapping< CORE + BORDER, MappingDesc > mapper(
-                    *( params->cellDescription ) );
+            int globalParticleOffset = 0;
+            AreaMapping< CORE + BORDER, MappingDesc > mapper(
+                *( params->cellDescription ) );
 
-                pmacc::particles::operations::ConcatListOfFrames< simDim >
-                    concatListOfFrames( mapper.getGridDim() );
+            pmacc::particles::operations::ConcatListOfFrames< simDim >
+                concatListOfFrames( mapper.getGridDim() );
 
 #if( PMACC_CUDA_ENABLED == 1 )
-                auto particlesBox = speciesTmp->getHostParticlesBox(
-                    mallocMCBuffer->getOffset() );
+            auto particlesBox =
+                speciesTmp->getHostParticlesBox( mallocMCBuffer->getOffset() );
 #else
-                /* This separate code path is only a workaround until
-                 * MallocMCBuffer is alpaka compatible.
-                 *
-                 * @todo remove this workaround: we know that we are allowed to
-                 * access the device memory directly.
-                 */
-                auto particlesBox = speciesTmp->getDeviceParticlesBox();
-                /* Notify to the event system that the particles box is used on
-                 * the host.
-                 *
-                 * @todo remove this workaround
-                 */
-                __startOperation( ITask::TASK_HOST );
+            /* This separate code path is only a workaround until
+             * MallocMCBuffer is alpaka compatible.
+             *
+             * @todo remove this workaround: we know that we are allowed to
+             * access the device memory directly.
+             */
+            auto particlesBox = speciesTmp->getDeviceParticlesBox();
+            /* Notify to the event system that the particles box is used on
+             * the host.
+             *
+             * @todo remove this workaround
+             */
+            __startOperation( ITask::TASK_HOST );
 
 #endif
-                concatListOfFrames( globalParticleOffset,
-                    hostFrame,
-                    particlesBox,
-                    filter,
-                    particleOffset, /*relative to data domain (not to physical
-                                       domain)*/
-                    totalCellIdx_,
-                    mapper,
-                    particleFilter );
+            concatListOfFrames( globalParticleOffset,
+                hostFrame,
+                particlesBox,
+                filter,
+                particleOffset, /*relative to data domain (not to physical
+                                   domain)*/
+                totalCellIdx_,
+                mapper,
+                particleFilter );
 #if( PMACC_CUDA_ENABLED == 1 )
-                dc.releaseData( MallocMCBuffer< DeviceHeap >::getName() );
+            dc.releaseData( MallocMCBuffer< DeviceHeap >::getName() );
 #endif
-                /* this costs a little bit of time but writing to external is
-                 * slower in general */
-                PMACC_ASSERT(
-                    ( uint64_cu )globalParticleOffset == totalNumParticles );
-            }
+            /* this costs a little bit of time but writing to external is
+             * slower in general */
+            PMACC_ASSERT(
+                ( uint64_cu )globalParticleOffset == totalNumParticles );
             /* dump to openPMD storage */
             ForEach
                 < typename openPMDFrameType::ValueTypeSeq,
