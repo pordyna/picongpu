@@ -50,7 +50,8 @@ namespace openPMD
     public:
         template< class Data >
         static void
-        loadField( Data & field,
+        loadField(
+            Data & field,
             const uint32_t numComponents,
             std::string objectName,
             ThreadParams * params )
@@ -176,7 +177,8 @@ namespace openPMD
             auto field = dc.get< FieldType >( FieldType::getName(), true );
 
             /* load from openPMD */
-            RestartFieldLoader::loadField( field->getGridBuffer(),
+            RestartFieldLoader::loadField(
+                field->getGridBuffer(),
                 ( uint32_t )FieldType::numComponents,
                 FieldType::getName(),
                 tp );

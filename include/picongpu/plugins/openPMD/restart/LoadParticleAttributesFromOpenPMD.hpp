@@ -58,7 +58,8 @@ namespace openPMD
          */
         template< typename FrameType >
         HINLINE void
-        operator()( ThreadParams * params,
+        operator()(
+            ThreadParams * params,
             FrameType & frame,
             ::openPMD::ParticleSpecies particleSpecies,
             const uint64_t particlesOffset,
@@ -110,7 +111,8 @@ namespace openPMD
                     // avoid deadlock between not finished pmacc tasks and mpi
                     // calls in openPMD
                     __getTransactionEvent().waitForFinished();
-                    rc.loadChunk< ComponentType >( loadBfr,
+                    rc.loadChunk< ComponentType >(
+                        loadBfr,
                         ::openPMD::Offset{ particlesOffset },
                         ::openPMD::Extent{ elements } );
                 }

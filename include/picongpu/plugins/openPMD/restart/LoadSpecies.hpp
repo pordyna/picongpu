@@ -76,7 +76,8 @@ namespace openPMD
             typename MakeSeq< ParticleCleanedAttributeList, totalCellIdx >::type
                 ParticleNewAttributeList;
 
-        typedef typename ReplaceValueTypeSeq< ParticleDescription,
+        typedef typename ReplaceValueTypeSeq<
+            ParticleDescription,
             ParticleNewAttributeList >::type NewParticleDescription;
 
         typedef Frame< OperatorCreateVectorBox, NewParticleDescription >
@@ -156,7 +157,8 @@ namespace openPMD
             // avoid deadlock between not finished pmacc tasks and mpi blocking
             // collectives
             __getTransactionEvent().waitForFinished();
-            MPI_CHECK( MPI_Allgather( particlesInfoPtr,
+            MPI_CHECK( MPI_Allgather(
+                particlesInfoPtr,
                 1,
                 MPI_UINT64_T,
                 fullParticlesInfo,
@@ -189,7 +191,7 @@ namespace openPMD
             /*malloc mapped memory*/
             ForEach
                 < typename openPMDFrameType::ValueTypeSeq,
-                    MallocMemory< bmpl::_1 > > mallocMem;
+                  MallocMemory< bmpl::_1 > > mallocMem;
             mallocMem( hostFrame, totalNumParticles ); // TODO
 
             log< picLog::INPUT_OUTPUT >(
@@ -199,14 +201,15 @@ namespace openPMD
             openPMDFrameType deviceFrame;
             ForEach
                 < typename openPMDFrameType::ValueTypeSeq,
-                    GetDevicePtr< bmpl::_1 > > getDevicePtr;
+                  GetDevicePtr< bmpl::_1 > > getDevicePtr;
             getDevicePtr( deviceFrame, hostFrame );
 
             ForEach
                 < typename openPMDFrameType::ValueTypeSeq,
-                    LoadParticleAttributesFromOpenPMD<
-                        bmpl::_1 > > loadAttributes;
-            loadAttributes( params,
+                  LoadParticleAttributesFromOpenPMD<
+                      bmpl::_1 > > loadAttributes;
+            loadAttributes(
+                params,
                 hostFrame,
                 particleSpecies,
                 particleOffset,
@@ -227,7 +230,7 @@ namespace openPMD
                 /*free host memory*/
                 ForEach
                     < typename openPMDFrameType::ValueTypeSeq,
-                        FreeMemory< bmpl::_1 > > freeMem;
+                      FreeMemory< bmpl::_1 > > freeMem;
                 freeMem( hostFrame );
             }
             log< picLog::INPUT_OUTPUT >(

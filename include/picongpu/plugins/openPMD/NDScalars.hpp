@@ -44,7 +44,8 @@ namespace openPMD
     template< typename T_Scalar, typename T_Attribute = uint64_t >
     struct WriteNDScalars
     {
-        WriteNDScalars( const std::string & baseName,
+        WriteNDScalars(
+            const std::string & baseName,
             const std::string & group,
             const std::string & dataset,
             const std::string & attrName = "" ) :
@@ -62,7 +63,8 @@ namespace openPMD
          *
          *  Must be called before executing the functor
          */
-        std::tuple<::openPMD::MeshRecordComponent,
+        std::tuple<
+            ::openPMD::MeshRecordComponent,
             ::openPMD::Offset,
             ::openPMD::Extent >
         prepare( ThreadParams & params, T_Attribute attribute )
@@ -103,13 +105,15 @@ namespace openPMD
 
                 mrc.setAttribute( attrName, attribute );
             }
-            params.initDataset< simDim >( mrc,
+            params.initDataset< simDim >(
+                mrc,
                 openPMDScalarType,
                 std::move( globalDomainSize ),
                 true,
                 params.compressionMethod );
 
-            return std::make_tuple( std::move( mrc ),
+            return std::make_tuple(
+                std::move( mrc ),
                 static_cast<::openPMD::Offset >( asStandardVector< simDim >(
                     std::move( localDomainOffset ) ) ),
                 static_cast<::openPMD::Extent >(
@@ -118,17 +122,17 @@ namespace openPMD
 
     public:
         void
-        operator()( ThreadParams & params,
+        operator()(
+            ThreadParams & params,
             T_Scalar value,
             T_Attribute attribute = T_Attribute() )
         {
-            auto tuple =
-                prepare( params, std::move( attribute ) );
+            auto tuple = prepare( params, std::move( attribute ) );
             auto name = baseName + "/" + group + "/" + dataset;
             log< picLog::INPUT_OUTPUT >( "openPMD: write %1%D scalars: %2%" ) %
                 simDim % name;
 
-            std::get< 0 >( tuple ).storeChunk( 
+            std::get< 0 >( tuple ).storeChunk(
                 std::make_shared< T_Scalar >( value ),
                 std::move( std::get< 1 >( tuple ) ),
                 std::move( std::get< 2 >( tuple ) ) );
@@ -155,7 +159,8 @@ namespace openPMD
         /** Read the skalar field and optionally the attribute into the values
          * referenced by the pointers */
         void
-        operator()( ThreadParams & params,
+        operator()(
+            ThreadParams & params,
             const std::string & baseName,
             const std::string & group,
             const std::string & dataset,

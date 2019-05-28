@@ -92,7 +92,8 @@ namespace openPMD
 
     template< unsigned DIM >
     ::openPMD::RecordComponent &
-    ThreadParams::initDataset( ::openPMD::RecordComponent & recordComponent,
+    ThreadParams::initDataset(
+        ::openPMD::RecordComponent & recordComponent,
         ::openPMD::Datatype datatype,
         pmacc::math::UInt64< DIM > const & globalDimensions,
         bool compression,
@@ -200,7 +201,8 @@ namespace openPMD
              * @param id index of the plugin, range: [0;help->getNumPlugins())
              */
             std::shared_ptr< ISlave >
-            create( std::shared_ptr< IHelp > & help,
+            create(
+                std::shared_ptr< IHelp > & help,
                 size_t const id,
                 MappingDesc * cellDescription )
             {
@@ -208,41 +210,55 @@ namespace openPMD
                     new openPMDWriter( help, id, cellDescription ) );
             }
 
-            plugins::multi::Option< std::string > notifyPeriod = { "period",
-                "enable openPMD IO [for each n-th step]" };
+            plugins::multi::Option< std::string > notifyPeriod = {
+                "period",
+                "enable openPMD IO [for each n-th step]"
+            };
 
-            plugins::multi::Option< std::string > source = { "source",
+            plugins::multi::Option< std::string > source = {
+                "source",
                 "data sources: ",
-                "species_all, fields_all" };
+                "species_all, fields_all"
+            };
 
-            plugins::multi::Option< std::string > fileName = { "file",
-                "openPMD file basename" };
+            plugins::multi::Option< std::string > fileName = {
+                "file",
+                "openPMD file basename"
+            };
 
-            plugins::multi::Option< std::string > fileNameExtension = { "ext",
+            plugins::multi::Option< std::string > fileNameExtension = {
+                "ext",
                 "openPMD filename extension (this controls the"
                 "backend picked by the openPMD API)",
-                "bp" };
+                "bp"
+            };
 
             std::vector< std::string > allowedDataSources = { "species_all",
-                "fields_all" };
+                                                              "fields_all" };
 
-            plugins::multi::Option< uint32_t > numAggregators = { "aggregators",
+            plugins::multi::Option< uint32_t > numAggregators = {
+                "aggregators",
                 "Number of aggregators [0 == number of MPI processes] "
                 "(currently "
                 "controlled by backend-specific environment variables)",
-                0u };
+                0u
+            };
 
-            plugins::multi::Option< uint32_t > numOSTs = { "ost",
+            plugins::multi::Option< uint32_t > numOSTs = {
+                "ost",
                 "Number of OST (currently controlled by backend-specific "
                 "environment variables)",
-                1u };
+                1u
+            };
 
-            plugins::multi::Option< uint32_t > disableMeta = { "disable-meta",
+            plugins::multi::Option< uint32_t > disableMeta = {
+                "disable-meta",
                 "Disable online gather and write of a global meta file, can be "
                 "time consuming (use `bpmeta` post-mortem) (currently "
                 "controlled "
                 "by backend-specific environment variables)",
-                0u };
+                0u
+            };
 
             /* select MPI method, #OSTs and #aggregators */
             plugins::multi::Option< std::string > transportParams = {
@@ -255,10 +271,12 @@ namespace openPMD
                 ""
             };
 
-            plugins::multi::Option< std::string > compression = { "compression",
+            plugins::multi::Option< std::string > compression = {
+                "compression",
                 "Backend-specific openPMD compression method, e.g., zlib (see "
                 "`adios_config -m` for help)",
-                "none" };
+                "none"
+            };
 
             /** defines if the plugin must register itself to the PMacc plugin
              * system
@@ -273,19 +291,20 @@ namespace openPMD
             struct CreateSpeciesFilter
             {
                 using type = plugins::misc::SpeciesFilter<
-                    typename pmacc::math::CT::At< T_TupleVector,
-                        bmpl::int_< 0 > >::type,
-                    typename pmacc::math::CT::At< T_TupleVector,
-                        bmpl::int_< 1 > >::type >;
+                    typename pmacc::math::CT::
+                        At< T_TupleVector, bmpl::int_< 0 > >::type,
+                    typename pmacc::math::CT::
+                        At< T_TupleVector, bmpl::int_< 1 > >::type >;
             };
 
             using AllParticlesTimesAllFilters =
-                typename AllCombinations< bmpl::vector< FileOutputParticles,
+                typename AllCombinations< bmpl::vector<
+                    FileOutputParticles,
                     particles::filter::AllParticleFilters > >::type;
 
-            using AllSpeciesFilter =
-                typename bmpl::transform< AllParticlesTimesAllFilters,
-                    CreateSpeciesFilter< bmpl::_1 > >::type;
+            using AllSpeciesFilter = typename bmpl::transform<
+                AllParticlesTimesAllFilters,
+                CreateSpeciesFilter< bmpl::_1 > >::type;
 
             using AllEligibleSpeciesSources = typename bmpl::copy_if<
                 AllSpeciesFilter,
@@ -295,19 +314,20 @@ namespace openPMD
 
             ///! method used by plugin controller to get --help description
             void
-            registerHelp( boost::program_options::options_description & desc,
+            registerHelp(
+                boost::program_options::options_description & desc,
                 std::string const & masterPrefix = std::string{} )
             {
                 ForEach
                     < AllEligibleSpeciesSources,
-                        plugins::misc::AppendName<
-                            bmpl::_1 > > getEligibleDataSourceNames;
+                      plugins::misc::AppendName<
+                          bmpl::_1 > > getEligibleDataSourceNames;
                 getEligibleDataSourceNames( allowedDataSources );
 
                 ForEach
                     < AllFieldSources,
-                        plugins::misc::AppendName<
-                            bmpl::_1 > > appendFieldSourceNames;
+                      plugins::misc::AppendName<
+                          bmpl::_1 > > appendFieldSourceNames;
                 appendFieldSourceNames( allowedDataSources );
 
                 // string list with all possible particle sources
@@ -316,7 +336,8 @@ namespace openPMD
                         allowedDataSources, ", " );
 
                 notifyPeriod.registerHelp( desc, masterPrefix + prefix );
-                source.registerHelp( desc,
+                source.registerHelp(
+                    desc,
                     masterPrefix + prefix,
                     std::string( "[" ) + concatenatedSourceNames + "]" );
 
@@ -325,7 +346,8 @@ namespace openPMD
             }
 
             void
-            expandHelp( boost::program_options::options_description & desc,
+            expandHelp(
+                boost::program_options::options_description & desc,
                 std::string const & masterPrefix = std::string{} )
             {
                 numAggregators.registerHelp( desc, masterPrefix + prefix );
@@ -346,7 +368,8 @@ namespace openPMD
                 if( selfRegister )
                 {
                     if( notifyPeriod.empty() || fileName.empty() )
-                        throw std::runtime_error( name +
+                        throw std::runtime_error(
+                            name +
                             ": parameter period and file must be defined" );
 
                     // check if user passed data source names are valid
@@ -362,8 +385,9 @@ namespace openPMD
                             if( !plugins::misc::containsObject(
                                     allowedDataSources, f ) )
                             {
-                                throw std::runtime_error( name +
-                                    ": unknown data source '" + f + "'" );
+                                throw std::runtime_error(
+                                    name + ": unknown data source '" + f +
+                                    "'" );
                             }
                         }
                     }
@@ -470,7 +494,8 @@ namespace openPMD
                  * solver implementation */
                 const float_X timeOffset = 0.0;
 
-                openPMDWriter::template writeField< ComponentType >( params,
+                openPMDWriter::template writeField< ComponentType >(
+                    params,
                     sizeof( ComponentType ),
                     ::openPMD::determineDatatype< ComponentType >(),
                     GetNComponents< ValueType >::value,
@@ -583,7 +608,8 @@ namespace openPMD
 
                 params->gridLayout = fieldTmp->getGridLayout();
                 /*write data to openPMD Series*/
-                openPMDWriter::template writeField< ComponentType >( params,
+                openPMDWriter::template writeField< ComponentType >(
+                    params,
                     sizeof( ComponentType ),
                     ::openPMD::determineDatatype< ComponentType >(),
                     components,
@@ -606,7 +632,8 @@ namespace openPMD
          * @param cellDescription PIConGPu cell description information for
          * kernel index mapping
          */
-        openPMDWriter( std::shared_ptr< plugins::multi::IHelp > & help,
+        openPMDWriter(
+            std::shared_ptr< plugins::multi::IHelp > & help,
             size_t const id,
             MappingDesc * cellDescription ) :
             m_help( std::static_pointer_cast< Help >( help ) ),
@@ -649,7 +676,8 @@ namespace openPMD
             // collectives
             __getTransactionEvent().waitForFinished();
             mThreadParams.communicator = MPI_COMM_NULL;
-            MPI_CHECK( MPI_Comm_dup( gc.getCommunicator().getMPIComm(),
+            MPI_CHECK( MPI_Comm_dup(
+                gc.getCommunicator().getMPIComm(),
                 &( mThreadParams.communicator ) ) );
 
             /* TODO: select MPI method, #OSTs and #aggregators */
@@ -702,7 +730,8 @@ namespace openPMD
         }
 
         virtual void
-        checkpoint( uint32_t currentStep,
+        checkpoint(
+            uint32_t currentStep,
             std::string const & checkpointDirectory )
         {
             /* ISlave checkpoint interface is not needed becase IIOBackend
@@ -711,7 +740,8 @@ namespace openPMD
         }
 
         void
-        dumpCheckpoint( const uint32_t currentStep,
+        dumpCheckpoint(
+            const uint32_t currentStep,
             const std::string & checkpointDirectory,
             const std::string & checkpointFilename )
         {
@@ -737,7 +767,8 @@ namespace openPMD
         }
 
         void
-        doRestart( const uint32_t restartStep,
+        doRestart(
+            const uint32_t restartStep,
             const std::string & restartDirectory,
             const std::string & constRestartFilename,
             const uint32_t restartChunkSize )
@@ -816,24 +847,26 @@ namespace openPMD
             /* load all fields */
             ForEach
                 < FileCheckpointFields,
-                    LoadFields< bmpl::_1 > > forEachLoadFields;
+                  LoadFields< bmpl::_1 > > forEachLoadFields;
             forEachLoadFields( &mThreadParams );
 
             /* load all particles */
             ForEach
                 < FileCheckpointParticles,
-                    LoadSpecies< bmpl::_1 > > forEachLoadSpecies;
+                  LoadSpecies< bmpl::_1 > > forEachLoadSpecies;
             forEachLoadSpecies( &mThreadParams, restartChunkSize );
 
             IdProvider< simDim >::State idProvState;
-            ReadNDScalars< uint64_t, uint64_t >()( mThreadParams,
+            ReadNDScalars< uint64_t, uint64_t >()(
+                mThreadParams,
                 "picongpu",
                 "idProvider",
                 "startId",
                 &idProvState.startId,
                 "maxNumProc",
                 &idProvState.maxNumProc );
-            ReadNDScalars< uint64_t >()( mThreadParams,
+            ReadNDScalars< uint64_t >()(
+                mThreadParams,
                 "picongpu",
                 "idProvider",
                 "nextId",
@@ -911,7 +944,7 @@ namespace openPMD
                  */
                 ForEach
                     < FileCheckpointParticles,
-                        CopySpeciesToHost< bmpl::_1 > > copySpeciesToHost;
+                      CopySpeciesToHost< bmpl::_1 > > copySpeciesToHost;
                 copySpeciesToHost();
                 lastSpeciesSyncStep = currentStep;
 #if( PMACC_CUDA_ENABLED == 1 )
@@ -927,19 +960,20 @@ namespace openPMD
         }
 
         static void
-        writeFieldAttributes( ThreadParams * params,
+        writeFieldAttributes(
+            ThreadParams * params,
             std::vector< float_64 > const & unitDimension,
             float_X timeOffset,
             ::openPMD::Mesh & mesh )
         {
             static constexpr ::openPMD::UnitDimension
                 openPMDUnitDimensions[ 7 ] = { ::openPMD::UnitDimension::L,
-                    ::openPMD::UnitDimension::M,
-                    ::openPMD::UnitDimension::T,
-                    ::openPMD::UnitDimension::I,
-                    ::openPMD::UnitDimension::theta,
-                    ::openPMD::UnitDimension::N,
-                    ::openPMD::UnitDimension::J };
+                                               ::openPMD::UnitDimension::M,
+                                               ::openPMD::UnitDimension::T,
+                                               ::openPMD::UnitDimension::I,
+                                               ::openPMD::UnitDimension::theta,
+                                               ::openPMD::UnitDimension::N,
+                                               ::openPMD::UnitDimension::J };
             std::map<::openPMD::UnitDimension, double > unitMap;
             for( unsigned i = 0; i < 7; ++i )
             {
@@ -954,7 +988,7 @@ namespace openPMD
             if( simDim == DIM2 )
             {
                 std::vector< std::string > axisLabels = { "y",
-                    "x" }; // 2D: F[y][x]
+                                                          "x" }; // 2D: F[y][x]
                 mesh.setAxisLabels( axisLabels );
             }
             if( simDim == DIM3 )
@@ -987,10 +1021,10 @@ namespace openPMD
             // globalDimensions is {x, y, z} but fields are F[z][y][x]
             std::vector< float_64 > gridGlobalOffset( simDim, 0.0 );
             for( uint32_t d = 0; d < simDim; ++d )
-                gridGlobalOffset.at( simDim - 1 - d ) =
-                    float_64( cellSize[ d ] ) *
+                gridGlobalOffset.at( simDim - 1 - d ) = float_64(
+                                                            cellSize[ d ] ) *
                     float_64( params->window.globalDimensions.offset[ d ] +
-                        globalSlideOffset[ d ] );
+                              globalSlideOffset[ d ] );
 
             mesh.setGridGlobalOffset( std::move( gridGlobalOffset ) );
             mesh.setGridUnitSI( UNIT_LENGTH );
@@ -999,7 +1033,8 @@ namespace openPMD
 
         template< typename ComponentType >
         static void
-        writeField( ThreadParams * params,
+        writeField(
+            ThreadParams * params,
             const uint32_t sizePtrType,
             ::openPMD::Datatype openPMDType,
             const uint32_t nComponents,
@@ -1025,7 +1060,8 @@ namespace openPMD
 
             const bool fieldTypeCorrect(
                 boost::is_same< ComponentType, float_X >::value );
-            PMACC_CASSERT_MSG( Precision_mismatch_in_Field_Components__ADIOS,
+            PMACC_CASSERT_MSG(
+                Precision_mismatch_in_Field_Components__ADIOS,
                 fieldTypeCorrect );
 
             ::openPMD::Iteration iteration =
@@ -1083,17 +1119,19 @@ namespace openPMD
                     }
                 }
 
-                ::openPMD::MeshRecordComponent mrc = mesh[ nComponents > 1
-                        ? name_lookup_tpl[ d ]
-                        : ::openPMD::RecordComponent::SCALAR ];
+                ::openPMD::MeshRecordComponent mrc = mesh
+                    [ nComponents > 1 ? name_lookup_tpl[ d ]
+                                      : ::openPMD::RecordComponent::SCALAR ];
 
                 params
-                    ->initDataset< simDim >( mrc,
+                    ->initDataset< simDim >(
+                        mrc,
                         openPMDType,
                         params->fieldsGlobalSizeDims,
                         true,
                         params->compressionMethod )
-                    .template storeChunk< ComponentType >( params->fieldBuffer,
+                    .template storeChunk< ComponentType >(
+                        params->fieldBuffer,
                         asStandardVector< simDim >( params->fieldsOffsetDims ),
                         asStandardVector< simDim >( params->fieldsSizeDims ) );
 
@@ -1162,7 +1200,8 @@ namespace openPMD
                  * (if any) */
                 if( 1 == d )
                 {
-                    uint64_t offset = std::max( 0,
+                    uint64_t offset = std::max(
+                        0,
                         localDomain.offset.y() -
                             threadParams->window.globalDimensions.offset.y() );
                     threadParams->fieldsOffsetDims[ d ] = offset;
@@ -1203,7 +1242,7 @@ namespace openPMD
             {
                 ForEach
                     < FileCheckpointFields,
-                        GetFields< bmpl::_1 > > forEachGetFields;
+                      GetFields< bmpl::_1 > > forEachGetFields;
                 forEachGetFields( threadParams );
             }
             else
@@ -1212,14 +1251,14 @@ namespace openPMD
                 {
                     ForEach
                         < FileOutputFields,
-                            GetFields< bmpl::_1 > > forEachGetFields;
+                          GetFields< bmpl::_1 > > forEachGetFields;
                     forEachGetFields( threadParams );
                 }
 
                 // move over all field data sources
                 ForEach
                     < typename Help::AllFieldSources,
-                        CallGetFields< bmpl::_1 > >{}(
+                      CallGetFields< bmpl::_1 > >{}(
                         vectorOfDataSourceNames, threadParams );
             }
             log< picLog::INPUT_OUTPUT >( "openPMD: ( end ) writing fields." );
@@ -1231,9 +1270,10 @@ namespace openPMD
             {
                 ForEach
                     < FileCheckpointParticles,
-                        WriteSpecies< plugins::misc::SpeciesFilter< bmpl::_1 >,
-                            plugins::misc::UnfilteredSpecies<
-                                bmpl::_1 > > > writeSpecies;
+                      WriteSpecies<
+                          plugins::misc::SpeciesFilter< bmpl::_1 >,
+                          plugins::misc::UnfilteredSpecies<
+                              bmpl::_1 > > > writeSpecies;
                 writeSpecies( threadParams, particleOffset );
             }
             else
@@ -1244,15 +1284,15 @@ namespace openPMD
                     // move over all species defined in FileOutputParticles
                     ForEach
                         < FileOutputParticles,
-                            WriteSpecies< plugins::misc::UnfilteredSpecies<
-                                bmpl::_1 > > > writeSpecies;
+                          WriteSpecies< plugins::misc::UnfilteredSpecies<
+                              bmpl::_1 > > > writeSpecies;
                     writeSpecies( threadParams, particleOffset );
                 }
 
                 // move over all species data sources
                 ForEach
                     < typename Help::AllEligibleSpeciesSources,
-                        CallWriteSpecies< bmpl::_1 > >{}(
+                      CallWriteSpecies< bmpl::_1 > >{}(
                         vectorOfDataSourceNames, threadParams, particleOffset );
             }
             log< picLog::INPUT_OUTPUT >(
@@ -1269,7 +1309,8 @@ namespace openPMD
                 "picongpu", "idProvider", "startId", "maxNumProc" );
             WriteNDScalars< uint64_t, uint64_t > writeIdProviderNextId(
                 "picongpu", "idProvider", "nextId" );
-            writeIdProviderStartId( *threadParams,
+            writeIdProviderStartId(
+                *threadParams,
                 idProviderState.startId,
                 idProviderState.maxNumProc );
             writeIdProviderNextId( *threadParams, idProviderState.nextId );

@@ -80,7 +80,8 @@ namespace openPMD
             typename MakeSeq< ParticleCleanedAttributeList, totalCellIdx >::type
                 ParticleNewAttributeList;
 
-        typedef typename ReplaceValueTypeSeq< ParticleDescription,
+        typedef typename ReplaceValueTypeSeq<
+            ParticleDescription,
             ParticleNewAttributeList >::type NewParticleDescription;
 
         typedef Frame< OperatorCreateVectorBox, NewParticleDescription >
@@ -160,7 +161,8 @@ namespace openPMD
             // avoid deadlock between not finished pmacc tasks and mpi blocking
             // collectives
             __getTransactionEvent().waitForFinished();
-            MPI_CHECK( MPI_Allgather( &myNumParticles,
+            MPI_CHECK( MPI_Allgather(
+                &myNumParticles,
                 1,
                 MPI_UNSIGNED_LONG_LONG,
                 allNumParticles,
@@ -202,7 +204,7 @@ namespace openPMD
                 T_SpeciesFilter::getName();
             ForEach
                 < typename openPMDFrameType::ValueTypeSeq,
-                    MallocHostMemory< bmpl::_1 > > mallocMem;
+                  MallocHostMemory< bmpl::_1 > > mallocMem;
             mallocMem( hostFrame, totalNumParticles );
             log< picLog::INPUT_OUTPUT >(
                 "openPMD:   ( end ) malloc host memory: %1%" ) %
@@ -220,7 +222,8 @@ namespace openPMD
             /* activate filter pipeline if moving window is activated */
             filter.setStatus( MovingWindow::getInstance().isSlidingWindowActive(
                 params->currentStep ) );
-            filter.setWindowPosition( params->localWindowToDomainOffset,
+            filter.setWindowPosition(
+                params->localWindowToDomainOffset,
                 params->window.localDimensions.size );
 
 #if( PMACC_CUDA_ENABLED == 1 )
@@ -253,7 +256,8 @@ namespace openPMD
             __startOperation( ITask::TASK_HOST );
 
 #endif
-            concatListOfFrames( globalParticleOffset,
+            concatListOfFrames(
+                globalParticleOffset,
                 hostFrame,
                 particlesBox,
                 filter,
@@ -272,14 +276,15 @@ namespace openPMD
             /* dump to openPMD storage */
             ForEach
                 < typename openPMDFrameType::ValueTypeSeq,
-                    openPMD::SetupRecordComponents<
-                        bmpl::_1 > > setupRecordComponents;
+                  openPMD::SetupRecordComponents<
+                      bmpl::_1 > > setupRecordComponents;
             setupRecordComponents(
                 params, particleSpecies, globalNumParticles );
             ForEach
                 < typename openPMDFrameType::ValueTypeSeq,
-                    openPMD::ParticleAttribute< bmpl::_1 > > writeToOpenPMD;
-            writeToOpenPMD( params,
+                  openPMD::ParticleAttribute< bmpl::_1 > > writeToOpenPMD;
+            writeToOpenPMD(
+                params,
                 hostFrame,
                 particleSpecies,
                 myNumParticles,
@@ -289,7 +294,7 @@ namespace openPMD
             /* free host memory */
             ForEach
                 < typename openPMDFrameType::ValueTypeSeq,
-                    FreeHostMemory< bmpl::_1 > > freeMem;
+                  FreeHostMemory< bmpl::_1 > > freeMem;
             freeMem( hostFrame );
             log< picLog::INPUT_OUTPUT >(
                 "openPMD: ( end ) writing species: %1%" ) %
@@ -342,12 +347,14 @@ namespace openPMD
                 std::cout << std::endl;
 
                 params
-                    ->initDataset< DIM1 >( recordComponent,
+                    ->initDataset< DIM1 >(
+                        recordComponent,
                         datatype,
                         { localTableSize * uint64_t( gc.getGlobalSize() ) },
                         true,
                         params->compressionMethod )
-                    .template storeChunk( particlesMetaInfo,
+                    .template storeChunk(
+                        particlesMetaInfo,
                         { localTableSize },
                         { localTableSize * uint64_t( gc.getGlobalRank() ) } );
 

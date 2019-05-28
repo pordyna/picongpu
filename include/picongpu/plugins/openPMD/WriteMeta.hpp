@@ -46,8 +46,8 @@ namespace openPMD
          *
          * @tparam numSpecies count of defined species
          */
-        template< uint32_t numSpecies =
-                      bmpl::size< VectorAllSpecies >::type::value >
+        template<
+            uint32_t numSpecies = bmpl::size< VectorAllSpecies >::type::value >
         struct OfAllSpecies
         {
             /** write meta data for species
@@ -102,7 +102,8 @@ namespace openPMD
              * @param fullMeshesPath path to mesh entry
              */
             void
-            operator()( ThreadParams * /* threadParams */,
+            operator()(
+                ThreadParams * /* threadParams */,
                 const std::string & /* fullMeshesPath */
                 ) const
             {
@@ -206,7 +207,8 @@ namespace openPMD
 
             /* write current iteration */
             log< picLog::INPUT_OUTPUT >( "openPMD: meta: iteration" );
-            iteration.setAttribute( "iteration",
+            iteration.setAttribute(
+                "iteration",
                 threadParams->currentStep ); // openPMD API will not write this
                                              // automatically
 
@@ -223,9 +225,9 @@ namespace openPMD
 
             /* write normed grid parameters */
             log< picLog::INPUT_OUTPUT >( "openPMD: meta: grid" );
-            std::string names[ 3 ] = {
-                "cell_width", "cell_height", "cell_depth"
-            };
+            std::string names[ 3 ] = { "cell_width",
+                                       "cell_height",
+                                       "cell_depth" };
             for( unsigned i = 0; i < 3; ++i )
             {
                 iteration.setAttribute( names[ i ], cellSize[ i ] );

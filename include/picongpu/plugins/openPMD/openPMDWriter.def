@@ -108,7 +108,8 @@ namespace openPMD
          */
         template< unsigned DIM >
         ::openPMD::RecordComponent &
-        initDataset( ::openPMD::RecordComponent & recordComponent,
+        initDataset(
+            ::openPMD::RecordComponent & recordComponent,
             ::openPMD::Datatype datatype,
             pmacc::math::UInt64< DIM > const & globalDimensions,
             bool compression,

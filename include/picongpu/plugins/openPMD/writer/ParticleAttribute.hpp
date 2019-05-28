@@ -45,7 +45,8 @@ namespace openPMD
     struct SetupRecordComponents
     {
         void
-        operator()( ThreadParams * params,
+        operator()(
+            ThreadParams * params,
             ::openPMD::Container<::openPMD::Record > & particleSpecies,
             const size_t globalElements )
         {
@@ -65,7 +66,8 @@ namespace openPMD
                     : record[::openPMD::MeshRecordComponent::SCALAR ];
                 ::openPMD::Datatype openPMDType =
                     ::openPMD::determineDatatype< ComponentType >();
-                params->initDataset< DIM1 >( recordComponent,
+                params->initDataset< DIM1 >(
+                    recordComponent,
                     openPMDType,
                     { globalElements },
                     true,
@@ -88,7 +90,8 @@ namespace openPMD
          */
         template< typename FrameType >
         HINLINE void
-        operator()( ThreadParams * params,
+        operator()(
+            ThreadParams * params,
             FrameType & frame,
             ::openPMD::Container<::openPMD::Record > & particleSpecies,
             const size_t elements,
