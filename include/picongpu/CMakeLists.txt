@@ -43,6 +43,7 @@ list(APPEND CMAKE_PREFIX_PATH "$ENV{BOOST_ROOT}")
 list(APPEND CMAKE_PREFIX_PATH "$ENV{HDF5_ROOT}")
 list(APPEND CMAKE_PREFIX_PATH "$ENV{ADIOS_ROOT}")
 list(APPEND CMAKE_PREFIX_PATH "$ENV{OPENPMD_ROOT}")
+list(APPEND CMAKE_PREFIX_PATH "$ENV{ADIOS2_ROOT}")
 # Add from environment after specific env vars
 list(APPEND CMAKE_PREFIX_PATH "$ENV{CMAKE_PREFIX_PATH}")
 
@@ -253,7 +254,7 @@ endif(ADIOS_FOUND)
 ################################################################################
 
 # find openPMD installation
-find_package(openPMD 0.6.2)
+find_package(openPMD 0.8.0)
 
 if(openPMD_FOUND)
     add_definitions(-DENABLE_OPENPMD=1)
