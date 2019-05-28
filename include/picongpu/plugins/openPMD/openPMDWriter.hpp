@@ -122,18 +122,6 @@ namespace openPMD
         return res;
     }
 
-    template< typename T >
-    template< unsigned DIM >
-    WithWindow< T >
-    WithWindow< T >::init( T & data,
-        pmacc::math::UInt64< DIM > offset,
-        pmacc::math::UInt64< DIM > extent )
-    {
-        return WithWindow< T >{ data,
-            asStandardVector< DIM >( std::move( offset ) ),
-            asStandardVector< DIM >( std::move( extent ) ) };
-    }
-
     ::openPMD::Series &
     ThreadParams::openSeries( ::openPMD::AccessType at )
     {

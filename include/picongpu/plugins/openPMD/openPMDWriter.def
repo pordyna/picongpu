@@ -51,21 +51,6 @@ namespace openPMD
     std::vector< T >
     asStandardVector( pmacc::math::Vector< T, DIM > const & );
 
-    template< typename T >
-    struct WithWindow
-    {
-        T m_data;
-        ::openPMD::Offset m_offset;
-        ::openPMD::Extent m_extent;
-
-        // regular method and no constructor since we would
-        // have to rely on template parameter deduction with constructors
-        template< unsigned DIM >
-        static WithWindow< T >
-        init( T & data,
-            pmacc::math::UInt64< DIM > offset,
-            pmacc::math::UInt64< DIM > extent );
-    };
 
     struct ThreadParams
     {
@@ -81,7 +66,8 @@ namespace openPMD
         MPI_Comm communicator; /* MPI communicator for openPMD API */
         std::string
             compressionMethod; /* openPMD data transform compression method */
-        std::string fileName;  /* Name of the openPMDSeries */
+        std::string fileName;  /* Name of the openPMDSeries, including the extension */
+        std::string fileExtension; /* Extension of the file name */
 
         pmacc::math::UInt64< simDim > fieldsSizeDims;
         pmacc::math::UInt64< simDim > fieldsGlobalSizeDims;

@@ -139,8 +139,6 @@ namespace openPMD
     private:
         const std::string baseName, group, dataset, attrName;
         int64_t varId;
-        std::unique_ptr< WithWindow<::openPMD::RecordComponent > >
-            preparedDataset;
     };
 
     /** Functor for reading ND scalar fields with N=simDim
