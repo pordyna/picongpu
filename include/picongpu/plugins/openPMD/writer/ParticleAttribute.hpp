@@ -65,7 +65,7 @@ namespace openPMD
                     : record[::openPMD::MeshRecordComponent::SCALAR ];
                 ::openPMD::Datatype openPMDType =
                     ::openPMD::determineDatatype< ComponentType >();
-                initDataset< DIM1 >( recordComponent,
+                params->initDataset< DIM1 >( recordComponent,
                     openPMDType,
                     { globalElements },
                     true,

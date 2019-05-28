@@ -104,7 +104,7 @@ namespace openPMD
                 mrc.setAttribute( attrName, attribute );
             }
 
-            return std::make_tuple( &initDataset< simDim >( mrc,
+            return std::make_tuple( &params.initDataset< simDim >( mrc,
                                         openPMDScalarType,
                                         std::move( globalDomainSize ),
                                         true,

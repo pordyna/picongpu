@@ -92,7 +92,7 @@ namespace openPMD
 
     template< unsigned DIM >
     ::openPMD::RecordComponent &
-    initDataset( ::openPMD::RecordComponent & recordComponent,
+    ThreadParams::initDataset( ::openPMD::RecordComponent & recordComponent,
         ::openPMD::Datatype datatype,
         pmacc::math::UInt64< DIM > const & globalDimensions,
         bool compression,
@@ -102,7 +102,14 @@ namespace openPMD
         ::openPMD::Dataset dataset{ datatype, std::move( v ) };
         if( compression )
         {
-            dataset.compression = compressionMethod;
+            if ( isADIOS1() )
+            {
+                dataset.compression = compressionMethod;
+            }
+            else
+            {
+                dataset.transform = compressionMethod;
+            }
         }
         recordComponent.resetDataset( std::move( dataset ) );
         return recordComponent;
@@ -165,6 +172,16 @@ namespace openPMD
             throw std::runtime_error(
                 "openPMD: Tried closing a Series that was not active" );
         }
+    }
+    
+    bool
+    ThreadParams::isADIOS1()
+    {
+#if openPMD_HAVE_ADIOS1 && !openPMD_HAVE_ADIOS2
+        return this->fileExtension == "bp";
+#else
+        return false;
+#endif
     }
 
 
@@ -659,8 +676,9 @@ namespace openPMD
 
             __getTransactionEvent().waitForFinished();
 
+            mThreadParams.fileExtension = m_help->fileNameExtension.get( m_id );
             std::string filename = m_help->fileName.get( m_id ) + "_%T." +
-                m_help->fileNameExtension.get( m_id );
+                mThreadParams.fileExtension;
 
             /* if file name is relative, prepend with common directory */
             if( boost::filesystem::path( filename ).has_root_path() )
@@ -703,13 +721,14 @@ namespace openPMD
 
             __getTransactionEvent().waitForFinished();
             /* if file name is relative, prepend with common directory */
+            mThreadParams.fileExtension = m_help->fileNameExtension.get( m_id );
             if( boost::filesystem::path( checkpointFilename ).has_root_path() )
                 mThreadParams.fileName = checkpointFilename;
             else
                 mThreadParams.fileName =
                     checkpointDirectory + "/" + checkpointFilename;
             mThreadParams.fileName +=
-                "_%T." + m_help->fileNameExtension.get( m_id );
+                "_%T." + mThreadParams.fileExtension;
 
             mThreadParams.window =
                 MovingWindow::getInstance().getDomainAsWindow( currentStep );
@@ -727,6 +746,8 @@ namespace openPMD
             // restart is only allowed if the plugin is controlled by the class
             // Checkpoint
             assert( !m_help->selfRegister );
+            
+            mThreadParams.fileExtension = m_help->fileNameExtension.get( m_id );
 
             /* if restartFilename is relative, prepend with restartDirectory */
             if( !boost::filesystem::path( constRestartFilename )
@@ -741,7 +762,7 @@ namespace openPMD
             }
 
             mThreadParams.fileName +=
-                "_%T." + m_help->fileNameExtension.get( m_id );
+                "_%T." + mThreadParams.fileExtension;
 
             // mThreadParams.isCheckpoint = isCheckpoint;
             mThreadParams.currentStep = restartStep;
@@ -1068,7 +1089,7 @@ namespace openPMD
                         ? name_lookup_tpl[ d ]
                         : ::openPMD::RecordComponent::SCALAR ];
 
-                initDataset< simDim >( mrc,
+                params->initDataset< simDim >( mrc,
                     openPMDType,
                     params->fieldsGlobalSizeDims,
                     true,

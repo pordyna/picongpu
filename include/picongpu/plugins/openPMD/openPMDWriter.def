@@ -90,7 +90,28 @@ namespace openPMD
 
         void
         closeSeries();
-    };
+        
+        inline bool
+        isADIOS1();
+        
+          /**
+            * Wrapper for ::openPMD::resetDataset, set dataset parameters
+            * @tparam DIM number of variable dimensions
+            * @param recordComponent Location of the dataset within the openPMD Series
+            * @param datatype Variable type
+            * @param globalDimensions Dataset global dimensions
+            * @param compression Enable compression data transform
+            * @param compressionMethod String denoting the data transform to use
+            * @return The input recordComponent
+            */
+           template< unsigned DIM >
+           ::openPMD::RecordComponent &
+           initDataset( ::openPMD::RecordComponent & recordComponent,
+               ::openPMD::Datatype datatype,
+               pmacc::math::UInt64< DIM > const & globalDimensions,
+               bool compression,
+               std::string const & compressionMethod );
+           };
 
     /**
      * Writes simulation data to openPMD series.
@@ -98,24 +119,5 @@ namespace openPMD
      */
 
     class openPMDWriter;
-
-    /**
-     * Wrapper for ::openPMD::resetDataset, set dataset parameters
-     * @tparam DIM number of variable dimensions
-     * @param recordComponent Location of the dataset within the openPMD Series
-     * @param datatype Variable type
-     * @param globalDimensions Dataset global dimensions
-     * @param compression Enable compression data transform
-     * @param compressionMethod String denoting the data transform to use
-     * @return The input recordComponent
-     */
-    template< unsigned DIM >
-    ::openPMD::RecordComponent &
-    initDataset( ::openPMD::RecordComponent & recordComponent,
-        ::openPMD::Datatype datatype,
-        pmacc::math::UInt64< DIM > const & globalDimensions,
-        bool compression,
-        std::string const & compressionMethod );
-
 } // namespace openPMD
 } // namespace picongpu

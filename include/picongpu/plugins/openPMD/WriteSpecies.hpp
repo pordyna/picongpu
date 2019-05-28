@@ -341,7 +341,7 @@ namespace openPMD
                 }
                 std::cout << std::endl;
 
-                initDataset< DIM1 >( recordComponent,
+                params->initDataset< DIM1 >( recordComponent,
                     datatype,
                     { localTableSize * uint64_t( gc.getGlobalSize() ) },
                     true,
