@@ -1182,12 +1182,6 @@ namespace openPMD
                 threadParams->fileName;
             threadParams->openSeries( ::openPMD::AccessType::CREATE );
 
-            /* collect size information for all attributes of all species and
-             * define particle variables
-             */
-            threadParams->particleAttributes.clear();
-            threadParams->speciesIndices.clear();
-
             bool dumpAllParticles = plugins::misc::containsObject(
                 vectorOfDataSourceNames, "species_all" );
 

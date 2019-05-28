@@ -87,13 +87,6 @@ namespace openPMD
         pmacc::math::UInt64< simDim > fieldsGlobalSizeDims;
         pmacc::math::UInt64< simDim > fieldsOffsetDims;
 
-        std::list< WithWindow<::openPMD::RecordComponent > >
-            fieldRecords; /* fields in order of appearance */
-        std::list< WithWindow<::openPMD::RecordComponent > >
-            particleAttributes; /* particle attributes in order of appearance */
-        std::list< WithWindow<::openPMD::RecordComponent > >
-            speciesIndices; /* species index tables in order of appearance */
-
         GridLayout< simDim > gridLayout;
         MappingDesc * cellDescription;
 
