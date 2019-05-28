@@ -181,9 +181,13 @@ namespace openPMD
 
             if( totalNumParticles == 0 )
             {
+                log< picLog::INPUT_OUTPUT >(
+                    "openPMD: ( end ) writing species: %1% - no particles "
+                    "present" ) %
+                    T_SpeciesFilter::getName();
                 return;
             }
-            
+
             // make sure to create the species only if actual particles are
             // present
             ::openPMD::Container<::openPMD::Record > & particleSpecies =
@@ -219,7 +223,6 @@ namespace openPMD
             filter.setWindowPosition( params->localWindowToDomainOffset,
                 params->window.localDimensions.size );
 
-            DataConnector & dc = Environment<>::get().DataConnector();
 #if( PMACC_CUDA_ENABLED == 1 )
             auto mallocMCBuffer = dc.get< MallocMCBuffer< DeviceHeap > >(
                 MallocMCBuffer< DeviceHeap >::getName(), true );
@@ -330,6 +333,13 @@ namespace openPMD
                 ::openPMD::RecordComponent & recordComponent =
                     particleSpecies[ "particles_info" ]
                                    [::openPMD::RecordComponent::SCALAR ];
+
+                std::cout << "storing particles_info: ";
+                for( unsigned i = 0; i < 5; i++ )
+                {
+                    std::cout << particlesMetaInfoPtr[ i ] << ", ";
+                }
+                std::cout << std::endl;
 
                 initDataset< DIM1 >( recordComponent,
                     datatype,
