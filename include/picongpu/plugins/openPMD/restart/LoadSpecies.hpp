@@ -21,7 +21,7 @@
 
 #include "picongpu/plugins/ISimulationPlugin.hpp"
 #include "picongpu/plugins/openPMD/openPMDWriter.def"
-#include "picongpu/plugins/openPMD/restart/LoadParticleAttributesFromADIOS.hpp"
+#include "picongpu/plugins/openPMD/restart/LoadParticleAttributesFromOpenPMD.hpp"
 #include "picongpu/plugins/output/WriteSpeciesCommon.hpp"
 #include "picongpu/simulation_defines.hpp"
 
@@ -204,7 +204,7 @@ namespace openPMD
 
             ForEach
                 < typename openPMDFrameType::ValueTypeSeq,
-                    LoadParticleAttributesFromADIOS<
+                    LoadParticleAttributesFromOpenPMD<
                         bmpl::_1 > > loadAttributes;
             loadAttributes( params,
                 hostFrame,

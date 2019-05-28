@@ -341,11 +341,12 @@ namespace openPMD
                 }
                 std::cout << std::endl;
 
-                params->initDataset< DIM1 >( recordComponent,
-                    datatype,
-                    { localTableSize * uint64_t( gc.getGlobalSize() ) },
-                    true,
-                    params->compressionMethod )
+                params
+                    ->initDataset< DIM1 >( recordComponent,
+                        datatype,
+                        { localTableSize * uint64_t( gc.getGlobalSize() ) },
+                        true,
+                        params->compressionMethod )
                     .template storeChunk( particlesMetaInfo,
                         { localTableSize },
                         { localTableSize * uint64_t( gc.getGlobalRank() ) } );

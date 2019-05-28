@@ -173,7 +173,7 @@ namespace openPMD
                 "openPMD: Tried closing a Series that was not active" );
         }
     }
-    
+
     bool
     ThreadParams::isADIOS1()
     {
@@ -727,8 +727,7 @@ namespace openPMD
             else
                 mThreadParams.fileName =
                     checkpointDirectory + "/" + checkpointFilename;
-            mThreadParams.fileName +=
-                "_%T." + mThreadParams.fileExtension;
+            mThreadParams.fileName += "_%T." + mThreadParams.fileExtension;
 
             mThreadParams.window =
                 MovingWindow::getInstance().getDomainAsWindow( currentStep );
@@ -746,7 +745,7 @@ namespace openPMD
             // restart is only allowed if the plugin is controlled by the class
             // Checkpoint
             assert( !m_help->selfRegister );
-            
+
             mThreadParams.fileExtension = m_help->fileNameExtension.get( m_id );
 
             /* if restartFilename is relative, prepend with restartDirectory */
@@ -761,8 +760,7 @@ namespace openPMD
                 mThreadParams.fileName = constRestartFilename;
             }
 
-            mThreadParams.fileName +=
-                "_%T." + mThreadParams.fileExtension;
+            mThreadParams.fileName += "_%T." + mThreadParams.fileExtension;
 
             // mThreadParams.isCheckpoint = isCheckpoint;
             mThreadParams.currentStep = restartStep;
@@ -1089,11 +1087,12 @@ namespace openPMD
                         ? name_lookup_tpl[ d ]
                         : ::openPMD::RecordComponent::SCALAR ];
 
-                params->initDataset< simDim >( mrc,
-                    openPMDType,
-                    params->fieldsGlobalSizeDims,
-                    true,
-                    params->compressionMethod )
+                params
+                    ->initDataset< simDim >( mrc,
+                        openPMDType,
+                        params->fieldsGlobalSizeDims,
+                        true,
+                        params->compressionMethod )
                     .template storeChunk< ComponentType >( params->fieldBuffer,
                         asStandardVector< simDim >( params->fieldsOffsetDims ),
                         asStandardVector< simDim >( params->fieldsSizeDims ) );

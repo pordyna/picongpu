@@ -45,7 +45,7 @@ namespace openPMD
      * @tparam T_Identifier identifier of species attribute
      */
     template< typename T_Identifier >
-    struct LoadParticleAttributesFromADIOS
+    struct LoadParticleAttributesFromOpenPMD
     {
         /** read attributes from ADIOS file
          *
