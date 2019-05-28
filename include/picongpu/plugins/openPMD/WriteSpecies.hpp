@@ -133,8 +133,8 @@ namespace openPMD
                 ThisSpecies::FrameType::getName(), true );
             const std::string speciesGroup( T_Species::getName() );
 
-            ::openPMD::Series & series = *params->openPMDSeries;
-            ::openPMD::Iteration & iteration =
+            ::openPMD::Series series = *params->openPMDSeries;
+            ::openPMD::Iteration iteration =
                 series.iterations[ params->currentStep ];
 
 
@@ -330,7 +330,7 @@ namespace openPMD
 
                 ::openPMD::Datatype datatype =
                     ::openPMD::determineDatatype< uint64_t >();
-                ::openPMD::RecordComponent & recordComponent =
+                ::openPMD::RecordComponent recordComponent =
                     particleSpecies[ "particles_info" ]
                                    [::openPMD::RecordComponent::SCALAR ];
 

@@ -768,7 +768,7 @@ namespace openPMD
 
             mThreadParams.openSeries( ::openPMD::AccessType::READ_ONLY );
 
-            ::openPMD::Iteration & iteration =
+            ::openPMD::Iteration iteration =
                 mThreadParams.openPMDSeries
                     ->iterations[ mThreadParams.currentStep ];
 
@@ -1028,9 +1028,9 @@ namespace openPMD
             PMACC_CASSERT_MSG( Precision_mismatch_in_Field_Components__ADIOS,
                 fieldTypeCorrect );
 
-            ::openPMD::Iteration & iteration =
+            ::openPMD::Iteration iteration =
                 params->openPMDSeries->iterations[ params->currentStep ];
-            ::openPMD::Mesh & mesh = iteration.meshes[ name ];
+            ::openPMD::Mesh mesh = iteration.meshes[ name ];
 
             // set mesh attributes
             writeFieldAttributes( params, unitDimension, timeOffset, mesh );
@@ -1083,7 +1083,7 @@ namespace openPMD
                     }
                 }
 
-                ::openPMD::MeshRecordComponent & mrc = mesh[ nComponents > 1
+                ::openPMD::MeshRecordComponent mrc = mesh[ nComponents > 1
                         ? name_lookup_tpl[ d ]
                         : ::openPMD::RecordComponent::SCALAR ];
 

@@ -42,7 +42,7 @@ namespace picongpu
 namespace openPMD
 {
     /**
-     * Helper class for openPMD plugin to load fields from parallel openPMD 
+     * Helper class for openPMD plugin to load fields from parallel openPMD
      * storages.
      */
     class RestartFieldLoader
@@ -71,7 +71,7 @@ namespace openPMD
 
             DataSpace< simDim > local_domain_size =
                 params->window.localDimensions.size;
-            ::openPMD::Series & series = *params->openPMDSeries;
+            ::openPMD::Series series = *params->openPMDSeries;
             ::openPMD::Container<::openPMD::Mesh > & meshes =
                 series.iterations[ params->currentStep ].meshes;
 
@@ -84,7 +84,7 @@ namespace openPMD
                 log< picLog::INPUT_OUTPUT >(
                     "openPMD: Read from domain: offset=%1% size=%2%" ) %
                     domain_offset % local_domain_size;
-                ::openPMD::RecordComponent & rc = numComponents > 1
+                ::openPMD::RecordComponent rc = numComponents > 1
                     ? meshes[ objectName ][ name_lookup_tpl[ n ] ]
                     : meshes[ objectName ][::openPMD::RecordComponent::SCALAR ];
 
@@ -112,7 +112,7 @@ namespace openPMD
                 /// GetComponentsType<ValueType>::type
                 /* magic parameters (0, 1): `from_step` (not used in streams),
                  * `nsteps` to read (must be 1 for stream) */
-               
+
 
                 // avoid deadlock between not finished pmacc tasks and mpi calls
                 // in openPMD backends

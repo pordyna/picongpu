@@ -82,7 +82,7 @@ namespace openPMD
                     }
                 }
 
-                ::openPMD::Iteration & iteration =
+                ::openPMD::Iteration iteration =
                     threadParams->openPMDSeries
                         ->iterations[ threadParams->currentStep ];
                 iteration.setAttribute(
@@ -119,7 +119,7 @@ namespace openPMD
             log< picLog::INPUT_OUTPUT >(
                 "openPMD: (begin) write meta attributes." );
 
-            ::openPMD::Series & series = *threadParams->openPMDSeries;
+            ::openPMD::Series series = *threadParams->openPMDSeries;
 
             /*
              * The openPMD API will kindly write the obligatory metadata by
@@ -149,7 +149,7 @@ namespace openPMD
             const std::string date = helper::getDateString( "%F %T %z" );
             series.setDate( date );
 
-            ::openPMD::Iteration & iteration =
+            ::openPMD::Iteration iteration =
                 series.iterations[ threadParams->currentStep ];
             ::openPMD::Container<::openPMD::Mesh > & meshes = iteration.meshes;
 

@@ -49,7 +49,7 @@ namespace openPMD
     {
         /** read attributes from openPMD file
          *
-         * @param params thread params 
+         * @param params thread params
          * @param frame frame with all particles
          * @param particleSpecies the openpmd representation of the species
          * @param particlesOffset read offset in the attribute array
@@ -93,8 +93,8 @@ namespace openPMD
             for( uint32_t n = 0; n < components; ++n )
             {
                 OpenPMDName< T_Identifier > openPMDName;
-                ::openPMD::Record & record = particleSpecies[ openPMDName() ];
-                ::openPMD::RecordComponent & rc = components > 1
+                ::openPMD::Record record = particleSpecies[ openPMDName() ];
+                ::openPMD::RecordComponent rc = components > 1
                     ? record[ name_lookup[ n ] ]
                     : record[::openPMD::RecordComponent::SCALAR ];
 
@@ -102,7 +102,7 @@ namespace openPMD
                     frame.getIdentifier( Identifier() ).getPointer();
                 // it's possible to aquire the local block with that call again
                 // and the local elements to-be-read, but the block-ID must be
-                // known 
+                // known
 
 
                 if( elements > 0 )

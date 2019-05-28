@@ -56,11 +56,11 @@ namespace openPMD
             typedef typename GetComponentsType< ValueType >::type ComponentType;
 
             OpenPMDName< T_Identifier > openPMDName;
-            ::openPMD::Record & record = particleSpecies[ openPMDName() ];
+            ::openPMD::Record record = particleSpecies[ openPMDName() ];
 
             for( uint32_t d = 0; d < components; d++ )
             {
-                ::openPMD::RecordComponent & recordComponent = components > 1
+                ::openPMD::RecordComponent recordComponent = components > 1
                     ? record[ name_lookup[ d ] ]
                     : record[::openPMD::MeshRecordComponent::SCALAR ];
                 ::openPMD::Datatype openPMDType =
@@ -102,7 +102,7 @@ namespace openPMD
             typedef typename GetComponentsType< ValueType >::type ComponentType;
 
             OpenPMDName< T_Identifier > openPMDName;
-            ::openPMD::Record & record = particleSpecies[ openPMDName() ];
+            ::openPMD::Record record = particleSpecies[ openPMDName() ];
 
             // get the SI scaling, dimensionality and weighting of the attribute
             OpenPMDUnit< T_Identifier > openPMDUnit;
@@ -130,7 +130,7 @@ namespace openPMD
 
             for( uint32_t d = 0; d < components; d++ )
             {
-                ::openPMD::RecordComponent & recordComponent = components > 1
+                ::openPMD::RecordComponent recordComponent = components > 1
                     ? record[ name_lookup[ d ] ]
                     : record[::openPMD::MeshRecordComponent::SCALAR ];
                 ::openPMD::Datatype openPMDType =

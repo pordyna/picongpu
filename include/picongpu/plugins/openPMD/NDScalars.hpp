@@ -62,7 +62,7 @@ namespace openPMD
          *
          *  Must be called before executing the functor
          */
-        std::tuple<::openPMD::RecordComponent *,
+        std::tuple<::openPMD::MeshRecordComponent,
             ::openPMD::Offset,
             ::openPMD::Extent >
         prepare( ThreadParams & params, T_Attribute attribute )
@@ -90,8 +90,8 @@ namespace openPMD
                                              .getPosition()[ d ];
             }
 
-            ::openPMD::Series & series = *params.openPMDSeries;
-            ::openPMD::MeshRecordComponent & mrc =
+            ::openPMD::Series series = *params.openPMDSeries;
+            ::openPMD::MeshRecordComponent mrc =
                 series.iterations[ params.currentStep ]
                     .meshes[ baseName + "_" + group ][ dataset ];
 
@@ -103,12 +103,13 @@ namespace openPMD
 
                 mrc.setAttribute( attrName, attribute );
             }
+            params.initDataset< simDim >( mrc,
+                openPMDScalarType,
+                std::move( globalDomainSize ),
+                true,
+                params.compressionMethod );
 
-            return std::make_tuple( &params.initDataset< simDim >( mrc,
-                                        openPMDScalarType,
-                                        std::move( globalDomainSize ),
-                                        true,
-                                        params.compressionMethod ),
+            return std::make_tuple( std::move( mrc ),
                 static_cast<::openPMD::Offset >( asStandardVector< simDim >(
                     std::move( localDomainOffset ) ) ),
                 static_cast<::openPMD::Extent >(
@@ -121,18 +122,16 @@ namespace openPMD
             T_Scalar value,
             T_Attribute attribute = T_Attribute() )
         {
-            ::openPMD::RecordComponent * rc;
-            ::openPMD::Offset offset;
-            ::openPMD::Extent extent;
-            std::tie( rc, offset, extent ) =
+            auto tuple =
                 prepare( params, std::move( attribute ) );
             auto name = baseName + "/" + group + "/" + dataset;
             log< picLog::INPUT_OUTPUT >( "openPMD: write %1%D scalars: %2%" ) %
                 simDim % name;
 
-            rc->storeChunk( std::make_shared< T_Scalar >( value ),
-                std::move( offset ),
-                std::move( extent ) );
+            std::get< 0 >( tuple ).storeChunk( 
+                std::make_shared< T_Scalar >( value ),
+                std::move( std::get< 1 >( tuple ) ),
+                std::move( std::get< 2 >( tuple ) ) );
             params.openPMDSeries->flush();
         }
 
@@ -170,8 +169,8 @@ namespace openPMD
 
 
             auto datasetName = baseName + "/" + group + "/" + dataset;
-            ::openPMD::Series & series = *params.openPMDSeries;
-            ::openPMD::MeshRecordComponent & mrc =
+            ::openPMD::Series series = *params.openPMDSeries;
+            ::openPMD::MeshRecordComponent mrc =
                 series.iterations[ params.currentStep ]
                     .meshes[ baseName + "_" + group ][ dataset ];
             auto ndim = mrc.getDimensionality();

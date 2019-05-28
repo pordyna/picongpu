@@ -99,7 +99,7 @@ namespace openPMD
             GridController< simDim > & gc =
                 Environment< simDim >::get().GridController();
 
-            ::openPMD::Series & series = *params->openPMDSeries;
+            ::openPMD::Series series = *params->openPMDSeries;
             ::openPMD::Container<::openPMD::ParticleSpecies > & particles =
                 series.iterations[ params->currentStep ].particles;
             auto it = particles.find( speciesName );
@@ -114,7 +114,7 @@ namespace openPMD
                     speciesName;
                 return;
             }
-            ::openPMD::ParticleSpecies & particleSpecies = it->second;
+            ::openPMD::ParticleSpecies particleSpecies = it->second;
 
             const pmacc::Selection< simDim > & localDomain =
                 Environment< simDim >::get().SubGrid().getLocalDomain();
