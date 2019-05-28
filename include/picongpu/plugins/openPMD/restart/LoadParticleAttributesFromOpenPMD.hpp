@@ -40,18 +40,18 @@ namespace openPMD
 {
     using namespace pmacc;
 
-    /** Load attribute of a species from ADIOS checkpoint file
+    /** Load attribute of a species from openPMD checkpoint storage
      *
      * @tparam T_Identifier identifier of species attribute
      */
     template< typename T_Identifier >
     struct LoadParticleAttributesFromOpenPMD
     {
-        /** read attributes from ADIOS file
+        /** read attributes from openPMD file
          *
-         * @param params thread params with ADIOS_FILE, ...
+         * @param params thread params 
          * @param frame frame with all particles
-         * @param particlePath path to the group in the ADIOS file
+         * @param particleSpecies the openpmd representation of the species
          * @param particlesOffset read offset in the attribute array
          * @param elements number of elements which should be read the attribute
          * array
@@ -72,7 +72,7 @@ namespace openPMD
             typedef typename GetComponentsType< ValueType >::type ComponentType;
 
             log< picLog::INPUT_OUTPUT >(
-                "ADIOS: ( begin ) load species attribute: %1%" ) %
+                "openPMD: ( begin ) load species attribute: %1%" ) %
                 Identifier::getName();
 
             const std::string name_lookup[] = { "x", "y", "z" };
@@ -102,14 +102,13 @@ namespace openPMD
                     frame.getIdentifier( Identifier() ).getPointer();
                 // it's possible to aquire the local block with that call again
                 // and the local elements to-be-read, but the block-ID must be
-                // known (MPI rank?) ADIOS_CMD(adios_inq_var_blockinfo(
-                // params->fp, varInfo ));
+                // known 
 
 
                 if( elements > 0 )
                 {
                     // avoid deadlock between not finished pmacc tasks and mpi
-                    // calls in adios
+                    // calls in openPMD
                     __getTransactionEvent().waitForFinished();
                     rc.loadChunk< ComponentType >( loadBfr,
                         ::openPMD::Offset{ particlesOffset },
@@ -117,7 +116,8 @@ namespace openPMD
                 }
 
                 /** start a blocking read of all scheduled variables
-                 *  (this is collective call in many ADIOS methods) */
+                 *  (this is collective call in many methods of openPMD
+                 * backends) */
                 params->openPMDSeries->flush();
 
                 log< picLog::INPUT_OUTPUT >(

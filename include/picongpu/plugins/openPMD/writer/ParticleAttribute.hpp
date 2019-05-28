@@ -144,7 +144,6 @@ namespace openPMD
 #pragma omp parallel for simd
                 for( size_t i = 0; i < elements; ++i )
                 {
-                    // TODO wtf?
                     storePtr[ i ] = reinterpret_cast< ComponentType * >(
                         dataPtr )[ d + i * components ];
                 }

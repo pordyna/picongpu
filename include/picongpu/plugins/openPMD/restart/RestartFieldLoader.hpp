@@ -32,13 +32,9 @@
 
 #include <openPMD/openPMD.hpp>
 
-#include <adios.h>
 #include <sstream>
 #include <stdexcept>
 #include <string>
-
-#include <adios_error.h>
-#include <adios_read.h>
 
 
 namespace picongpu
@@ -46,8 +42,8 @@ namespace picongpu
 namespace openPMD
 {
     /**
-     * Helper class for ADIOS plugin to load fields from parallel ADIOS BP
-     * files.
+     * Helper class for openPMD plugin to load fields from parallel openPMD 
+     * storages.
      */
     class RestartFieldLoader
     {
@@ -103,13 +99,11 @@ namespace openPMD
                 count.reserve( ndim );
                 for( int d = 0; d < ndim; ++d )
                 {
-                    /* \see adios_define_var: z,y,x in C-order */
+                    /* \see e.g. adios_define_var: z,y,x in C-order */
                     start.push_back( domain_offset.revert()[ d ] );
                     count.push_back( local_domain_size.revert()[ d ] );
                 }
 
-                /* specify what we want to read, but start reading at below at
-                 * `adios_perform_reads` */
                 log< picLog::INPUT_OUTPUT >(
                     "openPMD: Allocate %1% elements" ) %
                     local_domain_size.productOfComponents();
@@ -118,14 +112,10 @@ namespace openPMD
                 /// GetComponentsType<ValueType>::type
                 /* magic parameters (0, 1): `from_step` (not used in streams),
                  * `nsteps` to read (must be 1 for stream) */
-                // log<picLog::INPUT_OUTPUT > ("ADIOS: Schedule read from field
-                // (%1%, %2%, %3%, %4%)") %
-                //                             params->fp % fSel %
-                //                             datasetName.str() %
-                //                             (void*)field_container;
+               
 
                 // avoid deadlock between not finished pmacc tasks and mpi calls
-                // in adios
+                // in openPMD backends
                 __getTransactionEvent().waitForFinished();
 
                 std::shared_ptr< float_X > field_container =
@@ -167,7 +157,7 @@ namespace openPMD
 
     /**
      * Helper class for openPMDWriter (forEach operator) to load a field from
-     * ADIOS
+     * openPMD
      *
      * @tparam FieldType field class to load
      */
@@ -185,7 +175,7 @@ namespace openPMD
             /* load field without copying data to host */
             auto field = dc.get< FieldType >( FieldType::getName(), true );
 
-            /* load from ADIOS */
+            /* load from openPMD */
             RestartFieldLoader::loadField( field->getGridBuffer(),
                 ( uint32_t )FieldType::numComponents,
                 FieldType::getName(),

@@ -50,7 +50,7 @@ namespace openPMD
 {
     using namespace pmacc;
 
-    /** Load species from ADIOS checkpoint file
+    /** Load species from openPMD checkpoint storage
      *
      * @tparam T_Species type of species
      *
@@ -65,13 +65,13 @@ namespace openPMD
         typedef typename FrameType::ValueTypeSeq ParticleAttributeList;
 
 
-        /* delete multiMask and localCellIdx in adios particle*/
+        /* delete multiMask and localCellIdx in openPMD particle*/
         typedef bmpl::vector2< multiMask, localCellIdx > TypesToDelete;
         typedef
             typename RemoveFromSeq< ParticleAttributeList, TypesToDelete >::type
                 ParticleCleanedAttributeList;
 
-        /* add totalCellIdx for adios particle*/
+        /* add totalCellIdx for openPMD particle*/
         typedef
             typename MakeSeq< ParticleCleanedAttributeList, totalCellIdx >::type
                 ParticleNewAttributeList;
@@ -82,9 +82,9 @@ namespace openPMD
         typedef Frame< OperatorCreateVectorBox, NewParticleDescription >
             openPMDFrameType;
 
-        /** Load species from ADIOS checkpoint file
+        /** Load species from openPMD checkpoint storage
          *
-         * @param params thread params with ADIOS_FILE, ...
+         * @param params thread params
          * @param restartChunkSize number of particles processed in one kernel
          * call
          */
@@ -134,7 +134,7 @@ namespace openPMD
             uint64_t count = 5; // openPMDCountParticles: uint64_t
 
             // avoid deadlock between not finished pmacc tasks and mpi calls in
-            // adios
+            // openPMD
             __getTransactionEvent().waitForFinished();
             std::shared_ptr< uint64_t > particlesInfo =
                 particleSpecies[ "particles_info" ]
