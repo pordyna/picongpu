@@ -147,10 +147,14 @@ namespace picongpu
                 << "."
                 << OPENPMDAPI_VERSION_MINOR
                 << "."
-                << OPENPMDAPI_VERSION_PATCH
+                << OPENPMDAPI_VERSION_PATCH;
+        if ( OPENPMDAPI_VERSION_LABEL )
+        {
+            openPMD 
                 << " ("
                 << OPENPMDAPI_VERSION_LABEL
                 << ")";
+        }
 #else
         openPMD << versionNotFound;
 #endif
