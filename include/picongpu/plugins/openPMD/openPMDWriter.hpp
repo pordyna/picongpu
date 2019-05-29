@@ -453,9 +453,9 @@ namespace openPMD
         struct GetFields
         {
         private:
-            typedef typename T::ValueType ValueType;
-            typedef typename GetComponentsType< ValueType >::type ComponentType;
-            typedef typename T::UnitValueType UnitType;
+            using ValueType = typename T::ValueType;
+            using ComponentType = typename GetComponentsType< ValueType >::type;
+            using UnitType = typename T::UnitValueType;
 
         public:
             static std::vector< float_64 >
@@ -536,9 +536,9 @@ namespace openPMD
             }
 
         private:
-            typedef typename FieldTmp::UnitValueType UnitType;
-            typedef typename FieldTmp::ValueType ValueType;
-            typedef typename GetComponentsType< ValueType >::type ComponentType;
+            using UnitType = typename FieldTmp::UnitValueType;
+            using ValueType = typename FieldTmp::ValueType;
+            using ComponentType = typename GetComponentsType< ValueType >::type;
 
             /** Get the unit for the result from the solver*/
             static std::vector< float_64 >

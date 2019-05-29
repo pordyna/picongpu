@@ -66,11 +66,11 @@ namespace openPMD
             const uint64_t elements )
         {
             std::string particlePath = "";
-            typedef T_Identifier Identifier;
-            typedef typename pmacc::traits::Resolve< Identifier >::type::type
-                ValueType;
+            using Identifier = T_Identifier;
+            using ValueType =
+                typename pmacc::traits::Resolve< Identifier >::type::type;
             const uint32_t components = GetNComponents< ValueType >::value;
-            typedef typename GetComponentsType< ValueType >::type ComponentType;
+            using ComponentType = typename GetComponentsType< ValueType >::type;
 
             log< picLog::INPUT_OUTPUT >(
                 "openPMD: ( begin ) load species attribute: %1%" ) %

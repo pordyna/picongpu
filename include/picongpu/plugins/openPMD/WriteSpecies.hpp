@@ -64,28 +64,28 @@ namespace openPMD
     struct WriteSpecies
     {
     public:
-        typedef typename T_SpeciesFilter::Species ThisSpecies;
-        typedef typename ThisSpecies::FrameType FrameType;
-        typedef typename FrameType::ParticleDescription ParticleDescription;
-        typedef typename FrameType::ValueTypeSeq ParticleAttributeList;
+        using ThisSpecies = typename T_SpeciesFilter::Species;
+        using FrameType = typename ThisSpecies::FrameType;
+        using ParticleDescription = typename FrameType::ParticleDescription;
+        using ParticleAttributeList = typename FrameType::ValueTypeSeq;
 
         /* delete multiMask and localCellIdx in openPMD particle*/
-        typedef bmpl::vector< multiMask, localCellIdx > TypesToDelete;
-        typedef
-            typename RemoveFromSeq< ParticleAttributeList, TypesToDelete >::type
-                ParticleCleanedAttributeList;
+        using TypesToDelete = bmpl::vector< multiMask, localCellIdx >;
+        using ParticleCleanedAttributeList =
+            typename RemoveFromSeq< ParticleAttributeList, TypesToDelete >::
+                type;
 
         /* add totalCellIdx for openPMD particle*/
-        typedef
-            typename MakeSeq< ParticleCleanedAttributeList, totalCellIdx >::type
-                ParticleNewAttributeList;
+        using ParticleNewAttributeList =
+            typename MakeSeq< ParticleCleanedAttributeList, totalCellIdx >::
+                type;
 
-        typedef typename ReplaceValueTypeSeq<
+        using NewParticleDescription = typename ReplaceValueTypeSeq<
             ParticleDescription,
-            ParticleNewAttributeList >::type NewParticleDescription;
+            ParticleNewAttributeList >::type;
 
-        typedef Frame< OperatorCreateVectorBox, NewParticleDescription >
-            openPMDFrameType;
+        using openPMDFrameType =
+            Frame< OperatorCreateVectorBox, NewParticleDescription >;
 
         void
         setParticleAttributes( ::openPMD::Iteration & iteration )
@@ -214,10 +214,10 @@ namespace openPMD
                 "openPMD:   (begin) copy particle host (with hierarchy) to "
                 "host (without hierarchy): %1%" ) %
                 T_SpeciesFilter::getName();
-            typedef bmpl::vector< typename GetPositionFilter< simDim >::type >
-                usedFilters;
-            typedef typename FilterFactory< usedFilters >::FilterType
-                MyParticleFilter;
+            using usedFilters =
+                bmpl::vector< typename GetPositionFilter< simDim >::type >;
+            using MyParticleFilter =
+                typename FilterFactory< usedFilters >::FilterType;
             MyParticleFilter filter;
             /* activate filter pipeline if moving window is activated */
             filter.setStatus( MovingWindow::getInstance().isSlidingWindowActive(

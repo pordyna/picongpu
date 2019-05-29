@@ -50,11 +50,11 @@ namespace openPMD
             ::openPMD::Container<::openPMD::Record > & particleSpecies,
             const size_t globalElements )
         {
-            typedef T_Identifier Identifier;
-            typedef typename pmacc::traits::Resolve< Identifier >::type::type
-                ValueType;
+            using Identifier = T_Identifier;
+            using ValueType =
+                typename pmacc::traits::Resolve< Identifier >::type::type;
             const uint32_t components = GetNComponents< ValueType >::value;
-            typedef typename GetComponentsType< ValueType >::type ComponentType;
+            using ComponentType = typename GetComponentsType< ValueType >::type;
 
             OpenPMDName< T_Identifier > openPMDName;
             ::openPMD::Record record = particleSpecies[ openPMDName() ];
@@ -98,11 +98,11 @@ namespace openPMD
             const size_t globalElements,
             const size_t globalOffset )
         {
-            typedef T_Identifier Identifier;
-            typedef typename pmacc::traits::Resolve< Identifier >::type::type
-                ValueType;
+            using Identifier = T_Identifier;
+            using ValueType =
+                typename pmacc::traits::Resolve< Identifier >::type::type;
             const uint32_t components = GetNComponents< ValueType >::value;
-            typedef typename GetComponentsType< ValueType >::type ComponentType;
+            using ComponentType = typename GetComponentsType< ValueType >::type;
 
             OpenPMDName< T_Identifier > openPMDName;
             ::openPMD::Record record = particleSpecies[ openPMDName() ];

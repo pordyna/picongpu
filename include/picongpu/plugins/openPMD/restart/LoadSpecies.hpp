@@ -59,29 +59,29 @@ namespace openPMD
     struct LoadSpecies
     {
     public:
-        typedef T_Species ThisSpecies;
-        typedef typename ThisSpecies::FrameType FrameType;
-        typedef typename FrameType::ParticleDescription ParticleDescription;
-        typedef typename FrameType::ValueTypeSeq ParticleAttributeList;
+        using ThisSpecies = T_Species;
+        using FrameType = typename ThisSpecies::FrameType;
+        using ParticleDescription = typename FrameType::ParticleDescription;
+        using ParticleAttributeList = typename FrameType::ValueTypeSeq;
 
 
         /* delete multiMask and localCellIdx in openPMD particle*/
-        typedef bmpl::vector2< multiMask, localCellIdx > TypesToDelete;
-        typedef
-            typename RemoveFromSeq< ParticleAttributeList, TypesToDelete >::type
-                ParticleCleanedAttributeList;
+        using TypesToDelete = bmpl::vector2< multiMask, localCellIdx >;
+        using ParticleCleanedAttributeList =
+            typename RemoveFromSeq< ParticleAttributeList, TypesToDelete >::
+                type;
 
         /* add totalCellIdx for openPMD particle*/
-        typedef
-            typename MakeSeq< ParticleCleanedAttributeList, totalCellIdx >::type
-                ParticleNewAttributeList;
+        using ParticleNewAttributeList =
+            typename MakeSeq< ParticleCleanedAttributeList, totalCellIdx >::
+                type;
 
-        typedef typename ReplaceValueTypeSeq<
+        using NewParticleDescription = typename ReplaceValueTypeSeq<
             ParticleDescription,
-            ParticleNewAttributeList >::type NewParticleDescription;
+            ParticleNewAttributeList >::type;
 
-        typedef Frame< OperatorCreateVectorBox, NewParticleDescription >
-            openPMDFrameType;
+        using openPMDFrameType =
+            Frame< OperatorCreateVectorBox, NewParticleDescription >;
 
         /** Load species from openPMD checkpoint storage
          *

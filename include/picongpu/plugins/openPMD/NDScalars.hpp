@@ -72,7 +72,7 @@ namespace openPMD
             auto name = baseName + "/" + group + "/" + dataset;
             const auto openPMDScalarType =
                 ::openPMD::determineDatatype< T_Scalar >();
-            typedef pmacc::math::UInt64< simDim > Dimensions;
+            using Dimensions = pmacc::math::UInt64< simDim >;
 
             log< picLog::INPUT_OUTPUT >(
                 "openPMD: prepare write %1%D scalars: %2%" ) %
