@@ -355,8 +355,8 @@ namespace openPMD
                         params->compressionMethod )
                     .template storeChunk(
                         particlesMetaInfo,
-                        { localTableSize },
-                        { localTableSize * uint64_t( gc.getGlobalRank() ) } );
+                        { localTableSize * uint64_t( gc.getGlobalRank() ) },
+                        { localTableSize } );
 
                 /* openPMD ED-PIC: additional attributes */
                 setParticleAttributes( iteration );
