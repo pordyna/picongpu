@@ -65,16 +65,16 @@ namespace openPMD
             const uint64_t particlesOffset,
             const uint64_t elements )
         {
-            std::string particlePath = "";
             using Identifier = T_Identifier;
             using ValueType =
                 typename pmacc::traits::Resolve< Identifier >::type::type;
             const uint32_t components = GetNComponents< ValueType >::value;
             using ComponentType = typename GetComponentsType< ValueType >::type;
+            OpenPMDName< Identifier > openPMDName;
 
             log< picLog::INPUT_OUTPUT >(
                 "openPMD: ( begin ) load species attribute: %1%" ) %
-                Identifier::getName();
+                openPMDName();
 
             const std::string name_lookup[] = { "x", "y", "z" };
 
@@ -87,13 +87,8 @@ namespace openPMD
                 };
             }
 
-            // dev assert!
-            //        if( elements > 0 )
-            //            PMACC_ASSERT(tmpArray);
-
             for( uint32_t n = 0; n < components; ++n )
             {
-                OpenPMDName< T_Identifier > openPMDName;
                 ::openPMD::Record record = particleSpecies[ openPMDName() ];
                 ::openPMD::RecordComponent rc = components > 1
                     ? record[ name_lookup[ n ] ]
@@ -122,24 +117,30 @@ namespace openPMD
                  * backends) */
                 params->openPMDSeries->flush();
 
+                uint64_t globalNumElements = 1;
+                for( auto ext : rc.getExtent() )
+                {
+                    globalNumElements *= ext;
+                }
+
                 log< picLog::INPUT_OUTPUT >(
                     "openPMD:  Did read %1% local of %2% global elements for "
                     "%3%" ) %
-                    elements % rc.getDimensionality() % openPMDName();
+                    elements % globalNumElements % openPMDName();
 
 /* copy component from temporary array to array of structs */
 #pragma omp parallel for simd
                 for( size_t i = 0; i < elements; ++i )
                 {
-                    ComponentType & ref = reinterpret_cast< ComponentType * >(
+                    ComponentType * ref = &reinterpret_cast< ComponentType * >(
                         dataPtr )[ i * components + n ];
-                    ref = loadBfr.get()[ i ];
+                    *ref = loadBfr.get()[ i ];
                 }
             }
 
             log< picLog::INPUT_OUTPUT >(
                 "openPMD:  ( end ) load species attribute: %1%" ) %
-                Identifier::getName();
+                openPMDName();
         }
     };
 
