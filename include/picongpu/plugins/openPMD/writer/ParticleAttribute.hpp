@@ -35,46 +35,6 @@ namespace openPMD
 
     static const std::string name_lookup[] = { "x", "y", "z" };
 
-    /**
-     * openPMD complains if e.g. particle positions are flushed while
-     * positionOffsets have not even be defined yet.
-     * Hence, we first define all record components before filling and
-     * flushing them.
-     */
-    template< typename T_Identifier >
-    struct SetupRecordComponents
-    {
-        void
-        operator()(
-            ThreadParams * params,
-            ::openPMD::Container<::openPMD::Record > & particleSpecies,
-            const size_t globalElements )
-        {
-            using Identifier = T_Identifier;
-            using ValueType =
-                typename pmacc::traits::Resolve< Identifier >::type::type;
-            const uint32_t components = GetNComponents< ValueType >::value;
-            using ComponentType = typename GetComponentsType< ValueType >::type;
-
-            OpenPMDName< T_Identifier > openPMDName;
-            ::openPMD::Record record = particleSpecies[ openPMDName() ];
-
-            for( uint32_t d = 0; d < components; d++ )
-            {
-                ::openPMD::RecordComponent recordComponent = components > 1
-                    ? record[ name_lookup[ d ] ]
-                    : record[::openPMD::MeshRecordComponent::SCALAR ];
-                ::openPMD::Datatype openPMDType =
-                    ::openPMD::determineDatatype< ComponentType >();
-                params->initDataset< DIM1 >(
-                    recordComponent,
-                    openPMDType,
-                    { globalElements },
-                    true,
-                    params->compressionMethod );
-            }
-        }
-    };
 
     /** write attribute of a particle to openPMD series
      *
@@ -106,6 +66,8 @@ namespace openPMD
 
             OpenPMDName< T_Identifier > openPMDName;
             ::openPMD::Record record = particleSpecies[ openPMDName() ];
+            ::openPMD::Datatype openPMDType =
+                    ::openPMD::determineDatatype< ComponentType >();
 
             // get the SI scaling, dimensionality and weighting of the attribute
             OpenPMDUnit< T_Identifier > openPMDUnit;
@@ -151,8 +113,14 @@ namespace openPMD
                         dataPtr )[ d + i * components ];
                 }
 
-                recordComponent.storeChunk(
-                    storeBfr, { globalOffset }, { elements } );
+                params->initDataset< DIM1 >(
+                    recordComponent,
+                    openPMDType,
+                    { globalElements },
+                    true,
+                    params->compressionMethod )
+                    .template storeChunk(
+                        storeBfr, { globalOffset }, { elements } );
 
                 if( unit.size() >= ( d + 1 ) )
                 {
