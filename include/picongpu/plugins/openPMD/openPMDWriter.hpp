@@ -1232,10 +1232,6 @@ namespace openPMD
             bool dumpAllParticles = plugins::misc::containsObject(
                 vectorOfDataSourceNames, "species_all" );
 
-            /* attributes written here are pure meta data */
-            WriteMeta writeMetaAttributes;
-            writeMetaAttributes( threadParams );
-
             /* write fields */
             log< picLog::INPUT_OUTPUT >( "openPMD: (begin) writing fields." );
             if( threadParams->isCheckpoint )
@@ -1262,6 +1258,7 @@ namespace openPMD
                         vectorOfDataSourceNames, threadParams );
             }
             log< picLog::INPUT_OUTPUT >( "openPMD: ( end ) writing fields." );
+            
 
             /* print all particle species */
             log< picLog::INPUT_OUTPUT >(
@@ -1297,6 +1294,8 @@ namespace openPMD
             }
             log< picLog::INPUT_OUTPUT >(
                 "openPMD: ( end ) writing particle species." );
+            
+                                  
 
             auto idProviderState = IdProvider< simDim >::getState();
             log< picLog::INPUT_OUTPUT >(
@@ -1315,6 +1314,10 @@ namespace openPMD
                 idProviderState.maxNumProc );
             writeIdProviderNextId( *threadParams, idProviderState.nextId );
 
+            /* attributes written here are pure meta data */
+            WriteMeta writeMetaAttributes;
+            writeMetaAttributes( threadParams );
+            
             // avoid deadlock between not finished pmacc tasks and mpi calls in
             // openPMD
             __getTransactionEvent().waitForFinished();
