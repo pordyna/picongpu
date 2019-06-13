@@ -1258,7 +1258,7 @@ namespace openPMD
                         vectorOfDataSourceNames, threadParams );
             }
             log< picLog::INPUT_OUTPUT >( "openPMD: ( end ) writing fields." );
-            
+
 
             /* print all particle species */
             log< picLog::INPUT_OUTPUT >(
@@ -1294,8 +1294,8 @@ namespace openPMD
             }
             log< picLog::INPUT_OUTPUT >(
                 "openPMD: ( end ) writing particle species." );
-            
-                                  
+
+
 
             auto idProviderState = IdProvider< simDim >::getState();
             log< picLog::INPUT_OUTPUT >(
@@ -1317,7 +1317,7 @@ namespace openPMD
             /* attributes written here are pure meta data */
             WriteMeta writeMetaAttributes;
             writeMetaAttributes( threadParams );
-            
+
             // avoid deadlock between not finished pmacc tasks and mpi calls in
             // openPMD
             __getTransactionEvent().waitForFinished();
