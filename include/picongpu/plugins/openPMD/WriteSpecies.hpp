@@ -146,14 +146,13 @@ namespace openPMD
             // enforce that the filter interface is fulfilled
             particles::filter::IUnary< typename T_SpeciesFilter::Filter >
                 particleFilter{ params->currentStep };
-            uint64_cu const totalNumParticles =
+            uint64_cu const myNumParticles =
                 pmacc::CountParticles::countOnDevice< CORE + BORDER >(
                     *speciesTmp,
                     *( params->cellDescription ),
                     params->localWindowToDomainOffset,
                     params->window.localDimensions.size,
                     particleFilter );
-            uint64_t myNumParticles = totalNumParticles;
             uint64_t allNumParticles[ mpiSize ];
             uint64_t globalNumParticles = 0;
             uint64_t myParticleOffset = 0;
@@ -178,10 +177,10 @@ namespace openPMD
             }
             log< picLog::INPUT_OUTPUT >(
                 "openPMD:   ( end ) count particles: %1% = %2%" ) %
-                T_SpeciesFilter::getName() % totalNumParticles;
+                T_SpeciesFilter::getName() % globalNumParticles;
 
 
-            if( totalNumParticles == 0 )
+            if( globalNumParticles == 0 )
             {
                 log< picLog::INPUT_OUTPUT >(
                     "openPMD: ( end ) writing species: %1% - no particles "
@@ -205,7 +204,7 @@ namespace openPMD
             ForEach
                 < typename openPMDFrameType::ValueTypeSeq,
                   MallocHostMemory< bmpl::_1 > > mallocMem;
-            mallocMem( hostFrame, totalNumParticles );
+            mallocMem( hostFrame, myNumParticles );
             log< picLog::INPUT_OUTPUT >(
                 "openPMD:   ( end ) malloc host memory: %1%" ) %
                 T_SpeciesFilter::getName();
@@ -310,7 +309,7 @@ namespace openPMD
                  * offset x, y, z) */
                 std::shared_ptr< uint64_t > particlesMetaInfo{
                     new uint64_t[ localTableSize ]{
-                        totalNumParticles, gc.getScalarPosition(), 0, 0, 0 },
+                        myNumParticles, gc.getScalarPosition(), 0, 0, 0 },
                     []( uint64_t * ptr ) { delete[] ptr; }
                 };
                 auto particlesMetaInfoPtr = particlesMetaInfo.get();
