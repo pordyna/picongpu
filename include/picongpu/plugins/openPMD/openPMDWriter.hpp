@@ -232,6 +232,12 @@ namespace openPMD
                 "backend picked by the openPMD API)",
                 "bp"
             };
+            
+            plugins::multi::Option< std::string > dataPreparationStrategy = {
+                "dataPreparationStrategy",
+                "strategy for preparation of particle data ('adios' or 'hdf5')",
+                "adios"
+            };
 
             std::vector< std::string > allowedDataSources = { "species_all",
                                                               "fields_all" };
@@ -360,6 +366,8 @@ namespace openPMD
                 // );
                 fileName.registerHelp( desc, masterPrefix + prefix );
                 fileNameExtension.registerHelp( desc, masterPrefix + prefix );
+                dataPreparationStrategy.registerHelp( 
+                    desc, masterPrefix + prefix );
             }
 
             void
@@ -718,6 +726,23 @@ namespace openPMD
             mThreadParams.window =
                 MovingWindow::getInstance().getWindow( currentStep );
             mThreadParams.isCheckpoint = false;
+            {
+                std::string const & strategy = 
+                    m_help->dataPreparationStrategy.get( m_id );
+                if ( strategy == "adios" )
+                {
+                    mThreadParams.strategy = WriteSpeciesStrategy::ADIOS;
+                } 
+                else if ( strategy == "hdf5" )
+                {
+                    mThreadParams.strategy = WriteSpeciesStrategy::HDF5;
+                }
+                else 
+                {
+                    std::cerr << "Passed dataPreparationStrategy for openPMD"
+                        " plugin is invalid." << std::endl;
+                }
+            }
             dumpData( currentStep );
         }
 
@@ -762,6 +787,23 @@ namespace openPMD
             mThreadParams.window =
                 MovingWindow::getInstance().getDomainAsWindow( currentStep );
             mThreadParams.isCheckpoint = true;
+            {
+                std::string const & strategy = 
+                    m_help->dataPreparationStrategy.get( m_id );
+                if ( strategy == "adios" )
+                {
+                    mThreadParams.strategy = WriteSpeciesStrategy::ADIOS;
+                } 
+                else if ( strategy == "hdf5" )
+                {
+                    mThreadParams.strategy = WriteSpeciesStrategy::HDF5;
+                }
+                else 
+                {
+                    std::cerr << "Passed dataPreparationStrategy for openPMD"
+                        " plugin is invalid." << std::endl;
+                }
+            }
 
             dumpData( currentStep );
         }
@@ -796,6 +838,24 @@ namespace openPMD
             // mThreadParams.isCheckpoint = isCheckpoint;
             mThreadParams.currentStep = restartStep;
             mThreadParams.cellDescription = m_cellDescription;
+            
+            {
+                std::string const & strategy = 
+                    m_help->dataPreparationStrategy.get( m_id );
+                if ( strategy == "adios" )
+                {
+                    mThreadParams.strategy = WriteSpeciesStrategy::ADIOS;
+                } 
+                else if ( strategy == "hdf5" )
+                {
+                    mThreadParams.strategy = WriteSpeciesStrategy::HDF5;
+                }
+                else 
+                {
+                    std::cerr << "Passed dataPreparationStrategy for openPMD"
+                        " plugin is invalid." << std::endl;
+                }
+            }
 
             mThreadParams.openSeries( ::openPMD::AccessType::READ_ONLY );
 
