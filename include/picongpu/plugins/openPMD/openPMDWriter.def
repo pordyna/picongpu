@@ -50,7 +50,11 @@ namespace openPMD
     template< unsigned DIM, typename T >
     std::vector< T >
     asStandardVector( pmacc::math::Vector< T, DIM > const & );
-
+    
+    enum class WriteSpeciesStrategy
+    {
+        ADIOS, HDF5
+    };
 
     struct ThreadParams
     {
@@ -69,6 +73,7 @@ namespace openPMD
         std::string
             fileName; /* Name of the openPMDSeries, including the extension */
         std::string fileExtension; /* Extension of the file name */
+        WriteSpeciesStrategy strategy = WriteSpeciesStrategy::HDF5;
 
         pmacc::math::UInt64< simDim > fieldsSizeDims;
         pmacc::math::UInt64< simDim > fieldsGlobalSizeDims;
