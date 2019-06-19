@@ -72,7 +72,7 @@ namespace openPMD
         std::string
             compressionMethod; /* openPMD data transform compression method */
         std::string
-            fileName; /* Name of the openPMDSeries, including the extension */
+            fileName; /* Name of the openPMDSeries, excluding the extension */
         std::string fileExtension; /* Extension of the file name */
         WriteSpeciesStrategy strategy = WriteSpeciesStrategy::ADIOS;
 

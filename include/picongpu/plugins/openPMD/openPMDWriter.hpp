@@ -135,16 +135,17 @@ namespace openPMD
     {
         if( !openPMDSeries )
         {
-            log< picLog::INPUT_OUTPUT >( "openPMD: open file: %1%" ) % fileName;
+            std::string fullName = fileName + "_%06T." + fileExtension;
+            log< picLog::INPUT_OUTPUT >( "openPMD: open file: %1%" ) % fullName;
             openPMDSeries = std::unique_ptr<::openPMD::Series >(
-                new ::openPMD::Series( fileName, at, communicator ) );
+                new ::openPMD::Series( fullName, at, communicator ) );
             if( at == ::openPMD::AccessType::CREATE )
             {
                 openPMDSeries->setMeshesPath( MESHES_PATH );
             }
             log< picLog::INPUT_OUTPUT >(
                 "openPMD: successfully opened file: %1%" ) %
-                fileName;
+                fullName;
             return *openPMDSeries;
         }
         else
@@ -713,8 +714,7 @@ namespace openPMD
             __getTransactionEvent().waitForFinished();
 
             mThreadParams.fileExtension = m_help->fileNameExtension.get( m_id );
-            std::string filename = m_help->fileName.get( m_id ) + "_%T." +
-                mThreadParams.fileExtension;
+            std::string filename = m_help->fileName.get( m_id );
 
             /* if file name is relative, prepend with common directory */
             if( boost::filesystem::path( filename ).has_root_path() )
@@ -783,7 +783,6 @@ namespace openPMD
             else
                 mThreadParams.fileName =
                     checkpointDirectory + "/" + checkpointFilename;
-            mThreadParams.fileName += "_%T." + mThreadParams.fileExtension;
 
             mThreadParams.window =
                 MovingWindow::getInstance().getDomainAsWindow( currentStep );
@@ -834,8 +833,6 @@ namespace openPMD
             {
                 mThreadParams.fileName = constRestartFilename;
             }
-
-            mThreadParams.fileName += "_%T." + mThreadParams.fileExtension;
 
             // mThreadParams.isCheckpoint = isCheckpoint;
             mThreadParams.currentStep = restartStep;
