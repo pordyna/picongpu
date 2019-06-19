@@ -26,6 +26,7 @@
 #include "picongpu/plugins/openPMD/writer/ParticleAttribute.hpp"
 #include "picongpu/plugins/output/WriteSpeciesCommon.hpp"
 #include "picongpu/simulation_defines.hpp"
+#include "picongpu/particles/traits/GetSpeciesFlagName.hpp"
 
 #include <pmacc/assert.hpp>
 #include <pmacc/compileTime/conversion/MakeSeq.hpp>
