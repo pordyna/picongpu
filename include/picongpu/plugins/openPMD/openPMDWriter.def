@@ -50,10 +50,11 @@ namespace openPMD
     template< unsigned DIM, typename T >
     std::vector< T >
     asStandardVector( pmacc::math::Vector< T, DIM > const & );
-    
+
     enum class WriteSpeciesStrategy
     {
-        ADIOS, HDF5
+        ADIOS,
+        HDF5
     };
 
     struct ThreadParams

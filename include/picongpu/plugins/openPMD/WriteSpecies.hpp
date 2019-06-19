@@ -70,37 +70,25 @@ namespace openPMD
         Filter & filter;
         ParticleFilter & particleFilter;
         ParticleOffset & particleOffset;
-        ::openPMD::ParticleSpecies & particleSpecies;
-        uint64_cu myNumParticles;
-        uint64_t globalNumParticles;
-        uint64_t myParticleOffset;
         StrategyRunParameters(
             pmacc::DataConnector & c_dc,
             ThreadParams & c_params,
             SpeciesTmp & c_speciesTmp,
             Filter & c_filter,
             ParticleFilter & c_particleFilter,
-            ParticleOffset & c_particleOffset,
-            ::openPMD::ParticleSpecies & c_particleSpecies,
-            uint64_cu c_myNumParticles,
-            uint64_t c_globalNumParticles,
-            uint64_t c_myParticleOffset ) :
+            ParticleOffset & c_particleOffset ) :
             dc( c_dc ),
             params( c_params ),
             speciesTmp( c_speciesTmp ),
             filter( c_filter ),
             particleFilter( c_particleFilter ),
-            particleOffset( c_particleOffset ),
-            particleSpecies( c_particleSpecies ),
-            myNumParticles( c_myNumParticles ),
-            globalNumParticles( c_globalNumParticles ),
-            myParticleOffset( c_myParticleOffset )
+            particleOffset( c_particleOffset )
         {
         }
     };
 
     template< typename openPMDFrameType, typename RunParameters >
-    struct AbstractStrategy
+    struct Strategy
     {
         virtual void
         malloc(
@@ -112,13 +100,14 @@ namespace openPMD
         free( openPMDFrameType & hostFrame ) = 0;
 
         virtual void
-        run( std::string name,
-             openPMDFrameType & hostFrame,
-             RunParameters ) = 0;
+        prepare(
+            std::string name,
+            openPMDFrameType & hostFrame,
+            RunParameters ) = 0;
     };
 
     template< typename openPMDFrameType, typename RunParameters >
-    struct StrategyADIOS : AbstractStrategy< openPMDFrameType, RunParameters >
+    struct StrategyADIOS : Strategy< openPMDFrameType, RunParameters >
     {
         void
         malloc(
@@ -150,9 +139,10 @@ namespace openPMD
 
 
         void
-        run( std::string name,
-             openPMDFrameType & hostFrame,
-             RunParameters rp ) override
+        prepare(
+            std::string name,
+            openPMDFrameType & hostFrame,
+            RunParameters rp ) override
         {
             log< picLog::INPUT_OUTPUT >(
                 "openPMD:   (begin) copy particle host (with hierarchy) to "
@@ -210,7 +200,7 @@ namespace openPMD
     };
 
     template< typename openPMDFrameType, typename RunParameters >
-    struct StrategyHDF5 : AbstractStrategy< openPMDFrameType, RunParameters >
+    struct StrategyHDF5 : Strategy< openPMDFrameType, RunParameters >
     {
         void
         malloc(
@@ -241,16 +231,17 @@ namespace openPMD
         }
 
         void
-        run( std::string name,
-             openPMDFrameType & hostFrame,
-             RunParameters rp ) override
+        prepare(
+            std::string name,
+            openPMDFrameType & hostFrame,
+            RunParameters rp ) override
         {
             log< picLog::INPUT_OUTPUT >(
-                "HDF5:  (begin) copy particle to host: %1%" ) %
+                "openPMD:  (begin) copy particle to host: %1%" ) %
                 name;
 
             log< picLog::INPUT_OUTPUT >(
-                "HDF5:  (begin) get mapped memory device pointer: %1%" ) %
+                "openPMD:  (begin) get mapped memory device pointer: %1%" ) %
                 name;
             /*load device pointer of mapped memory*/
             openPMDFrameType deviceFrame;
@@ -259,7 +250,7 @@ namespace openPMD
                   GetDevicePtr< bmpl::_1 > > getDevicePtr;
             getDevicePtr( deviceFrame, hostFrame );
             log< picLog::INPUT_OUTPUT >(
-                "HDF5:  ( end ) get mapped memory device pointer: %1%" ) %
+                "openPMD:  ( end ) get mapped memory device pointer: %1%" ) %
                 name;
 
             GridBuffer< int, DIM1 > counterBuffer( DataSpace< DIM1 >( 1 ) );
@@ -283,11 +274,11 @@ namespace openPMD
                 rp.particleFilter );
             counterBuffer.deviceToHost();
             log< picLog::INPUT_OUTPUT >(
-                "HDF5:  ( end ) copy particle to host: %1%" ) %
+                "openPMD:  ( end ) copy particle to host: %1%" ) %
                 name;
             __getTransactionEvent().waitForFinished();
             log< picLog::INPUT_OUTPUT >(
-                "HDF5:  all events are finished: %1%" ) %
+                "openPMD:  all events are finished: %1%" ) %
                 name;
 
             PMACC_ASSERT(
@@ -401,7 +392,7 @@ namespace openPMD
                 const Space >;
 
             using AStrategy =
-                AbstractStrategy< openPMDFrameType, RunParameters_T >;
+                Strategy< openPMDFrameType, RunParameters_T >;
             std::unique_ptr< AStrategy > strategy;
 
             switch( params->strategy )
@@ -488,12 +479,8 @@ namespace openPMD
                 speciesTmp,
                 filter,
                 particleFilter,
-                particleOffset,
-                particleSpecies,
-                myNumParticles,
-                globalNumParticles,
-                myParticleOffset );
-            strategy->run(
+                particleOffset );
+            strategy->prepare(
                 T_SpeciesFilter::getName(),
                 hostFrame,
                 std::move( runParameters ) );

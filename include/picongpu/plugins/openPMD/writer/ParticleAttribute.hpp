@@ -67,7 +67,7 @@ namespace openPMD
             OpenPMDName< T_Identifier > openPMDName;
             ::openPMD::Record record = particleSpecies[ openPMDName() ];
             ::openPMD::Datatype openPMDType =
-                    ::openPMD::determineDatatype< ComponentType >();
+                ::openPMD::determineDatatype< ComponentType >();
 
             // get the SI scaling, dimensionality and weighting of the attribute
             OpenPMDUnit< T_Identifier > openPMDUnit;
@@ -113,12 +113,13 @@ namespace openPMD
                         dataPtr )[ d + i * components ];
                 }
 
-                params->initDataset< DIM1 >(
-                    recordComponent,
-                    openPMDType,
-                    { globalElements },
-                    true,
-                    params->compressionMethod )
+                params
+                    ->initDataset< DIM1 >(
+                        recordComponent,
+                        openPMDType,
+                        { globalElements },
+                        true,
+                        params->compressionMethod )
                     .template storeChunk(
                         storeBfr, { globalOffset }, { elements } );
 
