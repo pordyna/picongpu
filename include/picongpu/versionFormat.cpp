@@ -151,9 +151,8 @@ namespace picongpu
         if ( OPENPMDAPI_VERSION_LABEL )
         {
             openPMD
-                << " ("
-                << OPENPMDAPI_VERSION_LABEL
-                << ")";
+                << "-"
+                << OPENPMDAPI_VERSION_LABEL;
         }
 #else
         openPMD << versionNotFound;
