@@ -204,10 +204,6 @@ namespace openPMD
                 particleOffset,
                 totalNumParticles );
 
-            std::cout << "before barrier " << std::endl;
-            MPI_Barrier( gc.getCommunicator().getMPIComm() );
-            std::cout << "after barrier" << std::endl;
-
             if( totalNumParticles != 0 )
             {
                 pmacc::particles::operations::splitIntoListOfFrames(
