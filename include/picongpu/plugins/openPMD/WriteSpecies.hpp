@@ -454,18 +454,6 @@ namespace openPMD
                 "openPMD:   ( end ) count particles: %1% = %2%" ) %
                 T_SpeciesFilter::getName() % globalNumParticles;
 
-
-            if( globalNumParticles == 0 )
-            {
-                log< picLog::INPUT_OUTPUT >(
-                    "openPMD: ( end ) writing species: %1% - no particles "
-                    "present" ) %
-                    T_SpeciesFilter::getName();
-                return;
-            }
-
-            // make sure to create the species only if actual particles are
-            // present
             ::openPMD::ParticleSpecies & particleSpecies =
                 iteration.particles[ speciesGroup ];
 
@@ -481,10 +469,13 @@ namespace openPMD
                 filter,
                 particleFilter,
                 particleOffset );
-            strategy->prepare(
-                T_SpeciesFilter::getName(),
-                hostFrame,
-                std::move( runParameters ) );
+            if( globalNumParticles > 0 )
+            {
+                strategy->prepare(
+                    T_SpeciesFilter::getName(),
+                    hostFrame,
+                    std::move( runParameters ) );
+            }
             log< picLog::INPUT_OUTPUT >(
                 "openPMD:  (begin) write particle records for %1%" ) %
                 T_SpeciesFilter::getName();

@@ -103,19 +103,8 @@ namespace openPMD
             ::openPMD::Series series = *params->openPMDSeries;
             ::openPMD::Container<::openPMD::ParticleSpecies > & particles =
                 series.iterations[ params->currentStep ].particles;
-            auto it = particles.find( speciesName );
-            if( it == particles.end() )
-            {
-                // openPMD does (currently) not allow to write empty datasets
-                // hence, not finding a particle species is equivalent with
-                // no particles being present
-                log< picLog::INPUT_OUTPUT >(
-                    "openPMD: (end) load species: %1% - no particles present "
-                    "in storage" ) %
-                    speciesName;
-                return;
-            }
-            ::openPMD::ParticleSpecies particleSpecies = it->second;
+            ::openPMD::ParticleSpecies particleSpecies =
+                particles[ speciesName ];
 
             const pmacc::Selection< simDim > & localDomain =
                 Environment< simDim >::get().SubGrid().getLocalDomain();
@@ -231,6 +220,8 @@ namespace openPMD
                     *( params->cellDescription ),
                     picLog::INPUT_OUTPUT() );
 
+                //TODO: skipping the deallocation if totalNumParticles == 0
+                // is ok?
                 /*free host memory*/
                 ForEach
                     < typename openPMDFrameType::ValueTypeSeq,
