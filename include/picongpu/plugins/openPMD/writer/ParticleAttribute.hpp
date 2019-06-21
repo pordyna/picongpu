@@ -141,7 +141,7 @@ namespace openPMD
             // /** \todo check if always correct at this point, depends on
             // attribute
             //  *        and MW-solver/pusher implementation */
-            const std::vector< float_X > timeOffset( 7, 0.0 );
+            float_X const timeOffset = 0.0;
             record.setAttribute( "timeOffset", timeOffset );
 
             log< picLog::INPUT_OUTPUT >(
