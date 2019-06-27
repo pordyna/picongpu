@@ -122,8 +122,9 @@ namespace openPMD
                         openPMDType,
                         { globalElements },
                         true,
-                        params->compressionMethod )
-                    .template storeChunk(
+                        params->compressionMethod );
+                if( storeBfr )
+                    recordComponent.storeChunk(
                         storeBfr, { globalOffset }, { elements } );
 
                 if( unit.size() >= ( d + 1 ) )

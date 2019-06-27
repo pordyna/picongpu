@@ -1191,8 +1191,9 @@ namespace openPMD
                         openPMDType,
                         params->fieldsGlobalSizeDims,
                         true,
-                        params->compressionMethod )
-                    .template storeChunk< ComponentType >(
+                        params->compressionMethod );
+                if ( params->fieldBuffer )
+                    mrc.storeChunk< ComponentType >(
                         params->fieldBuffer,
                         asStandardVector< simDim >( params->fieldsOffsetDims ),
                         asStandardVector< simDim >( params->fieldsSizeDims ) );
