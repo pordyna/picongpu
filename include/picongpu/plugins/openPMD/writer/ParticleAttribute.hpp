@@ -89,10 +89,12 @@ namespace openPMD
                 "openPMD:  (begin) write species attribute: %1%" ) %
                 Identifier::getName();
 
-            std::shared_ptr< ComponentType > storeBfr{
-                new ComponentType[ elements ],
-                []( ComponentType * ptr ) { delete[] ptr; }
-            };
+            std::shared_ptr< ComponentType > storeBfr;
+            if ( elements > 0 )
+                storeBfr = std::shared_ptr< ComponentType >{
+                    new ComponentType[ elements ],
+                    []( ComponentType * ptr ) { delete[] ptr; }
+                };
 
             for( uint32_t d = 0; d < components; d++ )
             {

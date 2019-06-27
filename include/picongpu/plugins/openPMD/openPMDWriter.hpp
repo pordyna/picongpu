@@ -503,7 +503,7 @@ namespace openPMD
                  * solver implementation */
                 const float_X timeOffset = 0.0;
 
-                openPMDWriter::template writeField< ComponentType >(
+                openPMDWriter::writeField< ComponentType >(
                     params,
                     sizeof( ComponentType ),
                     ::openPMD::determineDatatype< ComponentType >(),
@@ -954,11 +954,13 @@ namespace openPMD
         void
         initWrite()
         {
-            mThreadParams.fieldBuffer = std::shared_ptr< float_X >{
-                new float_X[ mThreadParams.window.localDimensions.size
-                                 .productOfComponents() ],
-                []( float_X * ptr ) { delete[] ptr; }
-            };
+            auto size = mThreadParams.window.localDimensions.size
+                                 .productOfComponents();
+            if( size > 0 )
+                mThreadParams.fieldBuffer = std::shared_ptr< float_X >{
+                    new float_X[ size ],
+                    []( float_X * ptr ) { delete[] ptr; }
+                };
         }
 
         /**
