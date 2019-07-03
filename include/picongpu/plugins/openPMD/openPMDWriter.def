@@ -57,6 +57,19 @@ namespace openPMD
         HDF5
     };
 
+
+    /**
+     * Writes simulation data to openPMD series.
+     * Implements the ILightweightPlugin interface.
+     */
+
+    class openPMDWriter;
+    class Help;
+    // passes through to openPMDWriter constructor
+    // used to avoid forward declaring the constructor
+    template< typename ... Args >
+    openPMDWriter makeOpenPMDWriter( Args && ... );
+
     struct ThreadParams
     {
         uint32_t currentStep; /** current simulation step */
@@ -74,6 +87,10 @@ namespace openPMD
         std::string
             fileName; /* Name of the openPMDSeries, excluding the extension */
         std::string fileExtension; /* Extension of the file name */
+        std::string fileInfix;
+
+        std::string jsonConfig;
+
         WriteSpeciesStrategy strategy = WriteSpeciesStrategy::ADIOS;
 
         pmacc::math::UInt64< simDim > fieldsSizeDims;
@@ -98,6 +115,13 @@ namespace openPMD
         void
         closeSeries();
 
+        void
+        initFromConfig(
+            Help &,
+            size_t id,
+            std::string const & file,
+            std::string const & dir );
+
         inline bool
         isADIOS1();
 
@@ -121,12 +145,5 @@ namespace openPMD
             bool compression,
             std::string const & compressionMethod );
     };
-
-    /**
-     * Writes simulation data to openPMD series.
-     * Implements the ILightweightPlugin interface.
-     */
-
-    class openPMDWriter;
 } // namespace openPMD
 } // namespace picongpu

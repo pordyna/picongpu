@@ -29,6 +29,7 @@
 #include "picongpu/plugins/misc/SpeciesFilter.hpp"
 #include "picongpu/plugins/misc/misc.hpp"
 #include "picongpu/plugins/multi/Option.hpp"
+#include "picongpu/plugins/multi/IHelp.hpp"
 #include "picongpu/plugins/openPMD/openPMDWriter.def"
 #include "picongpu/simulationControl/MovingWindow.hpp"
 #include "picongpu/simulation_defines.hpp"
@@ -135,7 +136,7 @@ namespace openPMD
     {
         if( !openPMDSeries )
         {
-            std::string fullName = fileName + "_%06T." + fileExtension;
+            std::string fullName = fileName + fileInfix + "." + fileExtension;
             log< picLog::INPUT_OUTPUT >( "openPMD: open file: %1%" ) % fullName;
             openPMDSeries = std::unique_ptr<::openPMD::Series >(
                 new ::openPMD::Series( fullName, at, communicator ) );
@@ -176,6 +177,8 @@ namespace openPMD
         }
     }
 
+
+
     bool
     ThreadParams::isADIOS1()
     {
@@ -186,6 +189,295 @@ namespace openPMD
 #endif
     }
 
+    struct Help : public plugins::multi::IHelp
+    {
+        /** creates a instance of ISlave
+         *
+         * @param help plugin defined help
+         * @param id index of the plugin, range: [0;help->getNumPlugins())
+         */
+        std::shared_ptr< plugins::multi::ISlave >
+        create(
+            std::shared_ptr< IHelp > & help,
+            size_t const id,
+            MappingDesc * cellDescription );
+        // defined later since we need openPMDWriter constructor
+
+        plugins::multi::Option< std::string > notifyPeriod = {
+            "period",
+            "enable openPMD IO [for each n-th step]"
+        };
+
+        plugins::multi::Option< std::string > source = {
+            "source",
+            "data sources: ",
+            "species_all, fields_all"
+        };
+
+        plugins::multi::Option< std::string > fileName = {
+            "file",
+            "openPMD file basename"
+        };
+
+        plugins::multi::Option< std::string > fileNameExtension = {
+            "ext",
+            "openPMD filename extension (this controls the"
+            "backend picked by the openPMD API)",
+            "bp"
+        };
+
+        plugins::multi::Option< std::string > fileNameInfix = {
+            "infix",
+            "openPMD filename infix (use to pick file- or group-based "
+            "layout in openPMD)",
+            "_%06T"
+        };
+
+        plugins::multi::Option< std::string > jsonConfig = {
+            "json",
+            "advanced (backend) configuration for openPMD in JSON format",
+            "{}"
+        };
+
+        plugins::multi::Option< std::string > dataPreparationStrategy = {
+            "dataPreparationStrategy",
+            "strategy for preparation of particle data ('adios' or 'hdf5')",
+            "adios"
+        };
+
+        std::vector< std::string > allowedDataSources = { "species_all",
+                                                          "fields_all" };
+
+        plugins::multi::Option< uint32_t > numAggregators = {
+            "aggregators",
+            "Number of aggregators [0 == number of MPI processes] "
+            "(currently "
+            "controlled by backend-specific environment variables)",
+            0u
+        };
+
+        plugins::multi::Option< uint32_t > numOSTs = {
+            "ost",
+            "Number of OST (currently controlled by backend-specific "
+            "environment variables)",
+            1u
+        };
+
+        plugins::multi::Option< uint32_t > disableMeta = {
+            "disable-meta",
+            "Disable online gather and write of a global meta file, can be "
+            "time consuming (use `bpmeta` post-mortem) (currently "
+            "controlled "
+            "by backend-specific environment variables)",
+            0u
+        };
+
+        /* select MPI method, #OSTs and #aggregators */
+        plugins::multi::Option< std::string > transportParams = {
+            "transport-params",
+            "additional transport parameters, see ADIOS manual chapter "
+            "6.1.5, "
+            "e.g., 'random_offset=1;stripe_count=4' (currently controlled "
+            "by "
+            "backend-specific environment variables)",
+            ""
+        };
+
+        plugins::multi::Option< std::string > compression = {
+            "compression",
+            "Backend-specific openPMD compression method, e.g., zlib (see "
+            "`adios_config -m` for help)",
+            "none"
+        };
+
+        /** defines if the plugin must register itself to the PMacc plugin
+         * system
+         *
+         * true = the plugin is registering it self
+         * false = the plugin is not registering itself (plugin is
+         * controlled by another class)
+         */
+        bool selfRegister = false;
+
+        template< typename T_TupleVector >
+        struct CreateSpeciesFilter
+        {
+            using type = plugins::misc::SpeciesFilter<
+                typename pmacc::math::CT::
+                    At< T_TupleVector, bmpl::int_< 0 > >::type,
+                typename pmacc::math::CT::
+                    At< T_TupleVector, bmpl::int_< 1 > >::type >;
+        };
+
+        using AllParticlesTimesAllFilters =
+            typename AllCombinations< bmpl::vector<
+                FileOutputParticles,
+                particles::filter::AllParticleFilters > >::type;
+
+        using AllSpeciesFilter = typename bmpl::transform<
+            AllParticlesTimesAllFilters,
+            CreateSpeciesFilter< bmpl::_1 > >::type;
+
+        using AllEligibleSpeciesSources = typename bmpl::copy_if<
+            AllSpeciesFilter,
+            plugins::misc::speciesFilter::IsEligible< bmpl::_1 > >::type;
+
+        using AllFieldSources = FileOutputFields;
+
+        ///! method used by plugin controller to get --help description
+        void
+        registerHelp(
+            boost::program_options::options_description & desc,
+            std::string const & masterPrefix = std::string{} )
+        {
+            ForEach
+                < AllEligibleSpeciesSources,
+                  plugins::misc::AppendName<
+                      bmpl::_1 > > getEligibleDataSourceNames;
+            getEligibleDataSourceNames( allowedDataSources );
+
+            ForEach
+                < AllFieldSources,
+                  plugins::misc::AppendName<
+                      bmpl::_1 > > appendFieldSourceNames;
+            appendFieldSourceNames( allowedDataSources );
+
+            // string list with all possible particle sources
+            std::string concatenatedSourceNames =
+                plugins::misc::concatenateToString(
+                    allowedDataSources, ", " );
+
+            notifyPeriod.registerHelp( desc, masterPrefix + prefix );
+            source.registerHelp(
+                desc,
+                masterPrefix + prefix,
+                std::string( "[" ) + concatenatedSourceNames + "]" );
+
+            expandHelp( desc, "" );
+            selfRegister = true;
+        }
+
+        void
+        expandHelp(
+            boost::program_options::options_description & desc,
+            std::string const & masterPrefix = std::string{} )
+        {
+            numAggregators.registerHelp( desc, masterPrefix + prefix );
+            numOSTs.registerHelp( desc, masterPrefix + prefix );
+            disableMeta.registerHelp( desc, masterPrefix + prefix );
+            transportParams.registerHelp( desc, masterPrefix + prefix );
+            compression.registerHelp( desc, masterPrefix + prefix );
+            // fileName.registerHelp( desc, masterPrefix + prefix );
+            // fileNameExtension.registerHelp( desc, masterPrefix + prefix
+            // );
+            fileName.registerHelp( desc, masterPrefix + prefix );
+            fileNameExtension.registerHelp( desc, masterPrefix + prefix );
+            fileNameInfix.registerHelp( desc, masterPrefix + prefix );
+            jsonConfig.registerHelp( desc, masterPrefix + prefix );
+            dataPreparationStrategy.registerHelp(
+                desc, masterPrefix + prefix );
+        }
+
+        void
+        validateOptions()
+        {
+            if( selfRegister )
+            {
+                if( notifyPeriod.empty() || fileName.empty() )
+                    throw std::runtime_error(
+                        name +
+                        ": parameter period and file must be defined" );
+
+                // check if user passed data source names are valid
+                for( auto const & dataSourceNames : source )
+                {
+                    auto vectorOfDataSourceNames =
+                        plugins::misc::splitString(
+                            plugins::misc::removeSpaces(
+                                dataSourceNames ) );
+
+                    for( auto const & f : vectorOfDataSourceNames )
+                    {
+                        if( !plugins::misc::containsObject(
+                                allowedDataSources, f ) )
+                        {
+                            throw std::runtime_error(
+                                name + ": unknown data source '" + f +
+                                "'" );
+                        }
+                    }
+                }
+            }
+        }
+
+        size_t
+        getNumPlugins() const
+        {
+            if( selfRegister )
+                return notifyPeriod.size();
+            else
+                return 1;
+        }
+
+        std::string
+        getDescription() const
+        {
+            return description;
+        }
+
+        std::string
+        getOptionPrefix() const
+        {
+            return prefix;
+        }
+
+        std::string
+        getName() const
+        {
+            return name;
+        }
+
+        std::string const name = "openPMDWriter";
+        //! short description of the plugin
+        std::string const description = "dump simulation data with openPMD";
+        //! prefix used for command line arguments
+        std::string const prefix = "openPMD";
+    };
+
+    void
+    ThreadParams::initFromConfig(
+        Help & help,
+        size_t id,
+        std::string const & file,
+        std::string const & dir )
+    {
+        fileExtension = help.fileNameExtension.get( id );
+        fileInfix = help.fileNameInfix.get( id );
+        /* if file name is relative, prepend with common directory */
+        fileName = boost::filesystem::path( file ).has_root_path() ?
+            file : dir + "/" + file;
+
+        jsonConfig = help.jsonConfig.get( id );
+
+        {
+            std::string strategyString =
+                help.dataPreparationStrategy.get( id );
+            if( strategyString == "adios" )
+            {
+                strategy = WriteSpeciesStrategy::ADIOS;
+            }
+            else if( strategyString == "hdf5" )
+            {
+                strategy = WriteSpeciesStrategy::HDF5;
+            }
+            else
+            {
+                std::cerr << "Passed dataPreparationStrategy for openPMD"
+                             " plugin is invalid."
+                          << std::endl;
+            }
+        }
+    }
 
     /** Writes simulation data to openPMD.
      *
@@ -194,248 +486,6 @@ namespace openPMD
     class openPMDWriter : public IIOBackend
     {
     public:
-        struct Help : public plugins::multi::IHelp
-        {
-            /** creates a instance of ISlave
-             *
-             * @param help plugin defined help
-             * @param id index of the plugin, range: [0;help->getNumPlugins())
-             */
-            std::shared_ptr< ISlave >
-            create(
-                std::shared_ptr< IHelp > & help,
-                size_t const id,
-                MappingDesc * cellDescription )
-            {
-                return std::shared_ptr< ISlave >(
-                    new openPMDWriter( help, id, cellDescription ) );
-            }
-
-            plugins::multi::Option< std::string > notifyPeriod = {
-                "period",
-                "enable openPMD IO [for each n-th step]"
-            };
-
-            plugins::multi::Option< std::string > source = {
-                "source",
-                "data sources: ",
-                "species_all, fields_all"
-            };
-
-            plugins::multi::Option< std::string > fileName = {
-                "file",
-                "openPMD file basename"
-            };
-
-            plugins::multi::Option< std::string > fileNameExtension = {
-                "ext",
-                "openPMD filename extension (this controls the"
-                "backend picked by the openPMD API)",
-                "bp"
-            };
-
-            plugins::multi::Option< std::string > dataPreparationStrategy = {
-                "dataPreparationStrategy",
-                "strategy for preparation of particle data ('adios' or 'hdf5')",
-                "adios"
-            };
-
-            std::vector< std::string > allowedDataSources = { "species_all",
-                                                              "fields_all" };
-
-            plugins::multi::Option< uint32_t > numAggregators = {
-                "aggregators",
-                "Number of aggregators [0 == number of MPI processes] "
-                "(currently "
-                "controlled by backend-specific environment variables)",
-                0u
-            };
-
-            plugins::multi::Option< uint32_t > numOSTs = {
-                "ost",
-                "Number of OST (currently controlled by backend-specific "
-                "environment variables)",
-                1u
-            };
-
-            plugins::multi::Option< uint32_t > disableMeta = {
-                "disable-meta",
-                "Disable online gather and write of a global meta file, can be "
-                "time consuming (use `bpmeta` post-mortem) (currently "
-                "controlled "
-                "by backend-specific environment variables)",
-                0u
-            };
-
-            /* select MPI method, #OSTs and #aggregators */
-            plugins::multi::Option< std::string > transportParams = {
-                "transport-params",
-                "additional transport parameters, see ADIOS manual chapter "
-                "6.1.5, "
-                "e.g., 'random_offset=1;stripe_count=4' (currently controlled "
-                "by "
-                "backend-specific environment variables)",
-                ""
-            };
-
-            plugins::multi::Option< std::string > compression = {
-                "compression",
-                "Backend-specific openPMD compression method, e.g., zlib (see "
-                "`adios_config -m` for help)",
-                "none"
-            };
-
-            /** defines if the plugin must register itself to the PMacc plugin
-             * system
-             *
-             * true = the plugin is registering it self
-             * false = the plugin is not registering itself (plugin is
-             * controlled by another class)
-             */
-            bool selfRegister = false;
-
-            template< typename T_TupleVector >
-            struct CreateSpeciesFilter
-            {
-                using type = plugins::misc::SpeciesFilter<
-                    typename pmacc::math::CT::
-                        At< T_TupleVector, bmpl::int_< 0 > >::type,
-                    typename pmacc::math::CT::
-                        At< T_TupleVector, bmpl::int_< 1 > >::type >;
-            };
-
-            using AllParticlesTimesAllFilters =
-                typename AllCombinations< bmpl::vector<
-                    FileOutputParticles,
-                    particles::filter::AllParticleFilters > >::type;
-
-            using AllSpeciesFilter = typename bmpl::transform<
-                AllParticlesTimesAllFilters,
-                CreateSpeciesFilter< bmpl::_1 > >::type;
-
-            using AllEligibleSpeciesSources = typename bmpl::copy_if<
-                AllSpeciesFilter,
-                plugins::misc::speciesFilter::IsEligible< bmpl::_1 > >::type;
-
-            using AllFieldSources = FileOutputFields;
-
-            ///! method used by plugin controller to get --help description
-            void
-            registerHelp(
-                boost::program_options::options_description & desc,
-                std::string const & masterPrefix = std::string{} )
-            {
-                ForEach
-                    < AllEligibleSpeciesSources,
-                      plugins::misc::AppendName<
-                          bmpl::_1 > > getEligibleDataSourceNames;
-                getEligibleDataSourceNames( allowedDataSources );
-
-                ForEach
-                    < AllFieldSources,
-                      plugins::misc::AppendName<
-                          bmpl::_1 > > appendFieldSourceNames;
-                appendFieldSourceNames( allowedDataSources );
-
-                // string list with all possible particle sources
-                std::string concatenatedSourceNames =
-                    plugins::misc::concatenateToString(
-                        allowedDataSources, ", " );
-
-                notifyPeriod.registerHelp( desc, masterPrefix + prefix );
-                source.registerHelp(
-                    desc,
-                    masterPrefix + prefix,
-                    std::string( "[" ) + concatenatedSourceNames + "]" );
-
-                expandHelp( desc, "" );
-                selfRegister = true;
-            }
-
-            void
-            expandHelp(
-                boost::program_options::options_description & desc,
-                std::string const & masterPrefix = std::string{} )
-            {
-                numAggregators.registerHelp( desc, masterPrefix + prefix );
-                numOSTs.registerHelp( desc, masterPrefix + prefix );
-                disableMeta.registerHelp( desc, masterPrefix + prefix );
-                transportParams.registerHelp( desc, masterPrefix + prefix );
-                compression.registerHelp( desc, masterPrefix + prefix );
-                // fileName.registerHelp( desc, masterPrefix + prefix );
-                // fileNameExtension.registerHelp( desc, masterPrefix + prefix
-                // );
-                fileName.registerHelp( desc, masterPrefix + prefix );
-                fileNameExtension.registerHelp( desc, masterPrefix + prefix );
-                dataPreparationStrategy.registerHelp(
-                    desc, masterPrefix + prefix );
-            }
-
-            void
-            validateOptions()
-            {
-                if( selfRegister )
-                {
-                    if( notifyPeriod.empty() || fileName.empty() )
-                        throw std::runtime_error(
-                            name +
-                            ": parameter period and file must be defined" );
-
-                    // check if user passed data source names are valid
-                    for( auto const & dataSourceNames : source )
-                    {
-                        auto vectorOfDataSourceNames =
-                            plugins::misc::splitString(
-                                plugins::misc::removeSpaces(
-                                    dataSourceNames ) );
-
-                        for( auto const & f : vectorOfDataSourceNames )
-                        {
-                            if( !plugins::misc::containsObject(
-                                    allowedDataSources, f ) )
-                            {
-                                throw std::runtime_error(
-                                    name + ": unknown data source '" + f +
-                                    "'" );
-                            }
-                        }
-                    }
-                }
-            }
-
-            size_t
-            getNumPlugins() const
-            {
-                if( selfRegister )
-                    return notifyPeriod.size();
-                else
-                    return 1;
-            }
-
-            std::string
-            getDescription() const
-            {
-                return description;
-            }
-
-            std::string
-            getOptionPrefix() const
-            {
-                return prefix;
-            }
-
-            std::string
-            getName() const
-            {
-                return name;
-            }
-
-            std::string const name = "openPMDWriter";
-            //! short description of the plugin
-            std::string const description = "dump simulation data with openPMD";
-            //! prefix used for command line arguments
-            std::string const prefix = "openPMD";
-        };
 
         //! must be implemented by the user
         static std::shared_ptr< plugins::multi::IHelp >
@@ -713,37 +763,13 @@ namespace openPMD
 
             __getTransactionEvent().waitForFinished();
 
-            mThreadParams.fileExtension = m_help->fileNameExtension.get( m_id );
-            std::string filename = m_help->fileName.get( m_id );
-
-            /* if file name is relative, prepend with common directory */
-            if( boost::filesystem::path( filename ).has_root_path() )
-                mThreadParams.fileName = filename;
-            else
-                mThreadParams.fileName = outputDirectory + "/" + filename;
+            mThreadParams.initFromConfig(
+                *m_help, m_id, m_help->fileName.get( m_id ), outputDirectory );
 
             /* window selection */
             mThreadParams.window =
                 MovingWindow::getInstance().getWindow( currentStep );
             mThreadParams.isCheckpoint = false;
-            {
-                std::string const & strategy =
-                    m_help->dataPreparationStrategy.get( m_id );
-                if( strategy == "adios" )
-                {
-                    mThreadParams.strategy = WriteSpeciesStrategy::ADIOS;
-                }
-                else if( strategy == "hdf5" )
-                {
-                    mThreadParams.strategy = WriteSpeciesStrategy::HDF5;
-                }
-                else
-                {
-                    std::cerr << "Passed dataPreparationStrategy for openPMD"
-                                 " plugin is invalid."
-                              << std::endl;
-                }
-            }
             dumpData( currentStep );
         }
 
@@ -777,34 +803,12 @@ namespace openPMD
 
             __getTransactionEvent().waitForFinished();
             /* if file name is relative, prepend with common directory */
-            mThreadParams.fileExtension = m_help->fileNameExtension.get( m_id );
-            if( boost::filesystem::path( checkpointFilename ).has_root_path() )
-                mThreadParams.fileName = checkpointFilename;
-            else
-                mThreadParams.fileName =
-                    checkpointDirectory + "/" + checkpointFilename;
+
+            mThreadParams.initFromConfig(
+                *m_help, m_id, checkpointFilename, checkpointDirectory );
 
             mThreadParams.window =
                 MovingWindow::getInstance().getDomainAsWindow( currentStep );
-            mThreadParams.isCheckpoint = true;
-            {
-                std::string const & strategy =
-                    m_help->dataPreparationStrategy.get( m_id );
-                if( strategy == "adios" )
-                {
-                    mThreadParams.strategy = WriteSpeciesStrategy::ADIOS;
-                }
-                else if( strategy == "hdf5" )
-                {
-                    mThreadParams.strategy = WriteSpeciesStrategy::HDF5;
-                }
-                else
-                {
-                    std::cerr << "Passed dataPreparationStrategy for openPMD"
-                                 " plugin is invalid."
-                              << std::endl;
-                }
-            }
 
             dumpData( currentStep );
         }
@@ -820,19 +824,8 @@ namespace openPMD
             // Checkpoint
             assert( !m_help->selfRegister );
 
-            mThreadParams.fileExtension = m_help->fileNameExtension.get( m_id );
-
-            /* if restartFilename is relative, prepend with restartDirectory */
-            if( !boost::filesystem::path( constRestartFilename )
-                     .has_root_path() )
-            {
-                mThreadParams.fileName = restartDirectory + std::string( "/" ) +
-                    constRestartFilename;
-            }
-            else
-            {
-                mThreadParams.fileName = constRestartFilename;
-            }
+            mThreadParams.initFromConfig(
+                *m_help, m_id, constRestartFilename, restartDirectory );
 
             // mThreadParams.isCheckpoint = isCheckpoint;
             mThreadParams.currentStep = restartStep;
@@ -1409,6 +1402,16 @@ namespace openPMD
         DataSpace< simDim > mpi_pos;
         DataSpace< simDim > mpi_size;
     };
+
+    std::shared_ptr< plugins::multi::ISlave >
+    Help::create(
+        std::shared_ptr< plugins::multi::IHelp > & help,
+        size_t const id,
+        MappingDesc * cellDescription )
+    {
+        return std::shared_ptr< plugins::multi::ISlave >(
+            new openPMDWriter( help, id, cellDescription ) );
+    }
 
 } // namespace openPMD
 } // namespace picongpu
