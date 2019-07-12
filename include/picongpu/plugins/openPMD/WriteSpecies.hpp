@@ -71,19 +71,24 @@ namespace openPMD
         Filter & filter;
         ParticleFilter & particleFilter;
         ParticleOffset & particleOffset;
+        uint64_t myNumParticles, globalNumParticles;
         StrategyRunParameters(
             pmacc::DataConnector & c_dc,
             ThreadParams & c_params,
             SpeciesTmp & c_speciesTmp,
             Filter & c_filter,
             ParticleFilter & c_particleFilter,
-            ParticleOffset & c_particleOffset ) :
+            ParticleOffset & c_particleOffset,
+            uint64_t c_myNumParticles,
+            uint64_t c_globalNumParticles ) :
             dc( c_dc ),
             params( c_params ),
             speciesTmp( c_speciesTmp ),
             filter( c_filter ),
             particleFilter( c_particleFilter ),
-            particleOffset( c_particleOffset )
+            particleOffset( c_particleOffset ),
+            myNumParticles( c_globalNumParticles ),
+            globalNumParticles( c_globalNumParticles )
         {
         }
     };
@@ -196,7 +201,7 @@ namespace openPMD
             /* this costs a little bit of time but writing to external is
              * slower in general */
             PMACC_ASSERT(
-                ( uint64_cu )globalParticleOffset == totalNumParticles );
+                ( uint64_cu )globalParticleOffset == rp.globalNumParticles );
         }
     };
 
@@ -468,7 +473,9 @@ namespace openPMD
                 speciesTmp,
                 filter,
                 particleFilter,
-                particleOffset );
+                particleOffset,
+                myNumParticles,
+                globalNumParticles );
             if( globalNumParticles > 0 )
             {
                 strategy->prepare(
