@@ -1,0 +1,118 @@
+@startuml
+|Host|
+start
+:collision pipeline
+----
+//collision.param//>
+: collision = (species1, species2, collider)  <
+:call collider
+----
+//Collider.hpp, WithPeer.hpp //;
+
+if( species1 == species2 ) then (yes)
+: run IntraColisions kernel
+----
+//IntraSpecies.hpp 503:512//;
+partition (""IntraColisions"") {
+:start kernel;
+->Parallelize over
+particles in one frame.;
+:prepare storage for particle lists
+    (one list per grid cell)
+----
+//IntraSpecies.hpp 267:283,310:348//;
+-> sync threads;
+:call **""updateLinkedList""**
+----
+//IntraSpecies.hpp 352//;
+partition (""updateLinkedList"") {
+:start function;
+repeat
+    :assign superCell-wide particle id
+    ----
+    //IntraSpecies.hpp 186//;
+    :get particle's grid cell
+    ----
+    //IntraSpecies.hpp 189:190//;
+    :store id in cell's list
+    ----
+    //IntraSpecies.hpp 191:193//;
+repeat while (frames left?)
+:end function;
+}
+-> sync threads
+
+From now, parallelize
+over grid cells.;
+:shuffle cell's list
+----
+//IntraSpecies.hpp 374,91:106//;
+-> i = 0;
+while (i < (list size -1)) is (yes)
+:**collision functor**
+collide i-th and (i+1)-th particle
+----
+//IntraSpecies.hpp 387,422:436 //|
+:i=i+2;
+end while (no)
+-> sync threads;
+:free particle list storage
+----
+//IntraSpecies.hpp 443:451//;
+:end kernel;
+}
+
+else (no)
+: run InterCollisions kernel
+----
+//InterCollisions.hpp 406:416//;
+partition (""InterCollisions"") {
+:start kernel;
+->Parallelize over
+particles in one frame.;
+: prepare storage for particle lists
+(__species1__, one list per grid cell)
+----
+//InterSpecies.hpp 135:171//;
+-> sync threads;
+:call **""updateLinkedList""** for __species1__
+(just like in ""IntraColisions"")
+----
+//InterSpecies.hpp 175//|
+-> sync threads;
+: prepare storage for particle lists
+(__species2__, one list per grid cell)
+----
+//InterSpecies.hpp 198:234//;
+:call **""updateLinkedList""** for __species2__
+(just like in ""IntraColisions"")
+----
+//InterSpecies.hpp 238//|
+-> Parallelize over
+grid cells;
+:compare lists lengths (species1 & species2)
+----
+//InterSpecies.hpp 271//;
+
+:shuffle longer list
+----
+//InterSpecies.hpp 274//;
+
+-> i = 0;
+while (i < (shorter list size -1)) is (yes)
+:**collision functor**
+collide i-th particle in species1 list
+with i-th particle in species2 list
+----
+//InterSpecies.hpp 278,318:332 //|
+:i=i+1;
+end while (no)
+-> sync threads;
+:free particle list storage
+----
+//InterSpecies.hpp 339:348//;
+:end kernel;
+}
+endif
+stop
+@enduml

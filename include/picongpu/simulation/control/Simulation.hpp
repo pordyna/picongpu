@@ -59,6 +59,7 @@
 #include "picongpu/particles/filter/filter.hpp"
 #include "picongpu/particles/flylite/NonLTE.tpp"
 #include "picongpu/simulation/control/DomainAdjuster.hpp"
+#include "picongpu/simulation/stage/Collision.hpp"
 #include "picongpu/simulation/stage/Bremsstrahlung.hpp"
 #include "picongpu/simulation/stage/CurrentBackground.hpp"
 #include "picongpu/simulation/stage/CurrentDeposition.hpp"
@@ -92,6 +93,7 @@
 #include "picongpu/particles/ParticlesFunctors.hpp"
 #include "picongpu/particles/InitFunctors.hpp"
 #include <pmacc/particles/memory/buffers/MallocMCBuffer.hpp>
+#include <pmacc/particles/traits/FilterByFlag.hpp>
 #include <pmacc/particles/traits/FilterByFlag.hpp>
 #include <pmacc/particles/traits/FilterByIdentifier.hpp>
 #include <pmacc/particles/IdProvider.hpp>
@@ -540,8 +542,10 @@ namespace picongpu
         virtual void runOneStep(uint32_t currentStep)
         {
             using namespace simulation::stage;
+
             MomentumBackup{}(currentStep);
             CurrentReset{}(currentStep);
+            Collision{deviceHeap}(currentStep);
             ParticleIonization{*cellDescription}(currentStep);
             PopulationKinetics{}(currentStep);
             SynchrotronRadiation{*cellDescription, synchrotronFunctions}(currentStep);

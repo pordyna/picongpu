@@ -1,0 +1,2 @@
+Collisions: Testing example thermalization
+============================

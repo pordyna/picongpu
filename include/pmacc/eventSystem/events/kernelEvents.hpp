@@ -21,7 +21,6 @@
 
 #pragma once
 
-
 #include "pmacc/types.hpp"
 #include "pmacc/dimensions/DataSpace.hpp"
 #include "pmacc/traits/GetNComponents.hpp"
@@ -29,8 +28,8 @@
 #include "pmacc/Environment.hpp"
 #include "pmacc/nvidia/gpuEntryFunction.hpp"
 
+#include <iostream>
 #include <string>
-
 
 /* No namespace in this file since we only declare macro defines */
 
@@ -43,7 +42,6 @@
 /*no synchronize and check of kernel calls*/
 #    define CUDA_CHECK_KERNEL_MSG(...) ;
 #endif
-
 
 namespace pmacc
 {
@@ -153,27 +151,48 @@ namespace pmacc
                 std::string const kernelInfo = kernelName + std::string(" [") + m_kernel.m_file + std::string(":")
                     + std::to_string(m_kernel.m_line) + std::string(" ]");
 
-                CUDA_CHECK_KERNEL_MSG(cuplaDeviceSynchronize(), std::string("Crash before kernel call ") + kernelInfo);
+                /* alpaka reports errors as exceptions, in the check mode handle it
+                 * here while we still have kernel information
+                 */
+#if(PMACC_SYNC_KERNEL == 1)
+                try
+                {
+#endif
 
-                pmacc::TaskKernel* taskKernel
-                    = pmacc::Environment<>::get().Factory().createTaskKernel(typeid(kernelName).name());
+                    CUDA_CHECK_KERNEL_MSG(
+                        cuplaDeviceSynchronize(),
+                        std::string("Crash before kernel call ") + kernelInfo);
 
-                DataSpace<traits::GetNComponents<T_VectorGrid>::value> gridExtent(m_gridExtent);
+                    pmacc::TaskKernel* taskKernel
+                        = pmacc::Environment<>::get().Factory().createTaskKernel(typeid(kernelName).name());
 
-                DataSpace<traits::GetNComponents<T_VectorBlock>::value> blockExtent(m_blockExtent);
+                    DataSpace<traits::GetNComponents<T_VectorGrid>::value> gridExtent(m_gridExtent);
 
-                CUPLA_KERNEL(typename T_Kernel::KernelType)
-                (gridExtent.toDim3(), blockExtent.toDim3(), m_sharedMemByte, taskKernel->getCudaStream())(args...);
-                CUDA_CHECK_KERNEL_MSG(
-                    cuplaGetLastError(),
-                    std::string("Last error after kernel launch ") + kernelInfo);
-                CUDA_CHECK_KERNEL_MSG(
-                    cuplaDeviceSynchronize(),
-                    std::string("Crash after kernel launch ") + kernelInfo);
-                taskKernel->activateChecks();
-                CUDA_CHECK_KERNEL_MSG(
-                    cuplaDeviceSynchronize(),
-                    std::string("Crash after kernel activation") + kernelInfo);
+                    DataSpace<traits::GetNComponents<T_VectorBlock>::value> blockExtent(m_blockExtent);
+
+                    CUPLA_KERNEL(typename T_Kernel::KernelType)
+                    (gridExtent.toDim3(), blockExtent.toDim3(), m_sharedMemByte, taskKernel->getCudaStream())(args...);
+                    CUDA_CHECK_KERNEL_MSG(
+                        cuplaGetLastError(),
+                        std::string("Last error after kernel launch ") + kernelInfo);
+                    CUDA_CHECK_KERNEL_MSG(
+                        cuplaDeviceSynchronize(),
+                        std::string("Crash after kernel launch ") + kernelInfo);
+                    taskKernel->activateChecks();
+                    CUDA_CHECK_KERNEL_MSG(
+                        cuplaDeviceSynchronize(),
+                        std::string("Crash after kernel activation") + kernelInfo);
+
+                    // in the check mode, catch, report and re-throw alpaka exceptions
+#if(PMACC_SYNC_KERNEL == 1)
+                }
+                catch(...)
+                {
+                    std::cerr << "Error: trying to launch kernel " << kernelInfo
+                              << " threw an exception, re-throwing it\n";
+                    throw;
+                }
+#endif
             }
 
             template<typename... T_Args>

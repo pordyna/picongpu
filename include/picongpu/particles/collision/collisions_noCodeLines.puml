@@ -1,0 +1,98 @@
+@startuml
+start
+:collision pipeline
+----
+//collision.param//>
+: collision = (species1, species2, collider)  <
+:call collider
+----
+//Collider.hpp, WithPeer.hpp //;
+
+if( species1 == species2 ) then (yes)
+: run IntraColisions kernel
+----
+//IntraSpecies.hpp //;
+partition (""IntraColisions"") {
+:start kernel;
+->Parallelize over
+particles in one frame.;
+:prepare storage for particle lists
+    (one list per grid cell) ;
+-> sync threads;
+:call **""updateLinkedList""**;
+partition (""updateLinkedList"") {
+:start function;
+repeat
+    :assign superCell-wide particle id;
+    :get particle's grid cell ;
+    :store id in cell's list;
+repeat while (frames left?)
+:end function;
+}
+-> sync threads
+
+From now, parallelize
+over grid cells.;
+:calculate density;
+:shuffle cell's list;
+-> i = 0;
+while (i < (list size )) is (yes)
+if( odd particle number ) then (yes)
+:0th particle is duplicated
+(used twice);
+else ( no )
+endif
+:**collision functor**
+collide i-th and (i+1)-th particle
+----
+//DefaultAlg.hpp//|
+:i=i+2;
+end while (no)
+-> sync threads;
+:free particle list storage;
+:end kernel;
+}
+
+else (no)
+: run InterCollisions kernel
+----
+//InterSpecies.hpp//;
+partition (""InterCollisions"") {
+:start kernel;
+->Parallelize over
+particles in one frame.;
+: prepare storage for particle lists
+(__species1__, one list per grid cell);
+-> sync threads;
+:call **""updateLinkedList""** for __species1__
+(just like in ""IntraColisions"")|
+-> sync threads;
+: prepare storage for particle lists
+(__species2__, one list per grid cell);
+:call **""updateLinkedList""** for __species2__
+(just like in ""IntraColisions"")|
+-> Parallelize over
+grid cells;
+:calculate densities
+(for both species);
+:find longer list and shuffle it;
+
+-> i = 0;
+while (i < longer list size ) is (yes)
+:j= i mod (short list size);
+:determine j-th particle
+duplications in short list;
+:**collision functor**
+collide i-th particle in longer list
+with j-th particle in short list
+----
+//DefaultAlg.hpp//|
+:i=i+1;
+end while (no)
+-> sync threads;
+:free particle list storage;
+:end kernel;
+}
+endif
+stop
+@enduml
