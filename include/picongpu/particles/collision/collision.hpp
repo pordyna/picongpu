@@ -21,4 +21,3 @@
 
 #include "picongpu/particles/collision/Collider.hpp"
 #include "picongpu/particles/collision/binary/DefaultAlg.hpp"
-#include "picongpu/particles/collision/WithPeer.hpp"

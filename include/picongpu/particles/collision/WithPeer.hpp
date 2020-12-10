@@ -31,8 +31,8 @@
 
 #include "picongpu/particles/filter/filter.def"
 #include "picongpu/particles/collision/IBinary.def"
-#include "picongpu/particles/collision/IntraSpecies.hpp"
-#include "picongpu/particles/collision/InterSpecies.hpp"
+#include "picongpu/particles/collision/IntraCollision.hpp"
+#include "picongpu/particles/collision/InterCollision.hpp"
 
 
 namespace picongpu
@@ -81,7 +81,7 @@ namespace picongpu
              *     macro particle collision in the binary-collision algorithm.
              * @tparam T_BaseSpecies First species in the collision pair.
              * @tparam T_PeerSpecies Second species in the collision pair.
-             * @tparam T_Params A struct definning `coulombLog` for the collisions.
+             * @tparam T_Params A struct defining `coulombLog` for the collisions.
              * @tparam T_FilterPair A pair of particle filters, each for each species
              *     in the colliding pair.
              */

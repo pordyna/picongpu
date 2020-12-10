@@ -287,6 +287,16 @@ namespace picongpu
                 }
             };
 
+            /* Run kernel for collisions between two species.
+             *
+             * @tparam T_CollisionFunctor A binary particle functor defining a single macro particle collision in the
+             *     binary-collision algorithm.
+             * @tparam T_Params A struct defining `coulombLog` for the collisions.
+             * @tparam T_FilterPair A pair of particle filters, each for each species
+             *     in the colliding pair.
+             * @tparam T_Species0 1st colliding species.
+             * @tparam T_Species1 2nd colliding species.
+             */
             template<
                 typename T_CollisionFunctor,
                 typename T_Params,
@@ -295,7 +305,12 @@ namespace picongpu
                 typename T_Species1>
             struct DoInterCollision
             {
-                void operator()(const std::shared_ptr<DeviceHeap>& deviceHeap, uint32_t currentStep)
+                /* Run kernel
+                 *
+                 * @param deviceHeap A pointer to device heap for allocating particle lists.
+                 * @param currentStep The current simulation step.
+                 */
+                HINLINE void operator()(const std::shared_ptr<DeviceHeap>& deviceHeap, uint32_t currentStep)
                 {
                     using Species0 = T_Species0;
                     using FrameType0 = typename Species0::FrameType;
@@ -307,19 +322,21 @@ namespace picongpu
 
                     using CollisionFunctor = T_CollisionFunctor;
 
+                    // Access particle data:
                     DataConnector& dc = Environment<>::get().DataConnector();
                     auto species0 = dc.get<Species0>(FrameType0::getName(), true);
                     auto species1 = dc.get<Species1>(FrameType1::getName(), true);
 
-                    // use mapping information from the first species
+                    // Use mapping information from the first species:
                     AreaMapping<CORE + BORDER, picongpu::MappingDesc> mapper(species0->getCellDescription());
 
                     constexpr uint32_t numWorkers
                         = pmacc::traits::GetNumWorkers<pmacc::math::CT::volume<SuperCellSize>::type::value>::value;
 
-                    /* random number generator */
+                    //! random number generator
                     using RNGFactory = pmacc::random::RNGProvider<simDim, random::Generator>;
                     constexpr float_X coulombLog = T_Params::coulombLog;
+
                     PMACC_KERNEL(InterCollision<numWorkers>{})
                     (mapper.getGridDim(), numWorkers)(
                         species0->getDeviceParticlesBox(),
@@ -332,6 +349,8 @@ namespace picongpu
                         Filter0(),
                         Filter1());
 
+                    // Release particle data:
+                    // TODO: can I relase it like this? Or do I have to synchronize, make KERNEL call blocking?
                     dc.releaseData(FrameType0::getName());
                     dc.releaseData(FrameType1::getName());
                 }

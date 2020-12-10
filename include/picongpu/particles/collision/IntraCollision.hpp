@@ -173,12 +173,29 @@ namespace picongpu
                 }
             };
 
+            /* Run kernel for internal collisions of one species.
+             *
+             * @tparam T_CollisionFunctor A binary particle functor defining a single macro particle collision in the
+             *     binary-collision algorithm.
+             * @tparam T_Params A struct defining `coulombLog` for the collisions.
+             * @tparam T_FilterPair A pair of particle filters, each for each species
+             *     in the colliding pair.
+             * @tparam T_Species0 Colliding species.
+             * @tparam T_Species1 2nd colliding species.
+             */
             template<typename T_CollisionFunctor, typename T_Params, typename T_FilterPair, typename T_Species>
             struct DoIntraCollision;
 
+            // A single template specialization. This ensures that the code want compile if the FilterPair contains two
+            // different filters. That wouldn't make much sense for internal collisions.
             template<typename T_CollisionFunctor, typename T_Params, typename T_Filter, typename T_Species>
             struct DoIntraCollision<T_CollisionFunctor, T_Params, FilterPair<T_Filter, T_Filter>, T_Species>
             {
+                /* Run kernel
+                 *
+                 * @param deviceHeap A pointer to device heap for allocating particle lists.
+                 * @param currentStep The current simulation step.
+                 */
                 void operator()(const std::shared_ptr<DeviceHeap>& deviceHeap, uint32_t currentStep)
                 {
                     using Species = T_Species;

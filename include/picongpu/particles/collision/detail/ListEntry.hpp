@@ -30,12 +30,24 @@ namespace picongpu
         {
             namespace detail
             {
+                /* Storage for particle IDs.
+                 *
+                 * Storage for IDs of collision eligible macro particles. It comes with a simple
+                 * shuffling algorithm.
+                 */
                 struct ListEntry
                 {
+                    //! Size of the particle list (number of stored IDs).
                     uint32_t size;
+                    //! Pointer to the actual data stored on the device heap.
                     uint32_t* ptrToIndicies;
 
-
+                    /* Initialize storage, allocate memory.
+                     *
+                     * @param acc alpaka accelerator
+                     * @param deviceHeapHandle Heap handle used for allocating storage on device.
+                     * @param numPar maximal number of IDs to be stored in the list.
+                     */
                     template<typename T_acc, typename T_DeviceHeapHandle>
                     DINLINE void init(T_acc const& acc, T_DeviceHeapHandle& deviceHeapHandle, uint32_t numPar)
                     {
@@ -44,6 +56,7 @@ namespace picongpu
                         {
                             // printf("alloc %u: %u\n", linearIdx, (nppc[ linearIdx ] + 1) );
 #if(PMACC_CUDA_ENABLED == 1)
+                            // Allocate memory on a cuda device:
                             int i = 0;
                             while(ptrToIndicies == nullptr)
                             {
@@ -54,6 +67,7 @@ namespace picongpu
                                 ++i;
                             }
 #else
+                            // No cuda means the device heap is the host heap.
                             ptrToIndicies = new uint32_t[numPar];
 #endif
                         }
@@ -61,7 +75,11 @@ namespace picongpu
                         size = 0u;
                     }
 
-
+                    /* Release allocated heap memory.
+                     *
+                     * @param acc alpaka accelerator
+                     * @param deviceHeapHandle Heap handle used for allocating storage on device.
+                     */
                     template<typename T_acc, typename T_DeviceHeapHandle>
                     DINLINE void finalize(T_acc const& acc, T_DeviceHeapHandle& deviceHeapHandle)
                     {
@@ -77,7 +95,11 @@ namespace picongpu
                     }
 
 
-                    // non collective
+                    /* Shuffle list entries.
+                     *
+                     * @param acc alpaka accelerator
+                     * @param rngHandle random number generator handle
+                     */
                     template<typename T_Acc, typename T_RngHandle>
                     DINLINE void shuffle(T_Acc const& acc, T_RngHandle& rngHandle)
                     {
@@ -97,6 +119,11 @@ namespace picongpu
 
 
                 private:
+                    /* Swap two list entries.
+                     *
+                     * @param v0 index of the 1st entry to swap
+                     * @param v0 index of the 2nd entry to swap
+                     */
                     DINLINE void swap(uint32_t& v0, uint32_t& v1)
                     {
                         uint32_t tmp = v0;
@@ -105,7 +132,7 @@ namespace picongpu
                     }
                 };
 
-
+// TODO: simplify (maybe crate a class and inject all the required stuff as private references?), Check const, & etc.
                 //! Counting particles per grid frame
                 template<
                     typename T_Acc,
@@ -216,19 +243,17 @@ namespace picongpu
                     T_Array& nppc,
                     T_Filter filter)
                 {
+                    // Initialize nppc with zeros.
                     forEach([&](uint32_t const linearIdx, uint32_t const idx) { nppc[linearIdx] = 0u; });
-
                     cupla::__syncthreads(acc);
-
+                    // Count eligible
                     particlesCntHistogram(acc, forEach, parBox, firstFrame, numParticlesInSupercell, nppc, filter);
-
                     cupla::__syncthreads(acc);
 
                     // memory for particle indices
                     forEach([&](uint32_t const linearIdx, uint32_t const) {
                         parCellList[linearIdx].init(acc, deviceHeapHandle, nppc[linearIdx]);
                     });
-
                     cupla::__syncthreads(acc);
 
                     detail::updateLinkedList(
