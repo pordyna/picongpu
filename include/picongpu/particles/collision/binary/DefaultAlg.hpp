@@ -42,8 +42,11 @@ namespace picongpu
                 {
                     using namespace pmacc;
 
-                    /*
+                    /* Perform a single binary collision between two macro particles. (Device side functor)
                      *
+                     * This algorithm was described in [Perez 2012] @url www.doi.org/10.1063/1.4742167.
+                     * And it incorporates changes suggested in [Higginson 2020]
+                     * @url www.doi.org/10.1016/j.jcp.2020.109450
                      */
                     struct DefaultAlg
                     {
@@ -53,7 +56,14 @@ namespace picongpu
                         uint32_t potentialPartners;
                         float_X coulombLog;
 
-                        //! store user manipulators instance
+                        /* Initialize device side functor.
+                         *
+                         * @param p_densitySqCbrt0 @f[ n_0^{2/3} @f] where @f[ n_0 @f] is the 1st species density.
+                         * @param p_densitySqCbrt1 @f[ n_1^{2/3} @f] where @f[ n_1 @f] is the 2nd species density.
+                         * @param p_potentialPartners number of potential collision partners for a macro particle in
+                         *   the cell.
+                         * @param p_coulombLog coulomb logarithm
+                         */
                         HDINLINE DefaultAlg(
                             float_X p_densitySqCbrt0,
                             float_X p_densitySqCbrt1,
@@ -67,6 +77,15 @@ namespace picongpu
 
                         static constexpr float_X c = SPEED_OF_LIGHT;
 
+                        /* Convert momentum from the lab frame into the COM frame.
+                         *
+                         * @param labMomentum momentum in the lab frame
+                         * @param mass particle mass
+                         * @param gamma particle Lorentz factor in the lab frame
+                         * @param gammaComs @f[ \gamma_C @f] Lorentz factor of the COM frame in the lab frame
+                         * @param factorA @f[ \frac{\gamma_C - 1}{v_C^2} @f]
+                         * @param comsVelocity @f[ v_C @f] COM system velocity in the lab frame
+                         */
                         static DINLINE float3_X labToComs(
                             float3_X labMomentum,
                             float_X mass,
@@ -81,7 +100,15 @@ namespace picongpu
                             return labMomentum + diff;
                         }
 
-                        // (13) in [Perez 2012]
+                        /* Convert momentum from the COM frame into the lab frame.
+                         *
+                         * @param labMomentum momentum in the COM frame
+                         * @param mass particle mass
+                         * @param gamma particle Lorentz factor in the lab frame
+                         * @param gammaComs @f[ \gamma_C @f] Lorentz factor of the COM frame in the lab frame
+                         * @param factorA @f[ \frac{\gamma_C - 1}{v_C^2} @f]
+                         * @param comsVelocity @f[ v_C @f] COM system velocity in the lab frame
+                         */
                         static DINLINE float3_X comsToLab(
                             float3_X comsMomentum,
                             float_X mass,
@@ -90,12 +117,22 @@ namespace picongpu
                             float_X factorA,
                             float3_X comsVelocity)
                         {
+                            // (13) in [Perez 2012]
                             float_X dot = pmacc::math::dot(comsVelocity, comsMomentum);
                             float_X factorB = coeff * gammaComs;
                             float3_X diff = (factorA * dot + factorB) * comsVelocity;
                             return comsMomentum + diff;
                         }
 
+                        /* Calculate relative velocity in the COM system
+                         *
+                         * @param comsMementumMag0 1st particle momentum (in the COM system) magnitude
+                         * @param mass0 1st particle mass
+                         * @param mass1 2nd particle mass
+                         * @param gamma0 1st particle Lorentz factor
+                         * @param gamma1 2nd particle Lorentz factor
+                         * @param gammaComs Lorentz factor of the COM frame in the lab frame
+                         */
                         static DINLINE float_X calcRelativeComsVelocity(
                             float_X comsMomentumMag0,
                             float_X mass0,
@@ -110,7 +147,17 @@ namespace picongpu
                             val = val / (coeff0 * coeff1 * gammaComs);
                             return val;
                         }
-                        // Stared gamma times mass.
+
+                        /* Calculate @f[ \gamma^* m @f]
+                         *
+                         * Returns particle mass times its Lorentz factor in the COM frame.
+                         *
+                         * @param labMomentum particle momentum in the labFrame
+                         * @param mass particle mass
+                         * @param gammaComs Lorentz factor of the COM frame in the lab frame
+                         * @param comsVelocity COM system velocity in the lab frame
+                         */
+                        //
                         static DINLINE float_X coeff(
                             float3_X labMomentum,
                             float_X mass,
@@ -123,6 +170,14 @@ namespace picongpu
                             return gammaComs * val;
                         }
 
+                        /* Calculate the cosine of the scattering angle.
+                         *
+                         * The probabilty distribution  for the cosine depends on @f[ s_{12} @f]. The returned vale
+                         * is determined by a float value between 0 and 1.
+                         *
+                         * @param s12 @f[ s_{12} @f] parameter. See [Perez 2012].
+                         * @param u a usually random generated float between 0 and 1
+                         */
                         static DINLINE float_X calcCosXi(float_X const s12, float_X const u)
                         {
                             // TODO: find some better way to restrict the val to [-1, +1].
@@ -173,7 +228,12 @@ namespace picongpu
                             }
                         }
 
-                        // (12) in [Perez 2012]
+                        /* Calculate the momentum after the collision in the COM frame
+                         *
+                         * @param p momentum in the COM frame
+                         * @param cosXi cosine of the scattering angle
+                         * @param phi azimuthal scattering angle from [0, 2pi]
+                         */
                         static DINLINE float3_X
                         calcFinalComsMomentum(float3_X const p, float_X const cosXi, float_X const phi)
                         {
@@ -181,7 +241,9 @@ namespace picongpu
                             pmacc::math::sincos(phi, sinPhi, cosPhi);
                             float_X sinXi = math::sqrt(1 - cosXi * cosXi);
 
+                            // (12) in [Perez 2012]
                             float3_X finalVec;
+                            // TODO: sqrt returns a pmacc complex number. cast to float?
                             float_X const pAbs = math::sqrt(pmacc::math::abs2(p));
                             float_X const pPerp = math::sqrt(p.x() * p.x() + p.y() * p.y());
                             // TODO chose a better limmit?
@@ -202,12 +264,11 @@ namespace picongpu
                             return finalVec;
                         }
 
-                        /** execute the user manipulator functor
+                        /** Execute the collision functor
                          *
-                         * @tparam T_Args type of the arguments passed to the user manipulator
-                         *     functor.
-                         *
-                         * @param args arguments passed to the user functor
+                         * @param ctx collision context
+                         * @param par0 1st colliding macro particle
+                         * @param par1 2nd colliding macro particle
                          */
                         template<typename T_Context, typename T_Par0, typename T_Par1>
                         DINLINE void operator()(T_Context const& ctx, T_Par0& par0, T_Par1& par1) const
@@ -324,10 +385,6 @@ namespace picongpu
                             float_X const phi = 2.0_X * PI * rng(acc);
                             float3_X const finalComs0 = calcFinalComsMomentum(comsMomentum0, cosXi, phi);
 
-                            // float_X const corrWeight0 = weight0 / duplications;
-                            // float_X const corrWeight1 = weight1 / duplications;
-
-
                             float3_X finalLab0, finalLab1;
                             if(weight0 > weight1)
                             {
@@ -360,6 +417,7 @@ namespace picongpu
                     };
                 } // namespace acc
 
+                //! Host side binary collision functor
                 struct DefaultAlg
                 {
                     template<typename T_Species0, typename T_Species1>
@@ -372,14 +430,14 @@ namespace picongpu
 
                     /** create device manipulator functor
                      *
-                     * @tparam T_WorkerCfg pmacc::mappings::threads::WorkerCfg,
-                     *  configuration of the worker
-                     * @tparam T_Acc alpaka accelerator type
-                     *
-                     * @param alpaka accelerator
-                     * @param offset (in supercells, without any guards) to the
-                     *         origin of the local domain
-                     * @param configuration of the worker
+                     * @param acc alpaka accelerator
+                     * @param offset (in supercells, without any guards) to the origin of the local domain
+                     * @param workerCfg configuration of the worker
+                     * @param density0 cell density of the 1st species
+                     * @param density1 cell density of the 2nd species
+                     * @param potentialPartners number of potential collision partners for a macro particle in
+                     *   the cell.
+                     * @param coulombLog Coulomb logarithm
                      */
                     template<typename T_WorkerCfg, typename T_Acc>
                     HDINLINE acc::DefaultAlg operator()(
@@ -404,7 +462,6 @@ namespace picongpu
                         return "DefaultAlg";
                     }
                 };
-
             } // namespace binary
         } // namespace collision
     } // namespace particles
