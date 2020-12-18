@@ -133,15 +133,12 @@ namespace picongpu
                         nppc,
                         accFilter1);
 
-                    // TODO: density, debay length,...
-
                     cellDensity(acc, forEachFrameElem, firstFrame0, pb0, parCellList0, densityArray0, accFilter0);
                     cellDensity(acc, forEachFrameElem, firstFrame1, pb1, parCellList1, densityArray1, accFilter1);
                     cupla::__syncthreads(acc);
 
                     // shuffle indices list of the longest particle list
                     forEachFrameElem([&](uint32_t const linearIdx, uint32_t const idx) {
-                        // TODO rewrite as an if statement (to long)
                         // find longer list
                         auto* longParList = parCellList0[linearIdx].size >= parCellList1[linearIdx].size
                             ? &parCellList0[linearIdx]

@@ -112,7 +112,6 @@ namespace picongpu
                         nppc,
                         accFilter);
 
-                    // TODO: density, debaylength
 
                     cellDensity(acc, forEachFrameElem, firstFrame, pb, parCellList, densityArray, accFilter);
                     cupla::__syncthreads(acc);
@@ -126,7 +125,7 @@ namespace picongpu
                         decltype(collisionFunctor(
                             acc,
                             alpaka::core::declval<DataSpace<simDim> const>(),
-                            /* cellsPerSupercell is used because each virtual worker
+                            /*frameSize is used because each virtual worker
                              * is creating **exactly one** functor
                              */
                             alpaka::core::declval<WorkerCfg<frameSize> const>(),

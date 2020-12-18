@@ -247,7 +247,7 @@ namespace picongpu
                             float_X const pAbs = math::sqrt(pmacc::math::abs2(p));
                             float_X const pPerp = math::sqrt(p.x() * p.x() + p.y() * p.y());
                             // TODO chose a better limmit?
-                            if(pPerp > std::max(std::numeric_limits<float_X>::epsilon, 1.0e-10_X) * pAbs)
+                            if(pPerp > std::max(std::numeric_limits<float_X>::epsilon(), 1.0e-10_X) * pAbs)
                             {
                                 finalVec[0] = (p.x() * p.z() * sinXi * cosPhi - p.y() * pAbs * sinXi * sinPhi) / pPerp
                                     + p.x() * cosXi;
@@ -274,13 +274,13 @@ namespace picongpu
                         DINLINE void operator()(T_Context const& ctx, T_Par0& par0, T_Par1& par1) const
                         {
                             // feenableexcept(FE_INVALID | FE_OVERFLOW | FE_DIVBYZERO);
-                            float_X const weight0
+                            float_X const normalizedWeight0
                                 = par0[weighting_] / particles::TYPICAL_NUM_PARTICLES_PER_MACROPARTICLE;
-                            float_X const weight1
+                            float_X const normalizedWeight1
                                 = par1[weighting_] / particles::TYPICAL_NUM_PARTICLES_PER_MACROPARTICLE;
 
-                            float3_X const labMomentum0 = par0[momentum_] / weight0;
-                            float3_X const labMomentum1 = par1[momentum_] / weight1;
+                            float3_X const labMomentum0 = par0[momentum_] / normalizedWeight0;
+                            float3_X const labMomentum1 = par1[momentum_] / normalizedWeight1;
 
                             float_X const mass0 = picongpu::traits::attribute::getMass(
                                 particles::TYPICAL_NUM_PARTICLES_PER_MACROPARTICLE,
@@ -342,7 +342,8 @@ namespace picongpu
                                 return;
 
                             float_X s12Factor0 = (DELTA_T * coulombLog * charge0 * charge0 * charge1 * charge1)
-                                / (4.0_X * PI * EPS0 * EPS0 * c * c * c * c * mass0 * gamma0 * mass1 * gamma1);
+                                / (4.0_X * pmacc::math::Pi<float_X>::value * EPS0 * EPS0 * c * c * c * c * mass0
+                                   * gamma0 * mass1 * gamma1);
                             s12Factor0 *= 1.0_X / particles::TYPICAL_NUM_PARTICLES_PER_MACROPARTICLE
                                 / particles::TYPICAL_NUM_PARTICLES_PER_MACROPARTICLE;
                             float_X const s12Factor1
@@ -350,7 +351,8 @@ namespace picongpu
                             float_X const s12Factor2 = coeff0 * coeff1 * c * c / comsMomentum0Abs2 + 1.0_X;
                             // Statistical part from [Higginson 2020],
                             // corresponds to n1*n2/n12 in [Perez 2012]:
-                            float_X const s12Factor3 = potentialPartners * pmacc::math::max(weight0, weight1)
+                            float_X const s12Factor3 = potentialPartners
+                                * pmacc::math::max(normalizedWeight0, normalizedWeight1)
                                 * particles::TYPICAL_NUM_PARTICLES_PER_MACROPARTICLE / duplications / CELL_VOLUME;
                             float_X s12 = s12Factor0 * s12Factor1 * s12Factor2 * s12Factor2 * s12Factor3;
 
@@ -386,22 +388,22 @@ namespace picongpu
                             float3_X const finalComs0 = calcFinalComsMomentum(comsMomentum0, cosXi, phi);
 
                             float3_X finalLab0, finalLab1;
-                            if(weight0 > weight1)
+                            if(normalizedWeight0 > normalizedWeight1)
                             {
                                 finalLab1
                                     = comsToLab(-1.0_X * finalComs0, mass1, coeff1, gammaComs, factorA, comsVelocity);
-                                par1[momentum_] = finalLab1 * weight1;
-                                if((weight1 / weight0) - rng(acc) > 0)
+                                par1[momentum_] = finalLab1 * normalizedWeight1;
+                                if((normalizedWeight1 / normalizedWeight0) - rng(acc) > 0)
                                 {
                                     finalLab0 = comsToLab(finalComs0, mass0, coeff0, gammaComs, factorA, comsVelocity);
-                                    par0[momentum_] = finalLab0 * weight0;
+                                    par0[momentum_] = finalLab0 * normalizedWeight0;
                                 }
                             }
                             else
                             {
                                 finalLab0 = comsToLab(finalComs0, mass0, coeff0, gammaComs, factorA, comsVelocity);
-                                par0[momentum_] = finalLab0 * weight0;
-                                if((weight0 / weight1) - rng(acc) >= 0)
+                                par0[momentum_] = finalLab0 * normalizedWeight0;
+                                if((normalizedWeight0 / normalizedWeight1) - rng(acc) >= 0)
                                 {
                                     finalLab1 = comsToLab(
                                         -1.0_X * finalComs0,
@@ -410,7 +412,7 @@ namespace picongpu
                                         gammaComs,
                                         factorA,
                                         comsVelocity);
-                                    par1[momentum_] = finalLab1 * weight1;
+                                    par1[momentum_] = finalLab1 * normalizedWeight1;
                                 }
                             }
                         }
