@@ -54,22 +54,39 @@ namespace picongpu
                         ptrToIndicies = nullptr;
                         if(numPar != 0u)
                         {
-                            // printf("alloc %u: %u\n", linearIdx, (nppc[ linearIdx ] + 1) );
-#if(PMACC_CUDA_ENABLED == 1)
-                            // Allocate memory on a cuda device:
-                            int i = 0;
-                            while(ptrToIndicies == nullptr)
+                            const int maxTries = 13; // magic number is not performance critical
+                            for(int numTries = 0; numTries < maxTries; ++numTries)
                             {
+#if(BOOST_LANG_CUDA || BOOST_COMP_HIP) // Allocate memory on a GPU device
                                 ptrToIndicies = (uint32_t*) deviceHeapHandle.malloc(acc, sizeof(uint32_t) * numPar);
-
-                                if(i >= 5)
-                                    printf("no memory: %u\n", numPar);
-                                ++i;
-                            }
-#else
-                            // No cuda means the device heap is the host heap.
-                            ptrToIndicies = new uint32_t[numPar];
+#else // No cuda or hip means the device heap is the host heap.
+                                ptrToIndicies = new uint32_t[numPar];
 #endif
+                                if(ptrToIndicies != nullptr)
+                                {
+                                    break;
+                                }
+                                else
+                                {
+#ifndef BOOST_COMP_HIP
+                                    printf(
+                                        "%s in collisions:  mallocMC out of memory (try %i of %i)\n",
+                                        (numTries + 1) == maxTries ? "ERROR" : "WARNING",
+                                        numTries + 1,
+                                        maxTries);
+#endif
+                                }
+                            }
+                            if(ptrToIndicies == nullptr)
+                            {
+#if BOOST_COMP_HIP
+                                // do nothing
+#elif BOOST_LANG_CUDA
+                                __trap();
+#else
+                                throw std::runtime_error("Out of memory in collisions.");
+#endif
+                            }
                         }
                         // reset counter
                         size = 0u;
