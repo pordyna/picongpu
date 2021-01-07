@@ -31,41 +31,6 @@
 #include <fenv.h>
 #include <assert.h>
 
-// namespace pmacc
-//{
-
-/** abort program with an exception
- *
- * This function always throws a `runtime_error`.
- *
- * @param exp evaluated expression
- * @param filename name of the broken file
- * @param lineNumber line in file
- * @param msg user defined error message
- */
-//    DINLINE void abortWithErrorCuda(
-//        const std::string exp,
-//        const std::string filename,
-//        const uint32_t lineNumber,
-//        const std::string msg = std::string())
-//    {
-//        std::stringstream line;
-//        line << lineNumber;
-//
-//        std::printf("expression ( %s ) failed in file ( + %s + :  %s  ) :  + %s", exp.c_str(), filename.c_str(),
-//        line.str().c_str(), msg.c_str() );
-//        __trap();
-//    }
-
-//}
-#define PMACC_ASSERT_CUDA(condition)                                                                                  \
-    if(!(condition))                                                                                                  \
-    {                                                                                                                 \
-        printf("Assertion %s failed!\n", #condition);                                                                 \
-        assert(0);                                                                                                    \
-    }
-
-
 namespace picongpu
 {
     namespace particles
@@ -133,9 +98,9 @@ namespace picongpu
                             float_X dot = pmacc::math::dot(comsVelocity, labMomentum);
                             float_X factorB = mass * gamma * gammaComs;
                             float3_X diff = (factorA * dot - factorB) * comsVelocity;
-                            PMACC_ASSERT_CUDA(std::isfinite((labMomentum + diff)[0]));
-                            PMACC_ASSERT_CUDA(std::isfinite((labMomentum + diff)[1]));
-                            PMACC_ASSERT_CUDA(std::isfinite((labMomentum + diff)[2]));
+                            assert(std::isfinite((labMomentum + diff)[0]));
+                            assert(std::isfinite((labMomentum + diff)[1]));
+                            assert(std::isfinite((labMomentum + diff)[2]));
                             return labMomentum + diff;
                         }
 
@@ -160,9 +125,9 @@ namespace picongpu
                             float_X dot = pmacc::math::dot(comsVelocity, comsMomentum);
                             float_X factorB = coeff * gammaComs;
                             float3_X diff = (factorA * dot + factorB) * comsVelocity;
-                            PMACC_ASSERT_CUDA(std::isfinite((comsMomentum + diff)[0]));
-                            PMACC_ASSERT_CUDA(std::isfinite((comsMomentum + diff)[1]));
-                            PMACC_ASSERT_CUDA(std::isfinite((comsMomentum + diff)[2]));
+                            assert(std::isfinite((comsMomentum + diff)[0]));
+                            assert(std::isfinite((comsMomentum + diff)[1]));
+                            assert(std::isfinite((comsMomentum + diff)[2]));
                             return comsMomentum + diff;
                         }
 
@@ -187,23 +152,23 @@ namespace picongpu
                         {
                             float_X val = (mass0 * gamma0 + mass1 * gamma1) * comsMomentumMag0;
                             val = val / (coeff0 * coeff1 * gammaComs);
-                            if(!(std::isfinite(val)))
-                            {
-                                printf(
-                                    "comsMomentumMag0: %f, mass0: %f, mass1: %f, gamma0: %f, gamma1: %f,"
-                                    " coeff0: %f, coeff1: %f, gammaComs: %f, val: %f",
-                                    comsMomentumMag0,
-                                    mass0,
-                                    mass1,
-                                    gamma0,
-                                    gamma1,
-                                    coeff0,
-                                    coeff1,
-                                    gammaComs,
-                                    val);
-                                assert(0);
-                            }
-                            PMACC_ASSERT_CUDA(std::isfinite(val));
+//                            if(!(std::isfinite(val)))
+//                            {
+//                                printf(
+//                                    "comsMomentumMag0: %f, mass0: %f, mass1: %f, gamma0: %f, gamma1: %f,"
+//                                    " coeff0: %f, coeff1: %f, gammaComs: %f, val: %f",
+//                                    comsMomentumMag0,
+//                                    mass0,
+//                                    mass1,
+//                                    gamma0,
+//                                    gamma1,
+//                                    coeff0,
+//                                    coeff1,
+//                                    gammaComs,
+//                                    val);
+//                                assert(0);
+//                            }
+                            assert(std::isfinite(val));
                             return val;
                         }
 
@@ -226,7 +191,7 @@ namespace picongpu
                         {
                             float_X dot = pmacc::math::dot(comsVelocity, labMomentum);
                             float_X val = mass * gamma - dot / (c * c);
-                            PMACC_ASSERT_CUDA(std::isfinite(gammaComs * val));
+                            assert(std::isfinite(gammaComs * val));
                             return gammaComs * val;
                         }
 
@@ -398,51 +363,50 @@ namespace picongpu
 
                             //  f0 * f1 * f2^2
                             //  is equal  s12 * (n12/(n1*n2)) from [Perez 2012]
+                            if (comsMomentum0 == float3_X{0.0_X, 0.0_X, 0.0_X}) return;
                             float_X comsMomentum0Abs2 = pmacc::math::abs2(comsMomentum0);
-
-                            if(comsMomentum0Abs2 == 0.0_X && (comsMomentum0 != float3_X{0.0_X, 0.0_X, 0.0_X}))
-                                return;
+                            if(comsMomentum0Abs2 == 0.0_X) return;
 
                             float_X s12Factor0 = (DELTA_T * coulombLog * charge0 * charge0 * charge1 * charge1)
                                 / (4.0_X * pmacc::math::Pi<float_X>::value * EPS0 * EPS0 * c * c * c * c * mass0
                                    * gamma0 * mass1 * gamma1);
-                            // PMACC_ASSERT_CUDA(std::isfinite(s12Factor0));
+                            // assert(std::isfinite(s12Factor0));
                             s12Factor0 *= 1.0_X / particles::TYPICAL_NUM_PARTICLES_PER_MACROPARTICLE
                                 / particles::TYPICAL_NUM_PARTICLES_PER_MACROPARTICLE;
                             float_X const s12Factor1
                                 = gammaComs * math::sqrt(comsMomentum0Abs2) / (mass0 * gamma0 + mass1 * gamma1);
-                            // PMACC_ASSERT_CUDA(std::isfinite(s12Factor1));
+                            // assert(std::isfinite(s12Factor1));
                             float_X const s12Factor2 = coeff0 * coeff1 * c * c / comsMomentum0Abs2 + 1.0_X;
-                            // PMACC_ASSERT_CUDA(std::isfinite(s12Factor2));
+                            // assert(std::isfinite(s12Factor2));
                             // Statistical part from [Higginson 2020],
                             // corresponds to n1*n2/n12 in [Perez 2012]:
                             float_X const s12Factor3 = potentialPartners
                                 * pmacc::math::max(normalizedWeight0, normalizedWeight1)
                                 * particles::TYPICAL_NUM_PARTICLES_PER_MACROPARTICLE / duplications / CELL_VOLUME;
                             float_X s12n = s12Factor0 * s12Factor1 * s12Factor2 * s12Factor2 * s12Factor3;
-                            if(std::isnan(s12n))
-                            {
-                                printf(
-                                    "s12Factor0: %f, s12Factor1: %f,s12Factor2: %f, s12Factor3: %f, s12n: %f \n",
-                                    s12Factor0,
-                                    s12Factor1,
-                                    s12Factor2,
-                                    s12Factor3,
-                                    s12n);
-                                printf(
-                                    "gamma0: %f, gamma1: %f, gammaComs: %f, coeff0: %f, coeff1: %f, comsMomentum0x "
-                                    "%f, comsMomentum0y %f, comsMomentum0z %f \n",
-                                    gamma0,
-                                    gamma1,
-                                    gammaComs,
-                                    coeff0,
-                                    coeff1,
-                                    comsMomentum0[0],
-                                    comsMomentum0[1],
-                                    comsMomentum0[2]);
-                                assert(0);
-                            }
-                            PMACC_ASSERT_CUDA(!(std::isnan(s12n)));
+//                            if(std::isnan(s12n))
+//                            {
+//                                printf(
+//                                    "s12Factor0: %f, s12Factor1: %f,s12Factor2: %f, s12Factor3: %f, s12n: %f \n",
+//                                    s12Factor0,
+//                                    s12Factor1,
+//                                    s12Factor2,
+//                                    s12Factor3,
+//                                    s12n);
+//                                printf(
+//                                    "gamma0: %f, gamma1: %f, gammaComs: %f, coeff0: %f, coeff1: %f, comsMomentum0x "
+//                                    "%f, comsMomentum0y %f, comsMomentum0z %f \n",
+//                                    gamma0,
+//                                    gamma1,
+//                                    gammaComs,
+//                                    coeff0,
+//                                    coeff1,
+//                                    comsMomentum0[0],
+//                                    comsMomentum0[1],
+//                                    comsMomentum0[2]);
+//                                assert(0);
+//                            }
+                            assert(!(std::isnan(s12n)));
 
                             // Low Temeprature correction:
                             // [Perez 2012] (8)
@@ -460,9 +424,9 @@ namespace picongpu
                                 / pmacc::math::max(mass0 * densitySqCbrt0, mass1 * densitySqCbrt1)
                                 * relativeComsVelocity;
                             s12Max *= s12Factor3;
-                            PMACC_ASSERT_CUDA(std::isfinite(s12Max));
+                            assert(std::isfinite(s12Max));
                             float_X s12 = pmacc::math::min(s12n, s12Max);
-                            PMACC_ASSERT_CUDA(std::isfinite(s12));
+                            assert(std::isfinite(s12));
 
                             // Get a random float value from 0,1
                             auto const& acc = *ctx.m_acc;
@@ -476,34 +440,34 @@ namespace picongpu
                             // PMACC_ASSERT( cosXi <= 1 && cosXi >= -1 );
                             float_X const phi = 2.0_X * PI * rng(acc);
                             float3_X const finalComs0 = calcFinalComsMomentum(comsMomentum0, cosXi, phi);
-                            PMACC_ASSERT_CUDA(std::isfinite(finalComs0[0]));
-                            PMACC_ASSERT_CUDA(std::isfinite(finalComs0[1]));
-                            PMACC_ASSERT_CUDA(std::isfinite(finalComs0[2]));
+                            assert(std::isfinite(finalComs0[0]));
+                            assert(std::isfinite(finalComs0[1]));
+                            assert(std::isfinite(finalComs0[2]));
 
                             float3_X finalLab0, finalLab1;
                             if(normalizedWeight0 > normalizedWeight1)
                             {
                                 finalLab1
                                     = comsToLab(-1.0_X * finalComs0, mass1, coeff1, gammaComs, factorA, comsVelocity);
-                                PMACC_ASSERT_CUDA(std::isfinite(finalLab1[0] * normalizedWeight1));
-                                PMACC_ASSERT_CUDA(std::isfinite(finalLab1[1] * normalizedWeight1));
-                                PMACC_ASSERT_CUDA(std::isfinite(finalLab1[2] * normalizedWeight1));
+                                assert(std::isfinite(finalLab1[0] * normalizedWeight1));
+                                assert(std::isfinite(finalLab1[1] * normalizedWeight1));
+                                assert(std::isfinite(finalLab1[2] * normalizedWeight1));
                                 par1[momentum_] = finalLab1 * normalizedWeight1;
                                 if((normalizedWeight1 / normalizedWeight0) - rng(acc) > 0)
                                 {
                                     finalLab0 = comsToLab(finalComs0, mass0, coeff0, gammaComs, factorA, comsVelocity);
-                                    PMACC_ASSERT_CUDA(std::isfinite(finalLab0[0] * normalizedWeight1));
-                                    PMACC_ASSERT_CUDA(std::isfinite(finalLab0[1] * normalizedWeight1));
-                                    PMACC_ASSERT_CUDA(std::isfinite(finalLab0[2] * normalizedWeight1));
+                                    assert(std::isfinite(finalLab0[0] * normalizedWeight1));
+                                    assert(std::isfinite(finalLab0[1] * normalizedWeight1));
+                                    assert(std::isfinite(finalLab0[2] * normalizedWeight1));
                                     par0[momentum_] = finalLab0 * normalizedWeight0;
                                 }
                             }
                             else
                             {
                                 finalLab0 = comsToLab(finalComs0, mass0, coeff0, gammaComs, factorA, comsVelocity);
-                                PMACC_ASSERT_CUDA(std::isfinite(finalLab0[0] * normalizedWeight1));
-                                PMACC_ASSERT_CUDA(std::isfinite(finalLab0[1] * normalizedWeight1));
-                                PMACC_ASSERT_CUDA(std::isfinite(finalLab0[2] * normalizedWeight1));
+                                assert(std::isfinite(finalLab0[0] * normalizedWeight1));
+                                assert(std::isfinite(finalLab0[1] * normalizedWeight1));
+                                assert(std::isfinite(finalLab0[2] * normalizedWeight1));
                                 par0[momentum_] = finalLab0 * normalizedWeight0;
                                 if((normalizedWeight0 / normalizedWeight1) - rng(acc) >= 0)
                                 {
@@ -514,12 +478,12 @@ namespace picongpu
                                         gammaComs,
                                         factorA,
                                         comsVelocity);
-                                    PMACC_ASSERT_CUDA(std::isfinite(finalLab1[0] * normalizedWeight1));
-                                    PMACC_ASSERT_CUDA(std::isfinite(finalLab1[1] * normalizedWeight1));
-                                    PMACC_ASSERT_CUDA(std::isfinite(finalLab1[2] * normalizedWeight1));
+                                    assert(std::isfinite(finalLab1[0] * normalizedWeight1));
+                                    assert(std::isfinite(finalLab1[1] * normalizedWeight1));
+                                    assert(std::isfinite(finalLab1[2] * normalizedWeight1));
                                     par1[momentum_] = finalLab1 * normalizedWeight1;
                                 }
-                                // PMACC_ASSERT_CUDA( 1 == 2);
+                                // assert( 1 == 2);
                                 // fedisableexcept(FE_INVALID | FE_OVERFLOW | FE_DIVBYZERO);
                             }
                         }
