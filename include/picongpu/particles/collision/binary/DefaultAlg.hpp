@@ -381,8 +381,14 @@ namespace picongpu
                             float_X const gamma0 = picongpu::gamma<float_X>(labMomentum0, mass0);
                             float_X const gamma1 = picongpu::gamma<float_X>(labMomentum1, mass1);
 
-                            // assert(math::sqrt(pmacc::math::abs2(labMomentum0))/gamma0/mass0 < c);
-                            // assert(math::sqrt(pmacc::math::abs2(labMomentum1))/gamma1/mass1 < c);
+                            PMACC_DEVICE_ASSERT_MSG(
+                                math::sqrt(pmacc::math::abs2(labMomentum0)) / gamma0 / mass0 < c,
+                                "labVelocity0: %e",
+                                sqrt(pmacc::math::abs2(labMomentum0)) / gamma0 / mass0);
+                            PMACC_DEVICE_ASSERT_MSG(
+                                math::sqrt(pmacc::math::abs2(labMomentum1)) / gamma1 / mass1 < c,
+                                "labVelocity1: %e",
+                                sqrt(pmacc::math::abs2(labMomentum1)) / gamma1 / mass1);
                             // [Perez 2012] (1)
                             float3_X const comsVelocity
                                 = (labMomentum0 + labMomentum1) / (mass0 * gamma0 + mass1 * gamma1);
@@ -393,6 +399,17 @@ namespace picongpu
                             if(comsVelocityAbs2 != 0.0_X)
                             {
                                 gammaComs = 1.0_X / math::sqrt(1.0_X - comsVelocityAbs2 / (c * c));
+                                PMACC_DEVICE_ASSERT_MSG(
+                                    std::isfinite(gammaComs),
+                                    "comsVelocityAbs2: %e, labVelocity0: %e, labVelocity1 %e, mass0: %e, mass1: %e, "
+                                    "gamma0: %e, gamma1: %e",
+                                    comsVelocityAbs2,
+                                    math::sqrt(pmacc::math::abs2(labMomentum0)) / gamma0 / mass0,
+                                    math::sqrt(pmacc::math::abs2(labMomentum1)) / gamma1 / mass1,
+                                    mass0,
+                                    mass1,
+                                    gamma0,
+                                    gamma1);
                                 // used later for comsToLab:
                                 factorA = (gammaComs - 1.0_X) / comsVelocityAbs2;
 
@@ -520,26 +537,47 @@ namespace picongpu
                             {
                                 finalLab1
                                     = comsToLab(-1.0_X * finalComs0, mass1, coeff1, gammaComs, factorA, comsVelocity);
+                                PMACC_DEVICE_ASSERT_MSG(
+                                    (sqrt(pmacc::math::abs2(finalLab1)) / (picongpu::gamma<float_X>(finalLab1, mass1))
+                                     / mass1)
+                                        < c,
+                                    "finalLabVelocity1: %e",
+                                    math::sqrt(pmacc::math::abs2(finalLab1))
+                                        / (picongpu::gamma<float_X>(finalLab1, mass1)) / mass1);
                                 assert(std::isfinite(finalLab1[0] * normalizedWeight1));
                                 assert(std::isfinite(finalLab1[1] * normalizedWeight1));
                                 assert(std::isfinite(finalLab1[2] * normalizedWeight1));
-                                par1[momentum_] = finalLab1 * normalizedWeight1;
+                                // par1[momentum_] = finalLab1 * normalizedWeight1;
                                 if((normalizedWeight1 / normalizedWeight0) - rng(acc) > 0)
                                 {
                                     finalLab0 = comsToLab(finalComs0, mass0, coeff0, gammaComs, factorA, comsVelocity);
+                                    PMACC_DEVICE_ASSERT_MSG(
+                                        (sqrt(pmacc::math::abs2(finalLab0))
+                                         / (picongpu::gamma<float_X>(finalLab0, mass0)) / mass0)
+                                            < c,
+                                        "finalLabVelocity1: %e",
+                                        math::sqrt(pmacc::math::abs2(finalLab0))
+                                            / (picongpu::gamma<float_X>(finalLab0, mass0)) / mass0);
                                     assert(std::isfinite(finalLab0[0] * normalizedWeight1));
                                     assert(std::isfinite(finalLab0[1] * normalizedWeight1));
                                     assert(std::isfinite(finalLab0[2] * normalizedWeight1));
-                                    par0[momentum_] = finalLab0 * normalizedWeight0;
+                                    // par0[momentum_] = finalLab0 * normalizedWeight0;
                                 }
                             }
                             else
                             {
                                 finalLab0 = comsToLab(finalComs0, mass0, coeff0, gammaComs, factorA, comsVelocity);
+                                PMACC_DEVICE_ASSERT_MSG(
+                                    (sqrt(pmacc::math::abs2(finalLab0)) / (picongpu::gamma<float_X>(finalLab0, mass0))
+                                     / mass0)
+                                        < c,
+                                    "finalLabVelocity1: %e",
+                                    math::sqrt(pmacc::math::abs2(finalLab0))
+                                        / (picongpu::gamma<float_X>(finalLab0, mass0)) / mass0);
                                 assert(std::isfinite(finalLab0[0] * normalizedWeight1));
                                 assert(std::isfinite(finalLab0[1] * normalizedWeight1));
                                 assert(std::isfinite(finalLab0[2] * normalizedWeight1));
-                                par0[momentum_] = finalLab0 * normalizedWeight0;
+                                // par0[momentum_] = finalLab0 * normalizedWeight0;
                                 if((normalizedWeight0 / normalizedWeight1) - rng(acc) >= 0)
                                 {
                                     finalLab1 = comsToLab(
@@ -549,10 +587,17 @@ namespace picongpu
                                         gammaComs,
                                         factorA,
                                         comsVelocity);
+                                    PMACC_DEVICE_ASSERT_MSG(
+                                        (sqrt(pmacc::math::abs2(finalLab1))
+                                         / (picongpu::gamma<float_X>(finalLab1, mass1)) / mass1)
+                                            < c,
+                                        "finalLabVelocity1: %e",
+                                        math::sqrt(pmacc::math::abs2(finalLab1))
+                                            / (picongpu::gamma<float_X>(finalLab1, mass1)) / mass1);
                                     assert(std::isfinite(finalLab1[0] * normalizedWeight1));
                                     assert(std::isfinite(finalLab1[1] * normalizedWeight1));
                                     assert(std::isfinite(finalLab1[2] * normalizedWeight1));
-                                    par1[momentum_] = finalLab1 * normalizedWeight1;
+                                    // par1[momentum_] = finalLab1 * normalizedWeight1;
                                 }
                                 // assert( 1 == 2);
                                 // fedisableexcept(FE_INVALID | FE_OVERFLOW | FE_DIVBYZERO);
