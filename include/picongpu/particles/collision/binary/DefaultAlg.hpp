@@ -31,6 +31,16 @@
 #include <fenv.h>
 #include <assert.h>
 
+namespace pmacc
+{
+#ifdef NDEBUG
+// debug mode is disabled
+/* `(void)0` force a semicolon after the macro function */
+#    define PMACC_DEVICE_ASSERT_MSG (expr, ...)((void) 0)
+#else
+#    define PMACC_DEVICE_ASSERT_MSG(expr, ...) (!!expr) ? ((void) 0) : (printf(__VA_ARGS__), assert(expr))
+#endif
+} // namespace pmacc
 namespace picongpu
 {
     namespace particles
@@ -95,9 +105,12 @@ namespace picongpu
                             float_X factorA,
                             float3_X comsVelocity)
                         {
-                            float_X dot = pmacc::math::dot(comsVelocity, labMomentum);
-                            float_X factorB = mass * gamma * gammaComs;
-                            float3_X diff = (factorA * dot - factorB) * comsVelocity;
+                            float3_X labVelocity = labMomentum / gamma / mass;
+                            float_X dot = pmacc::math::dot(comsVelocity, labVelocity);
+                            float_X factor = (factorA * dot - gammaComs);
+                            factor *= mass * gamma;
+                            float3_X diff = factor * comsVelocity;
+
                             assert(std::isfinite((labMomentum + diff)[0]));
                             assert(std::isfinite((labMomentum + diff)[1]));
                             assert(std::isfinite((labMomentum + diff)[2]));
@@ -123,8 +136,8 @@ namespace picongpu
                         {
                             // (13) in [Perez 2012]
                             float_X dot = pmacc::math::dot(comsVelocity, comsMomentum);
-                            float_X factorB = coeff * gammaComs;
-                            float3_X diff = (factorA * dot + factorB) * comsVelocity;
+                            float_X factor = (factorA * dot + coeff * gammaComs);
+                            float3_X diff = factor * comsVelocity;
                             assert(std::isfinite((comsMomentum + diff)[0]));
                             assert(std::isfinite((comsMomentum + diff)[1]));
                             assert(std::isfinite((comsMomentum + diff)[2]));
@@ -151,24 +164,25 @@ namespace picongpu
                             float_X gammaComs)
                         {
                             float_X val = (mass0 * gamma0 + mass1 * gamma1) * comsMomentumMag0;
-                            val = val / (coeff0 * coeff1 * gammaComs);
-//                            if(!(std::isfinite(val)))
-//                            {
-//                                printf(
-//                                    "comsMomentumMag0: %f, mass0: %f, mass1: %f, gamma0: %f, gamma1: %f,"
-//                                    " coeff0: %f, coeff1: %f, gammaComs: %f, val: %f",
-//                                    comsMomentumMag0,
-//                                    mass0,
-//                                    mass1,
-//                                    gamma0,
-//                                    gamma1,
-//                                    coeff0,
-//                                    coeff1,
-//                                    gammaComs,
-//                                    val);
-//                                assert(0);
-//                            }
-                            assert(std::isfinite(val));
+                            val = val / (coeff0 * coeff1 * gammaComs); // TODO: null division?
+                            // TODO:
+                            // this is actualy no the relative velocity! since we are missing the (1 + v1v2/c^2) factor
+                            // this is actually only used in the non-relativistic limit. Should we use
+                            // a non-relativistic formula? Propably yes!
+
+                            //                            if(!(std::isfinite(val)) || val>=c)
+                            //                            {
+                            //                                printf(
+                            //                                    "comsMomentumMag0: %e, mass0: %e, mass1: %e, gamma0:
+                            //                                    %e, gamma1: %e," " coeff0: %e, coeff1: %e, gammaComs:
+                            //                                    %e, val: %e", comsMomentumMag0, mass0, mass1, gamma0,
+                            //                                    gamma1,
+                            //                                    coeff0,
+                            //                                    coeff1,
+                            //                                    gammaComs,
+                            //                                    val);
+                            //                                assert(0);
+                            //}
                             return val;
                         }
 
@@ -178,6 +192,7 @@ namespace picongpu
                          *
                          * @param labMomentum particle momentum in the labFrame
                          * @param mass particle mass
+                         * @param gamma
                          * @param gammaComs Lorentz factor of the COM frame in the lab frame
                          * @param comsVelocity COM system velocity in the lab frame
                          */
@@ -189,10 +204,52 @@ namespace picongpu
                             float_X gammaComs,
                             float3_X comsVelocity)
                         {
-                            float_X dot = pmacc::math::dot(comsVelocity, labMomentum);
-                            float_X val = mass * gamma - dot / (c * c);
-                            assert(std::isfinite(gammaComs * val));
-                            return gammaComs * val;
+                            float3_X labVelocity = labMomentum / gamma / mass;
+                            float_X dot = pmacc::math::dot(comsVelocity, labVelocity);
+                            float_X val = 1.0_X - dot / (c * c);
+                            val *= gammaComs * gamma;
+#ifndef NDEBUG
+//                            if( val < 0.9_X )//1.0_X - 100._X * std::numeric_limits<float_X>::epsilon())
+//                            {
+//                                printf(
+//                                    "dot: %e, val: %e, gammaComs: %e, mass: %e, labMomentum0: %e, labMomentum1: %e, "
+//                                    "labMomentum2: %e, gamma: %e, comsVelocity0 %e, comsVelocity1 %e, comsVelocity2 "
+//                                    "%e \n",
+//                                    dot,
+//                                    val,
+//                                    gammaComs,
+//                                    mass,
+//                                    labMomentum[0],
+//                                    labMomentum[1],
+//                                    labMomentum[2],
+//                                    gamma,
+//                                    comsVelocity[0],
+//                                    comsVelocity[1],
+//                                    comsVelocity[2] );
+//                                assert(0);
+//                            }
+#endif
+                            // if(val < 1.0_X) val = 1.0_X;
+
+                            val *= mass;
+                            PMACC_DEVICE_ASSERT_MSG(
+                                std::isfinite(val),
+                                "dot: %e, val: %e, gammaComs: %e, mass: %e, labMomentum0: %e, labMomentum1: %e, "
+                                "labMomentum2: %e, gamma: %e, comsVelocity0 %e, comsVelocity1 %e, comsVelocity2 "
+                                "%e \n",
+                                dot,
+                                val,
+                                gammaComs,
+                                mass,
+                                labMomentum[0],
+                                labMomentum[1],
+                                labMomentum[2],
+                                gamma,
+                                comsVelocity[0],
+                                comsVelocity[1],
+                                comsVelocity[2]);
+
+                            return val;
                         }
 
                         /* Calculate the cosine of the scattering angle.
@@ -321,10 +378,11 @@ namespace picongpu
                             float_X const charge1 = picongpu::traits::attribute::getCharge(
                                 particles::TYPICAL_NUM_PARTICLES_PER_MACROPARTICLE,
                                 par1);
-
                             float_X const gamma0 = picongpu::gamma<float_X>(labMomentum0, mass0);
                             float_X const gamma1 = picongpu::gamma<float_X>(labMomentum1, mass1);
 
+                            // assert(math::sqrt(pmacc::math::abs2(labMomentum0))/gamma0/mass0 < c);
+                            // assert(math::sqrt(pmacc::math::abs2(labMomentum1))/gamma1/mass1 < c);
                             // [Perez 2012] (1)
                             float3_X const comsVelocity
                                 = (labMomentum0 + labMomentum1) / (mass0 * gamma0 + mass1 * gamma1);
@@ -334,15 +392,16 @@ namespace picongpu
 
                             if(comsVelocityAbs2 != 0.0_X)
                             {
-                                gammaComs = 1.0_X / math::sqrt(1 - comsVelocityAbs2 / (c * c));
+                                gammaComs = 1.0_X / math::sqrt(1.0_X - comsVelocityAbs2 / (c * c));
                                 // used later for comsToLab:
                                 factorA = (gammaComs - 1.0_X) / comsVelocityAbs2;
 
                                 // Stared gamma times mass, from [Perez 2012].
                                 coeff0 = coeff(labMomentum0, mass0, gamma0, gammaComs, comsVelocity);
+                                // assert(coeff0 > 0.0_X);
                                 // gamma^* . mass
                                 coeff1 = coeff(labMomentum1, mass1, gamma1, gammaComs, comsVelocity);
-
+                                // assert(coeff1 > 0.0_X);
                                 // (2) in [Perez 2012]
                                 comsMomentum0
                                     = labToComs(labMomentum0, mass0, gamma0, gammaComs, factorA, comsVelocity);
@@ -355,18 +414,21 @@ namespace picongpu
                                 factorA = 0.5_X;
                                 // Stared gamma times mass, from [Perez 2012].
                                 coeff0 = mass0 * gamma0;
+                                // assert(coeff0 > 0.0_X);
                                 // gamma^* . mass
                                 coeff1 = mass1 * gamma1;
+                                // assert(coeff1 > 0.0_X);
                                 comsMomentum0 = labMomentum0;
                             }
 
 
                             //  f0 * f1 * f2^2
                             //  is equal  s12 * (n12/(n1*n2)) from [Perez 2012]
-                            if (comsMomentum0 == float3_X{0.0_X, 0.0_X, 0.0_X}) return;
+                            if(comsMomentum0 == float3_X{0.0_X, 0.0_X, 0.0_X})
+                                return;
                             float_X comsMomentum0Abs2 = pmacc::math::abs2(comsMomentum0);
-                            if(comsMomentum0Abs2 == 0.0_X) return;
-
+                            if(comsMomentum0Abs2 == 0.0_X)
+                                return;
                             float_X s12Factor0 = (DELTA_T * coulombLog * charge0 * charge0 * charge1 * charge1)
                                 / (4.0_X * pmacc::math::Pi<float_X>::value * EPS0 * EPS0 * c * c * c * c * mass0
                                    * gamma0 * mass1 * gamma1);
@@ -384,32 +446,33 @@ namespace picongpu
                                 * pmacc::math::max(normalizedWeight0, normalizedWeight1)
                                 * particles::TYPICAL_NUM_PARTICLES_PER_MACROPARTICLE / duplications / CELL_VOLUME;
                             float_X s12n = s12Factor0 * s12Factor1 * s12Factor2 * s12Factor2 * s12Factor3;
-//                            if(std::isnan(s12n))
-//                            {
-//                                printf(
-//                                    "s12Factor0: %f, s12Factor1: %f,s12Factor2: %f, s12Factor3: %f, s12n: %f \n",
-//                                    s12Factor0,
-//                                    s12Factor1,
-//                                    s12Factor2,
-//                                    s12Factor3,
-//                                    s12n);
-//                                printf(
-//                                    "gamma0: %f, gamma1: %f, gammaComs: %f, coeff0: %f, coeff1: %f, comsMomentum0x "
-//                                    "%f, comsMomentum0y %f, comsMomentum0z %f \n",
-//                                    gamma0,
-//                                    gamma1,
-//                                    gammaComs,
-//                                    coeff0,
-//                                    coeff1,
-//                                    comsMomentum0[0],
-//                                    comsMomentum0[1],
-//                                    comsMomentum0[2]);
-//                                assert(0);
-//                            }
+                            //                            if(std::isnan(s12n))
+                            //                            {
+                            //                                printf(
+                            //                                    "s12Factor0: %e, s12Factor1: %e,s12Factor2: %e,
+                            //                                    s12Factor3: %e, s12n: %e \n", s12Factor0, s12Factor1,
+                            //                                    s12Factor2,
+                            //                                    s12Factor3,
+                            //                                    s12n);
+                            //                                printf(
+                            //                                    "gamma0: %e, gamma1: %e, gammaComs: %e, coeff0: %e,
+                            //                                    coeff1: %e, comsMomentum0x "
+                            //                                    "%e, comsMomentum0y %e, comsMomentum0z %e \n",
+                            //                                    gamma0,
+                            //                                    gamma1,
+                            //                                    gammaComs,
+                            //                                    coeff0,
+                            //                                    coeff1,
+                            //                                    comsMomentum0[0],
+                            //                                    comsMomentum0[1],
+                            //                                    comsMomentum0[2]);
+                            //                                assert(0);
+                            //                            }
                             assert(!(std::isnan(s12n)));
 
                             // Low Temeprature correction:
                             // [Perez 2012] (8)
+                            // TODO: should we check for the non-relativistic condition? Which gamma should we look at?
                             float_X relativeComsVelocity = calcRelativeComsVelocity(
                                 math::sqrt(comsMomentum0Abs2),
                                 mass0,
@@ -424,8 +487,16 @@ namespace picongpu
                                 / pmacc::math::max(mass0 * densitySqCbrt0, mass1 * densitySqCbrt1)
                                 * relativeComsVelocity;
                             s12Max *= s12Factor3;
-                            assert(std::isfinite(s12Max));
-                            float_X s12 = pmacc::math::min(s12n, s12Max);
+                            float_X s12;
+                            // assert(std::isfinite(s12Max));
+                            if(std::isnan(s12Max))
+                            {
+                                s12 = s12n;
+                            }
+                            else
+                            {
+                                s12 = pmacc::math::min(s12n, s12Max);
+                            }
                             assert(std::isfinite(s12));
 
                             // Get a random float value from 0,1
