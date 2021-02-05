@@ -190,20 +190,18 @@ namespace picongpu
                          */
                         //
                         static DINLINE float_X coeff(
-                            float3_X labMomentum,
-                            float_X mass,
-                            float_X gamma,
-                            float_X gammaComs,
-                            float3_X comsVelocity)
+                            float3_64 labMomentum,
+                            float_64 mass,
+                            float_64 gamma,
+                            float_64 gammaComs,
+                            float3_64 comsVelocity)
                         {
-                            float3_X labVelocity = labMomentum / gamma / mass;
-                            float_X dot = precisionCast<float_X>(pmacc::math::dot(
-                                precisionCast<float_64>(comsVelocity),
-                                precisionCast<float_64>(labVelocity)));
+                            float3_64 labVelocity = labMomentum / gamma / mass;
+                            float_64 dot = pmacc::math::dot(comsVelocity, labVelocity);
 
-                            float_X val = gammaComs * gamma - dot * (gammaComs * gamma / (c * c));
+                            float_64 val = gammaComs * gamma - dot * (gammaComs * gamma / (c * c));
                             PMACC_DEVICE_ASSERT_MSG(
-                                val > 0.0_X,
+                                val > 0.0,
                                 "dot: %e, val: %e, gammaComs: %e, mass: %e, labMomentum0: %e, labMomentum1: %e, "
                                 "labMomentum2: %e, gamma: %e, comsVelocity0 %e, comsVelocity1 %e, comsVelocity2 "
                                 "%e \n",
@@ -219,8 +217,9 @@ namespace picongpu
                                 comsVelocity[1],
                                 comsVelocity[2]);
                             val *= mass;
+                            float_X val_X = precisionCast<float_X>(val);
                             PMACC_DEVICE_ASSERT_MSG(
-                                std::isfinite(val),
+                                (std::isfinite(val_X) && val_X > 0.0_X),
                                 "dot: %e, val: %e, gammaComs: %e, mass: %e, labMomentum0: %e, labMomentum1: %e, "
                                 "labMomentum2: %e, gamma: %e, comsVelocity0 %e, comsVelocity1 %e, comsVelocity2 "
                                 "%e \n",
@@ -235,8 +234,7 @@ namespace picongpu
                                 comsVelocity[0],
                                 comsVelocity[1],
                                 comsVelocity[2]);
-
-                            return val;
+                            return val_X;
                         }
 
                         /* Calculate the cosine of the scattering angle.
@@ -271,7 +269,20 @@ namespace picongpu
                                     float_X s12sq = s12 * s12;
                                     a = 0.0056958_X + 0.9560202_X * s12 - 0.508139_X * s12sq
                                         + 0.47913906_X * s12sq * s12 - 0.12788975_X * s12sq * s12sq
-                                        + 0.02389567_X * s12sq * s12sq * s12sq;
+                                        + 0.02389567_X * s12sq * s12sq
+                                            * s12sq; //                                PMACC_DEVICE_ASSERT_MSG(
+                                    //                                    std::isfinite(gammaComs),
+                                    //                                    "gammaComs: %e, comsVelocityAbs2: %e,
+                                    //                                    labMomentum0: %e, labMomentum1 %e, mass0: %e,
+                                    //                                    mass1: %e, " "gamma0: %e, gamma1: %e",
+                                    //                                    gammaComs,
+                                    //                                    comsVelocityAbs2,
+                                    //                                    labMomentum0,
+                                    //                                    labMomentum1,
+                                    //                                    mass0,
+                                    //                                    mass1,
+                                    //                                    gamma0,
+                                    //                                    gamma1);
                                     a = 1 / a;
                                 }
                                 else
@@ -377,23 +388,34 @@ namespace picongpu
                             //                                mass1 < c, "labVelocity1: %e",
                             //                                sqrt(pmacc::math::abs2(labMomentum1)) / gamma1 / mass1);
                             // [Perez 2012] (1)
-                            float3_X const comsVelocity
-                                = (labMomentum0 + labMomentum1) / (mass0 * gamma0 + mass1 * gamma1);
-                            float_64 const comsVelocityAbs2 = pmacc::math::abs2(precisionCast<float_64>(comsVelocity));
+                            // todo:: maybe this also with doubles?
+                            float3_X comsVelocity;
+                            float_64 comsVelocityAbs2;
+                            {
+                                float3_64 const comsVelocity_64
+                                    = (precisionCast<float_64>(labMomentum0) + precisionCast<float_64>(labMomentum1))
+                                    / (precisionCast<float_64>(mass0) * precisionCast<float_64>(gamma0)
+                                       + precisionCast<float_64>(mass1) * precisionCast<float_64>(gamma1));
+                                comsVelocity = precisionCast<float_X>(comsVelocity_64);
+                                comsVelocityAbs2 = pmacc::math::abs2(precisionCast<float_64>(comsVelocity_64));
+                            }
                             float3_X comsMomentum0;
                             float_X gammaComs, factorA, coeff0, coeff1;
 
                             if(comsVelocityAbs2 != 0.0_X)
                             {
-                                gammaComs
-                                    = precisionCast<float_X>(1.0 / math::sqrt(1.0 - comsVelocityAbs2 / c64 / c64));
+                                float_64 gammaComs_64 = 1.0 / math::sqrt(1.0 - comsVelocityAbs2 / c64 / c64);
+                                gammaComs = precisionCast<float_X>(gammaComs_64);
+                                // if(!(std::isfinite(gammaComs)))  return;
                                 PMACC_DEVICE_ASSERT_MSG(
                                     std::isfinite(gammaComs),
-                                    "comsVelocityAbs2: %e, labVelocity0: %e, labVelocity1 %e, mass0: %e, mass1: %e, "
+                                    "gammaComs: %e, comsVelocityAbs2: %e, labMomentum0: %e, labMomentum1 %e, mass0: "
+                                    "%e, mass1: %e, "
                                     "gamma0: %e, gamma1: %e",
+                                    gammaComs,
                                     comsVelocityAbs2,
-                                    math::sqrt(pmacc::math::abs2(labMomentum0)) / gamma0 / mass0,
-                                    math::sqrt(pmacc::math::abs2(labMomentum1)) / gamma1 / mass1,
+                                    labMomentum0,
+                                    labMomentum1,
                                     mass0,
                                     mass1,
                                     gamma0,
@@ -402,10 +424,22 @@ namespace picongpu
                                 factorA = (gammaComs - 1.0_X) / comsVelocityAbs2;
 
                                 // Stared gamma times mass, from [Perez 2012].
-                                coeff0 = coeff(labMomentum0, mass0, gamma0, gammaComs, comsVelocity);
+                                coeff0 = coeff(
+                                    precisionCast<float_64>(labMomentum0),
+                                    precisionCast<float_64>(mass0),
+                                    precisionCast<float_64>(gamma0),
+                                    gammaComs_64,
+                                    precisionCast<float_64>(comsVelocity));
                                 // PMACC_DEVICE_ASSERT(coeff0 > 0.0_X);
                                 // gamma^* . mass
-                                coeff1 = coeff(labMomentum1, mass1, gamma1, gammaComs, comsVelocity);
+                                // if(coeff0 == 0.0_X) return;
+                                coeff1 = coeff(
+                                    precisionCast<float_64>(labMomentum1),
+                                    precisionCast<float_64>(mass1),
+                                    precisionCast<float_64>(gamma1),
+                                    gammaComs_64,
+                                    precisionCast<float_64>(comsVelocity));
+                                // if(coeff1 == 0.0_X) return;
                                 // PMACC_DEVICE_ASSERT(coeff1 > 0.0_X);
                                 // (2) in [Perez 2012]
                                 comsMomentum0
@@ -522,9 +556,9 @@ namespace picongpu
                                     //                                            /
                                     //                                            (picongpu::gamma<float_X>(finalLab0,
                                     //                                            mass0)) / mass0);
-                                    PMACC_DEVICE_ASSERT(std::isfinite(finalLab0[0] * normalizedWeight1));
-                                    PMACC_DEVICE_ASSERT(std::isfinite(finalLab0[1] * normalizedWeight1));
-                                    PMACC_DEVICE_ASSERT(std::isfinite(finalLab0[2] * normalizedWeight1));
+                                    PMACC_DEVICE_ASSERT(std::isfinite(finalLab0[0] * normalizedWeight0));
+                                    PMACC_DEVICE_ASSERT(std::isfinite(finalLab0[1] * normalizedWeight0));
+                                    PMACC_DEVICE_ASSERT(std::isfinite(finalLab0[2] * normalizedWeight0));
                                     par0[momentum_] = finalLab0 * normalizedWeight0;
                                 }
                             }
@@ -540,9 +574,9 @@ namespace picongpu
                                 //                                    math::sqrt(pmacc::math::abs2(finalLab0))
                                 //                                        / (picongpu::gamma<float_X>(finalLab0,
                                 //                                        mass0)) / mass0);
-                                PMACC_DEVICE_ASSERT(std::isfinite(finalLab0[0] * normalizedWeight1));
-                                PMACC_DEVICE_ASSERT(std::isfinite(finalLab0[1] * normalizedWeight1));
-                                PMACC_DEVICE_ASSERT(std::isfinite(finalLab0[2] * normalizedWeight1));
+                                PMACC_DEVICE_ASSERT(std::isfinite(finalLab0[0] * normalizedWeight0));
+                                PMACC_DEVICE_ASSERT(std::isfinite(finalLab0[1] * normalizedWeight0));
+                                PMACC_DEVICE_ASSERT(std::isfinite(finalLab0[2] * normalizedWeight0));
                                 par0[momentum_] = finalLab0 * normalizedWeight0;
                                 if((normalizedWeight0 / normalizedWeight1) - rng(acc) >= 0)
                                 {
