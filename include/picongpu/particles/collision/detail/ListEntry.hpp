@@ -151,7 +151,8 @@ namespace picongpu
                     }
                 };
 
-// TODO: simplify (maybe crate a class and inject all the required stuff as private references?), Check const, & etc.
+                // TODO: simplify (maybe crate a class and inject all the required stuff as private references?), Check
+                // const, & etc.
                 //! Counting particles per grid frame
                 template<
                     typename T_Acc,
