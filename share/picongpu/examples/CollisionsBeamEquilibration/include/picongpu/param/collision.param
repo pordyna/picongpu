@@ -1,4 +1,4 @@
-/* Copyright 2019 Rene Widera
+/* Copyright 2021 Rene Widera, Pawel Ordyna
  *
  * This file is part of PIConGPU.
  *
@@ -28,6 +28,10 @@ namespace picongpu
     {
         namespace collision
         {
+            namespace precision
+            {
+                using float_COLL = float_64;
+            } // namespace precision
             /** CollisionPipeline defines in which order species interact with each other
              *
              * the functors are called in order (from first to last functor)

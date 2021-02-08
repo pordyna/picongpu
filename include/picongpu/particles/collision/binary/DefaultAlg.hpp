@@ -21,6 +21,7 @@
 
 #include "picongpu/simulation_defines.hpp"
 #include "picongpu/particles/collision/binary/DefaultAlg.def"
+#include "picongpu/unitless/collision.unitless"
 
 #include <pmacc/random/distributions/Uniform.hpp>
 
@@ -41,20 +42,7 @@ namespace picongpu
                 namespace acc
                 {
                     using namespace pmacc;
-
-                    using float_COLL = float_64;
-                    using float3_COLL = float3_64;
-                    const float_COLL DELTA_T_COLL = precisionCast<float_COLL>(DELTA_T);
-                    const float_COLL EPS0_COLL = precisionCast<float_COLL>(EPS0);
-                    const float_COLL WEIGHT_NORM_COLL
-                        = precisionCast<float_COLL>(particles::TYPICAL_NUM_PARTICLES_PER_MACROPARTICLE);
-                    const float_COLL CELL_VOLUME_COLL = precisionCast<float_COLL>(CELL_VOLUME);
-
-                    // literals for short-hand notations for collisions
-                    constexpr float_COLL operator""_COLL(long double x)
-                    {
-                        return float_COLL(x);
-                    }
+                    using namespace picongpu::particles::collision::precision;
 
                     /* Perform a single binary collision between two macro particles. (Device side functor)
                      *
@@ -545,7 +533,7 @@ namespace picongpu
                                 PMACC_DEVICE_ASSERT(std::isfinite(finalLab1[0] * normalizedWeight1));
                                 PMACC_DEVICE_ASSERT(std::isfinite(finalLab1[1] * normalizedWeight1));
                                 PMACC_DEVICE_ASSERT(std::isfinite(finalLab1[2] * normalizedWeight1));
-                                par1[momentum_] = finalLab1 * normalizedWeight1;
+                                par1[momentum_] = precisionCast<float_X>(finalLab1 * normalizedWeight1);
                                 if((normalizedWeight1 / normalizedWeight0) - rng(acc) > 0)
                                 {
                                     finalLab0 = comsToLab(finalComs0, mass0, coeff0, gammaComs, factorA, comsVelocity);
@@ -563,7 +551,7 @@ namespace picongpu
                                     PMACC_DEVICE_ASSERT(std::isfinite(finalLab0[0] * normalizedWeight0));
                                     PMACC_DEVICE_ASSERT(std::isfinite(finalLab0[1] * normalizedWeight0));
                                     PMACC_DEVICE_ASSERT(std::isfinite(finalLab0[2] * normalizedWeight0));
-                                    par0[momentum_] = finalLab0 * normalizedWeight0;
+                                    par0[momentum_] = precisionCast<float_X>(finalLab0 * normalizedWeight0);
                                 }
                             }
                             else
@@ -581,7 +569,7 @@ namespace picongpu
                                 PMACC_DEVICE_ASSERT(std::isfinite(finalLab0[0] * normalizedWeight0));
                                 PMACC_DEVICE_ASSERT(std::isfinite(finalLab0[1] * normalizedWeight0));
                                 PMACC_DEVICE_ASSERT(std::isfinite(finalLab0[2] * normalizedWeight0));
-                                par0[momentum_] = finalLab0 * normalizedWeight0;
+                                par0[momentum_] = precisionCast<float_X>(finalLab0 * normalizedWeight0);
                                 if((normalizedWeight0 / normalizedWeight1) - rng(acc) >= 0.0_COLL)
                                 {
                                     finalLab1 = comsToLab(
@@ -605,7 +593,7 @@ namespace picongpu
                                     PMACC_DEVICE_ASSERT(std::isfinite(finalLab1[0] * normalizedWeight1));
                                     PMACC_DEVICE_ASSERT(std::isfinite(finalLab1[1] * normalizedWeight1));
                                     PMACC_DEVICE_ASSERT(std::isfinite(finalLab1[2] * normalizedWeight1));
-                                    par1[momentum_] = finalLab1 * normalizedWeight1;
+                                    par1[momentum_] = precisionCast<float_X>(finalLab1 * normalizedWeight1);
                                 }
                             }
                         }
@@ -644,11 +632,12 @@ namespace picongpu
                         uint32_t const& potentialPartners,
                         float_X const& coulombLog) const
                     {
+                        using namespace picongpu::particles::collision::precision;
                         return acc::DefaultAlg(
-                            math::pow(precisionCast<acc::float_COLL>(density0), 2. / 3.),
-                            math::pow(precisionCast<acc::float_COLL>(density1), 2. / 3.),
+                            math::pow(precisionCast<float_COLL>(density0), 2. / 3.),
+                            math::pow(precisionCast<float_COLL>(density1), 2. / 3.),
                             potentialPartners,
-                            precisionCast<acc::float_COLL>(coulombLog));
+                            precisionCast<float_COLL>(coulombLog));
                     }
 
                     //! get the name of the functor
