@@ -32,6 +32,7 @@
 #include "picongpu/particles/collision/detail/ListEntry.hpp"
 #include "picongpu/particles/collision/detail/CollisionContext.hpp"
 #include "picongpu/particles/collision/detail/cellDensity.hpp"
+#include "picongpu/particles/collision/CollidingGroup.hpp"
 
 
 namespace picongpu
@@ -100,11 +101,10 @@ namespace picongpu
                     /* loop over all particles in the frame */
                     ForEachIdx<FrameDomCfg> forEachFrameElem(workerIdx);
                     FramePtr firstFrame = pb.getFirstFrame(superCellIdx);
-
                     prepareList(
                         acc,
                         forEachFrameElem,
-                        deviceHeapHandle,
+                        deviceHeapHandle
                         pb,
                         firstFrame,
                         numParticlesInSupercell,

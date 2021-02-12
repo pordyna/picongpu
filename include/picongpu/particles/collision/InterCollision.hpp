@@ -110,6 +110,8 @@ namespace picongpu
                     ForEachIdx<FrameDomCfg> forEachFrameElem(workerIdx);
 
                     FramePtr0 firstFrame0 = pb0.getFirstFrame(superCellIdx);
+                    CollidingGroup<decltype(pb0.getFirstFrame(superCellIdx)), decltype(pb0) > collidingGroup0(pb0.getFirstFrame(superCellIdx), pb0);
+
                     prepareList(
                         acc,
                         forEachFrameElem,
