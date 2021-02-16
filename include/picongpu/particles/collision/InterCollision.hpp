@@ -74,11 +74,7 @@ namespace picongpu
                     constexpr uint32_t frameSize = pmacc::math::CT::volume<SuperCellSize>::type::value;
                     constexpr uint32_t numWorkers = T_numWorkers;
 
-                    using FramePtr0 = typename T_ParBox0::FramePtr;
-                    using FramePtr1 = typename T_ParBox1::FramePtr;
-
                     PMACC_SMEM(acc, nppc, memory::Array<uint32_t, frameSize>);
-
                     PMACC_SMEM(acc, parCellList0, memory::Array<detail::ListEntry, frameSize>);
                     PMACC_SMEM(acc, parCellList1, memory::Array<detail::ListEntry, frameSize>);
                     PMACC_SMEM(acc, densityArray0, memory::Array<float_X, frameSize>);
@@ -100,53 +96,23 @@ namespace picongpu
                     auto accFilter0 = filter0(acc, localSuperCellOffset, threads::WorkerCfg<T_numWorkers>{workerIdx});
                     auto accFilter1 = filter1(acc, localSuperCellOffset, threads::WorkerCfg<T_numWorkers>{workerIdx});
 
-                    auto& superCell0 = pb0.getSuperCell(superCellIdx);
-                    uint32_t numParticlesInSupercell0 = superCell0.getNumParticles();
-
-                    auto& superCell1 = pb1.getSuperCell(superCellIdx);
-                    uint32_t numParticlesInSupercell1 = superCell1.getNumParticles();
-
                     /* loop over all particles in the frame */
                     ForEachIdx<FrameDomCfg> forEachFrameElem(workerIdx);
 
-                    FramePtr0 firstFrame0 = pb0.getFirstFrame(superCellIdx);
-                    CollidingGroup<decltype(pb0.getFirstFrame(superCellIdx)), decltype(pb0) > collidingGroup0(pb0.getFirstFrame(superCellIdx), pb0);
+                    using CollidingGroup0Type
+                        = CollidingGroup<T_ParBox0, decltype(parCellList0), decltype(densityArray0)>;
+                    using CollidingGroup1Type
+                        = CollidingGroup<T_ParBox1, decltype(parCellList1), decltype(densityArray1)>;
+                    CollidingGroup0Type collidingGroup0(pb0, parCellList0, densityArray0, superCellIdx);
+                    CollidingGroup1Type collidingGroup1(pb1, parCellList1, densityArray1, superCellIdx);
 
-                    prepareList(
-                        acc,
-                        forEachFrameElem,
-                        deviceHeapHandle,
-                        pb0,
-                        firstFrame0,
-                        numParticlesInSupercell0,
-                        parCellList0,
-                        nppc,
-                        accFilter0);
+                    prepareList(acc, forEachFrameElem, deviceHeapHandle, collidingGroup0, nppc, accFilter0);
 
-                    FramePtr1 firstFrame1 = pb1.getFirstFrame(superCellIdx);
-                    prepareList(
-                        acc,
-                        forEachFrameElem,
-                        deviceHeapHandle,
-                        pb1,
-                        firstFrame1,
-                        numParticlesInSupercell1,
-                        parCellList1,
-                        nppc,
-                        accFilter1);
+                    prepareList(acc, forEachFrameElem, deviceHeapHandle, collidingGroup1, nppc, accFilter1);
 
-                    cellDensity(acc, forEachFrameElem, firstFrame0, pb0, parCellList0, densityArray0, accFilter0);
-                    cellDensity(acc, forEachFrameElem, firstFrame1, pb1, parCellList1, densityArray1, accFilter1);
+                    cellDensity(acc, forEachFrameElem, collidingGroup0, accFilter0);
+                    cellDensity(acc, forEachFrameElem, collidingGroup1, accFilter1);
                     cupla::__syncthreads(acc);
-
-                    // shuffle indices list of the longest particle list
-                    forEachFrameElem([&](uint32_t const linearIdx, uint32_t const idx) {
-                        // find longer list
-                        auto* longParList = parCellList0[linearIdx].size >= parCellList1[linearIdx].size
-                            ? &parCellList0[linearIdx]
-                            : &parCellList1[linearIdx];
-                        (*longParList).shuffle(acc, rngHandle);
-                    });
 
                     memory::CtxArray<
                         decltype(collisionFunctor(
@@ -163,50 +129,58 @@ namespace picongpu
                         FrameDomCfg>
                         collisionFunctorCtx{};
 
+                    // shuffle indices list of the longest particle list
                     forEachFrameElem([&](uint32_t const linearIdx, uint32_t const idx) {
-                        if(parCellList0[linearIdx].size >= parCellList1[linearIdx].size)
+                        // find longer list
+                        auto collidingGroups = (parCellList0[linearIdx].size >= parCellList1[linearIdx].size)
+                            ? CollidingGroupPair<CollidingGroup1Type, CollidingGroup0Type>(
+                                collidingGroup1,
+                                collidingGroup0)
+                            : CollidingGroupPair<CollidingGroup0Type, CollidingGroup1Type>(
+                                collidingGroup0,
+                                collidingGroup1);
+
+                        collidingGroups.collidingGroupLong.parCellsList[linearIdx].shuffle(acc, rngHandle);
+
+                        uint32_t const sizeShort = collidingGroups.collidingGroupShort.parCellsList[linearIdx].size;
+                        uint32_t const sizeLong = collidingGroups.collidingGroupLong.parCellsList[linearIdx].size;
+                        collisionFunctorCtx[idx] = collisionFunctor(
+                            acc,
+                            localSuperCellOffset,
+                            threads::WorkerCfg<T_numWorkers>{workerIdx},
+                            collidingGroups.collidingGroupLong.densArray[linearIdx],
+                            collidingGroups.collidingGroupShort.densArray[linearIdx],
+                            sizeLong,
+                            coulombLog);
+                        if(sizeShort == 0u)
+                            return;
+                        for(uint32_t i = 0; i < sizeLong; ++i)
                         {
-                            inCellCollisions(
-                                acc,
-                                rngHandle,
-                                collisionFunctor,
-                                localSuperCellOffset,
-                                workerIdx,
-                                densityArray0[linearIdx],
-                                densityArray1[linearIdx],
-                                parCellList0[linearIdx].ptrToIndicies,
-                                parCellList1[linearIdx].ptrToIndicies,
-                                parCellList0[linearIdx].size,
-                                parCellList1[linearIdx].size,
-                                pb0,
-                                pb1,
-                                firstFrame0,
-                                firstFrame1,
-                                coulombLog,
-                                collisionFunctorCtx,
-                                idx);
-                        }
-                        else
-                        {
-                            inCellCollisions(
-                                acc,
-                                rngHandle,
-                                collisionFunctor,
-                                localSuperCellOffset,
-                                workerIdx,
-                                densityArray1[linearIdx],
-                                densityArray0[linearIdx],
-                                parCellList1[linearIdx].ptrToIndicies,
-                                parCellList0[linearIdx].ptrToIndicies,
-                                parCellList1[linearIdx].size,
-                                parCellList0[linearIdx].size,
-                                pb1,
-                                pb0,
-                                firstFrame1,
-                                firstFrame0,
-                                coulombLog,
-                                collisionFunctorCtx,
-                                idx);
+                            PMACC_DEVICE_ASSERT(sizeLong >= sizeShort);
+                            uint32_t duplications(1u);
+                            if(sizeLong > sizeShort)
+                            {
+                                // integer division: floor(longSize / shortSize)
+                                duplications = sizeLong / sizeShort;
+                                uint32_t modulo = sizeLong % sizeShort;
+                                if((i % sizeShort) < modulo) // TODO:
+                                {
+                                    duplications += 1;
+                                }
+                            };
+                            auto parLong = detail::getParticle(
+                                collidingGroups.collidingGroupLong.pb,
+                                collidingGroups.collidingGroupLong.firstFrame,
+                                (collidingGroups.collidingGroupLong.parCellsList[linearIdx])[i]);
+                            auto parShort = detail::getParticle(
+                                collidingGroups.collidingGroupShort.pb,
+                                collidingGroups.collidingGroupShort.firstFrame,
+                                (collidingGroups.collidingGroupShort.parCellsList[linearIdx])[i % sizeShort]);
+                            collisionFunctorCtx[idx].duplications = duplications;
+                            (collisionFunctorCtx[idx])(
+                                detail::makeCollisionContext(acc, rngHandle),
+                                parLong,
+                                parShort);
                         }
                     });
 
@@ -217,79 +191,13 @@ namespace picongpu
                         parCellList1[linearIdx].finalize(acc, deviceHeapHandle);
                     });
                 }
-
-
-                template<
-                    typename T_Acc,
-                    typename T_RngHandle,
-                    typename T_CollisionFunctor,
-                    typename T_ListLong,
-                    typename T_ListShort,
-                    typename T_SizeLong,
-                    typename T_SizeShort,
-                    typename T_PBoxLong,
-                    typename T_PBoxShort,
-                    typename T_FrameLong,
-                    typename T_FrameShort,
-                    typename T_CollisionFunctorCtx>
-                DINLINE void inCellCollisions(
-                    T_Acc const& acc,
-                    T_RngHandle& rngHandle,
-                    T_CollisionFunctor const& collisionFunctor,
-                    DataSpace<simDim> const& localSuperCellOffset,
-                    uint32_t const& workerIdx,
-                    float_X const& densityLong,
-                    float_X const& densityShort,
-                    T_ListLong& listLong,
-                    T_ListShort& listShort,
-                    T_SizeLong const& sizeLong,
-                    T_SizeShort const& sizeShort,
-                    T_PBoxLong const& pBoxLong,
-                    T_PBoxShort const& pBoxShort,
-                    T_FrameLong const& frameLong,
-                    T_FrameShort const& frameShort,
-                    float_X const& coulombLog,
-                    T_CollisionFunctorCtx& collisionFunctorCtx,
-                    uint32_t idx
-
-                ) const
-                {
-                    collisionFunctorCtx[idx] = collisionFunctor(
-                        acc,
-                        localSuperCellOffset,
-                        threads::WorkerCfg<T_numWorkers>{workerIdx},
-                        densityLong,
-                        densityShort,
-                        sizeLong,
-                        coulombLog);
-                    if(sizeShort == 0u)
-                        return;
-                    for(uint32_t i = 0; i < sizeLong; ++i)
-                    {
-                        // PMACC_ASSERT( sizeLong >= sizeShort );
-                        uint32_t duplications(1u);
-                        if(sizeLong > sizeShort)
-                        {
-                            // integer division: floor(longSize / shortSize)
-                            duplications = sizeLong / sizeShort;
-                            uint32_t modulo = sizeLong % sizeShort;
-                            if((i % sizeShort) < modulo) // TODO:
-                            {
-                                duplications += 1;
-                            }
-                        };
-                        auto parLong = detail::getParticle(pBoxLong, frameLong, listLong[i]);
-                        auto parShort = detail::getParticle(pBoxShort, frameShort, listShort[i % sizeShort]);
-                        collisionFunctorCtx[idx].duplications = duplications;
-                        (collisionFunctorCtx[idx])(detail::makeCollisionContext(acc, rngHandle), parLong, parShort);
-                    }
-                }
             };
+
 
             /* Run kernel for collisions between two species.
              *
-             * @tparam T_CollisionFunctor A binary particle functor defining a single macro particle collision in the
-             *     binary-collision algorithm.
+             * @tparam T_CollisionFunctor A binary particle functor defining a single macro particle collision in
+             * the binary-collision algorithm.
              * @tparam T_Params A struct defining `coulombLog` for the collisions.
              * @tparam T_FilterPair A pair of particle filters, each for each species
              *     in the colliding pair.

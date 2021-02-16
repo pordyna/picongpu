@@ -247,19 +247,14 @@ namespace picongpu
                     typename T_Acc,
                     typename T_ForEach,
                     typename T_DeviceHeapHandle,
-                    typename T_ParBox,
-                    typename T_FramePtr,
-                    typename T_EntryListArray,
+                    typename T_CollidingGroup,
                     typename T_Array,
                     typename T_Filter>
                 DINLINE void prepareList(
                     T_Acc const& acc,
                     T_ForEach forEach,
                     T_DeviceHeapHandle deviceHeapHandle,
-                    T_ParBox& parBox,
-                    T_FramePtr firstFrame,
-                    uint32_t const numParticlesInSupercell,
-                    T_EntryListArray& parCellList,
+                    T_CollidingGroup& collidingGroup,
                     T_Array& nppc,
                     T_Filter filter)
                 {
@@ -267,22 +262,29 @@ namespace picongpu
                     forEach([&](uint32_t const linearIdx, uint32_t const idx) { nppc[linearIdx] = 0u; });
                     cupla::__syncthreads(acc);
                     // Count eligible
-                    particlesCntHistogram(acc, forEach, parBox, firstFrame, numParticlesInSupercell, nppc, filter);
+                    particlesCntHistogram(
+                        acc,
+                        forEach,
+                        collidingGroup.pb,
+                        collidingGroup.firstFrame,
+                        collidingGroup.numParticlesInSuperCell,
+                        nppc,
+                        filter);
                     cupla::__syncthreads(acc);
 
                     // memory for particle indices
                     forEach([&](uint32_t const linearIdx, uint32_t const) {
-                        parCellList[linearIdx].init(acc, deviceHeapHandle, nppc[linearIdx]);
+                        collidingGroup.parCellsList[linearIdx].init(acc, deviceHeapHandle, nppc[linearIdx]);
                     });
                     cupla::__syncthreads(acc);
 
                     detail::updateLinkedList(
                         acc,
                         forEach,
-                        parBox,
-                        firstFrame,
-                        numParticlesInSupercell,
-                        parCellList,
+                        collidingGroup.pb,
+                        collidingGroup.firstFrame,
+                        collidingGroup.numParticlesInSuperCell,
+                        collidingGroup.parCellsList,
                         filter);
                     cupla::__syncthreads(acc);
                 }

@@ -155,7 +155,7 @@ namespace picongpu
                     // this is bodged so it passes the verification at
                     // MappingDescription.hpp:79
                     cellDescription(DataSpace<simDim>(SuperCellSize::toRT()))
-                    , isMaster(false)
+                    , isMasmart pointers c++ ster(false)
                     , currentStep(0)
                     , accumulatedRotations(0)
                 {

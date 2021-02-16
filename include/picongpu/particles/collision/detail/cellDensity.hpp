@@ -30,36 +30,27 @@ namespace picongpu
         {
             namespace detail
             {
-                template<
-                    typename T_Acc,
-                    typename T_ForEach,
-                    typename T_FramePtr,
-                    typename T_ParBox,
-                    typename T_EntryListArray,
-                    typename T_Array,
-                    typename T_Filter>
+                template<typename T_Acc, typename T_ForEach, typename T_CollidingGroup, typename T_Filter>
                 DINLINE void cellDensity(
                     T_Acc const& acc,
                     T_ForEach forEach,
-                    T_FramePtr firstFrame,
-                    T_ParBox parBox,
-                    T_EntryListArray& parCellList,
-                    T_Array& densityArray,
+                    T_CollidingGroup collidingGroup,
                     T_Filter& filter)
                 {
                     forEach([&](uint32_t const linearIdx, uint32_t const idx) {
-                        uint32_t const numParInCell = parCellList[linearIdx].size;
-                        uint32_t* parListStart = parCellList[linearIdx].ptrToIndicies;
+                        uint32_t const numParInCell = collidingGroup.parCellsList[linearIdx].size;
+                        uint32_t* parListStart = collidingGroup.parCellsList[linearIdx].ptrToIndicies;
                         float_X density(0.0);
                         for(uint32_t ii = 0; ii < numParInCell; ii++)
                         {
-                            auto particle = getParticle(parBox, firstFrame, parListStart[ii]);
+                            auto particle
+                                = getParticle(collidingGroup.pb, collidingGroup.firstFrame, parListStart[ii]);
                             if(filter(acc, particle))
                             {
                                 density += particle[weighting_];
                             }
                         }
-                        densityArray[linearIdx] = density / CELL_VOLUME;
+                        collidingGroup.densArray[linearIdx] = density / CELL_VOLUME;
                     });
                 }
 

@@ -104,7 +104,7 @@ namespace picongpu
                     prepareList(
                         acc,
                         forEachFrameElem,
-                        deviceHeapHandle
+                        deviceHeapHandle,
                         pb,
                         firstFrame,
                         numParticlesInSupercell,

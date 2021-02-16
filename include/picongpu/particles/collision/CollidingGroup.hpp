@@ -20,24 +20,53 @@
 #pragma once
 
 #include "picongpu/simulation_defines.hpp"
-    namespace picongpu
+namespace picongpu
 {
     namespace particles
     {
         namespace collision
         {
-            template<typename T_FramePtr, typename T_ParBox>
+            template<typename T_ParBox, typename T_ParCellsList, typename T_DensArray>
             struct CollidingGroup
             {
-                T_FramePtr& firstFrame;
+                // TODO: PMACC align??
+                using FramePtrType = typename T_ParBox::FramePtr;
+                FramePtrType firstFrame;
                 T_ParBox& pb;
+                T_ParCellsList& parCellsList;
+                T_DensArray& densArray;
+                uint32_t const numParticlesInSuperCell;
 
-                CollidingGroup(T_FramePtr& firstFrame_p, T_ParBox& pb_p) : firstFrame(firstFrame_p)
-                                                                         , pb(pb_p)
+
+                HDINLINE CollidingGroup(
+                    T_ParBox& pb_p,
+                    T_ParCellsList& cellsList_p,
+                    T_DensArray& densArray_p,
+                    DataSpace<simDim> const superCellIdx)
+                    : // firstFrame(firstFrame_p)
+                    pb(pb_p)
+                    , parCellsList(cellsList_p)
+                    , densArray(densArray_p)
+                    , firstFrame(pb_p.getFirstFrame(superCellIdx))
+                    , numParticlesInSuperCell(pb_p.getSuperCell(superCellIdx).getNumParticles())
                 {
                 }
+            };
 
+            template<typename T_CollidingGroupShort, typename T_CollidingGroupLong>
+            struct CollidingGroupPair
+            {
+                T_CollidingGroupShort& collidingGroupShort;
+                T_CollidingGroupLong& collidingGroupLong;
+
+                HDINLINE CollidingGroupPair(
+                    T_CollidingGroupShort& collidingGroupShort_p,
+                    T_CollidingGroupLong& collidingGroupLong_p)
+                    : collidingGroupShort(collidingGroupShort_p)
+                    , collidingGroupLong(collidingGroupLong_p)
+                {
+                }
             };
         } // namespace collision
     } // namespace particles
-}
+} // namespace picongpu
