@@ -1,4 +1,4 @@
-gg140/* Copyright 2014-2021 Rene Widera, Pawel Ordyna
+/* Copyright 2014-2021 Rene Widera, Pawel Ordyna
  *
  * This file is part of PIConGPU.
  *
