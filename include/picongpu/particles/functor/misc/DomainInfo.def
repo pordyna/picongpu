@@ -1,4 +1,4 @@
-/* Copyright 2014-2022 Rene Widera, Axel Huebl
+/* Copyright 2017-2021 Rene Widera
  *
  * This file is part of PIConGPU.
  *
@@ -19,8 +19,24 @@
 
 #pragma once
 
-#include "picongpu/particles/functor/User.def"
-#include "picongpu/particles/functor/misc/Parametrized.def"
-#include "picongpu/particles/functor/misc/DomainInfo.def"
-#include "picongpu/particles/functor/misc/Rng.def"
-#include "picongpu/particles/functor/misc/TotalCellOffset.def"
+
+namespace picongpu
+{
+    namespace particles
+    {
+        namespace functor
+        {
+            namespace misc
+            {
+                struct Domain
+                {
+                    pmacc::Selection<simDim> global;
+                    pmacc::Selection<simDim> local;
+                };
+
+                //! Provide the cell offset of a supercell to the total domain origin
+                struct DomainInfo;
+            } // namespace misc
+        } // namespace functor
+    } // namespace particles
+} // namespace picongpu
