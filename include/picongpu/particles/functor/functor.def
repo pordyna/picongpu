@@ -21,5 +21,6 @@
 
 #include "picongpu/particles/functor/User.def"
 #include "picongpu/particles/functor/misc/Parametrized.def"
+#include "picongpu/particles/functor/misc/DomainInfo.def"
 #include "picongpu/particles/functor/misc/Rng.def"
 #include "picongpu/particles/functor/misc/TotalCellOffset.def"
