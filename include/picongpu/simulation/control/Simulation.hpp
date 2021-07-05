@@ -54,6 +54,9 @@
 #include "picongpu/simulation/stage/ParticleIonization.hpp"
 #include "picongpu/simulation/stage/ParticlePush.hpp"
 #include "picongpu/simulation/stage/PopulationKinetics.hpp"
+#if(SIMDIM==DIM3)
+#include "picongpu/simulation/stage/Scattering.hpp"
+#endif
 #include "picongpu/simulation/stage/RuntimeDensityFile.hpp"
 #include "picongpu/simulation/stage/SynchrotronRadiation.hpp"
 #include "picongpu/versionFormat.hpp"
@@ -542,6 +545,9 @@ namespace picongpu
             MomentumBackup{}(currentStep);
             CurrentReset{}(currentStep);
             Collision{deviceHeap}(currentStep);
+#if(SIMDIM==DIM3)
+            Scattering{}(currentStep);
+#endif
             ParticleIonization{*cellDescription}(currentStep);
             PopulationKinetics{}(currentStep);
             SynchrotronRadiation{*cellDescription, synchrotronFunctions}(currentStep);

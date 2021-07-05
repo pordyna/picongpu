@@ -1,0 +1,59 @@
+/* Copyright 2021 Pawel Ordyna
+ *
+ * This file is part of PIConGPU.
+ *
+ * PIConGPU is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * PIConGPU is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with PIConGPU.
+ * If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#pragma once
+
+#include "picongpu/simulation_defines.hpp"
+
+#include "picongpu/particles/scattering/generic/FreeRng.def"
+
+namespace picongpu
+{
+    namespace particles
+    {
+        namespace scattering
+        {
+            namespace direction
+            {
+                namespace acc
+                {
+                    /* Scatter particles in a random direction
+                     *
+                     * Particles are uniformly scattered in a cone defined by the minimal and maximal polar angle.
+                     * @tparam T_ParamClass param class with the polar angle limits
+                     *      Example:
+                     *       struct DirectionParam
+                     *       {
+                     *          // unit are radians
+                     *          static constexpr float_64 maxPolarAngle = 0.05;
+                     *          static constexpr float_64 minPolarAngle = 0.0;
+                     *       };
+                     */
+                    template<typename T_ParamClass>
+                    struct Random;
+                } // namespace acc
+
+                // TODO make the distribution precission an option
+                template<typename T_ParamClass>
+                using Random = picongpu::particles::scattering::generic::
+                    FreeRng<acc::Random<T_ParamClass>, pmacc::random::distributions::Uniform<float_X>>;
+            } // namespace direction
+        } // namespace scattering
+    } // namespace particles
+} // namespace picongpu

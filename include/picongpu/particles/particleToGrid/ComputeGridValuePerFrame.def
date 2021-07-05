@@ -156,6 +156,8 @@ namespace picongpu
                 using OperationPerFrame = ComputeGridValuePerFrame<shapeType, T_DerivedAttribute>;
                 using type = FieldTmpOperation<OperationPerFrame, T_Species, T_Filter>;
             };
+
+
             template<typename T_Species, typename T_DerivedAttribute, typename T_Filter = filter::All>
             using CreateFieldTmpOperation_t =
                 typename CreateFieldTmpOperation<T_Species, T_DerivedAttribute, T_Filter>::type;

@@ -1,0 +1,257 @@
+/* Copyright 2021 Pawel Ordyna
+ *
+ * This file is part of PIConGPU.
+ *
+ * PIConGPU is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * PIConGPU is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with PIConGPU.
+ * If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#pragma once
+
+#include "picongpu/simulation_defines.hpp"
+
+#include "picongpu/particles/scattering/scattering.kernel"
+
+namespace picongpu
+{
+    namespace particles
+    {
+        namespace scattering
+        {
+            namespace acc
+            {
+                namespace detail
+                {
+                    // TODO: define this outside and use with collisions.
+                    template<typename T_ParBox, typename T_FramePtr>
+                    DINLINE auto getParticle(T_ParBox& parBox, T_FramePtr frame, uint32_t particleId) ->
+                        typename T_FramePtr::type::ParticleType
+                    {
+                        constexpr uint32_t frameSize
+                            = pmacc::math::CT::volume<typename T_FramePtr::type::SuperCellSize>::type::value;
+                        uint32_t const skipFrames = particleId / frameSize;
+                        for(uint32_t i = 0; i < skipFrames; ++i)
+                            frame = parBox.getNextFrame(frame);
+                        PMACC_DEVICE_ASSERT_MSG(
+                            frame.isValid(),
+                            "frame in get Particle was invalid. particleIdWas: %u",
+                            particleId);
+                        return frame[particleId % frameSize];
+                    }
+                } // namespace detail
+
+                template<uint32_t T_numWorkers>
+                struct SplitAndScatterParticlesKernel
+                {
+                    template<
+                        typename T_Acc,
+                        typename T_Mapper,
+                        typename T_ParticleBox,
+                        typename T_HostScattererFunctor,
+                        typename... T_FieldBoxes>
+                    DINLINE void operator()(
+                        T_Acc& acc,
+                        T_Mapper const mapper,
+                        T_ParticleBox particleBox,
+                        T_HostScattererFunctor hostScattererFunctor,
+                        T_FieldBoxes... fieldBoxes) const
+                    {
+                        using FrameType = typename T_ParticleBox::FrameType;
+                        using FramePtr = typename T_ParticleBox::FramePtr;
+
+                        DataSpace<simDim> const superCellIdx
+                            = mapper.getSuperCellIndex(DataSpace<simDim>(cupla::blockIdx(acc)));
+
+                        auto const firstFrame = particleBox.getFirstFrame(superCellIdx);
+                        auto sourceFrame = firstFrame;
+                        auto const lastSourceFrame = particleBox.getLastFrame(superCellIdx);
+
+                        // cover the case when there are no particles at all
+                        if(!sourceFrame.isValid())
+                            return;
+
+                        // get block cell
+                        // shift fields
+                        // CtxArray with SumDensity
+                        // Write sums into shared memory
+                        constexpr uint32_t numWorkers = T_numWorkers;
+                        uint32_t const workerIdx = cupla::threadIdx(acc).x;
+                        constexpr uint32_t frameSize = pmacc::math::CT::volume<SuperCellSize>::type::value;
+                        constexpr uint32_t cellsPerSuperCell = frameSize;
+
+                        DataSpace<simDim> const blockCell{superCellIdx * SuperCellSize::toRT()};
+                        auto& superCell = particleBox.getSuperCell(superCellIdx);
+                        const uint32_t numParticlesInSupercell = superCell.getNumParticles();
+                        DataSpace<simDim> const localSuperCellOffset(superCellIdx - mapper.getGuardingSuperCells());
+
+
+                        PMACC_SMEM(acc, densityArray, memory::Array<float_X, frameSize>);
+
+                        auto forEachCellInSuperCell = lockstep::makeForEach<cellsPerSuperCell, numWorkers>(workerIdx);
+                        auto forEachParticleInFrame = lockstep::makeForEach<frameSize, numWorkers>(workerIdx);
+                        auto onlyMaster = lockstep::makeMaster(workerIdx);
+
+                        auto SumDensityCtx
+                            = forEachCellInSuperCell([&](lockstep::Idx const idx) { return SumDensity(); });
+                        forEachCellInSuperCell(
+                            [&](lockstep::Idx const idx)
+                            {
+                                auto const idxInSuperCell
+                                    = DataSpaceOperations<simDim>::template map<SuperCellSize>(idx);
+                                SumDensityCtx[idx]((fieldBoxes.shift(blockCell))(idxInSuperCell)[0]...);
+                                densityArray[idx] = SumDensityCtx[idx].sum;
+                            });
+
+
+                        auto accScatteringFunctorCtx = forEachParticleInFrame(
+                            [&](lockstep::Idx const idx) {
+                                return hostScattererFunctor(
+                                    acc,
+                                    localSuperCellOffset,
+                                    forEachParticleInFrame.getWorkerCfg());
+                            });
+
+                        const uint32_t fillLastSourceFrame = superCell.getSizeLastFrame();
+                        constexpr uint32_t maxNewParticlesOnSplit = T_HostScattererFunctor::maxNewParticlesOnSplit;
+
+                        PMACC_SMEM(acc, particlesToSplit, uint32_t);
+                        PMACC_SMEM(acc, countSplittedParticles, uint32_t);
+                        onlyMaster(
+                            [&]()
+                            {
+                                particlesToSplit = 0u;
+                                countSplittedParticles = 0u;
+                            });
+                        // sync after setting counters to 0 and after filling the densityArray
+                        cupla::__syncthreads(acc);
+
+
+                        uint32_t particlesToSplitThread{0};
+
+                        for(uint32_t i = 0; i < numParticlesInSupercell; i += frameSize)
+                        {
+                            forEachParticleInFrame(
+                                [&](lockstep::Idx const idx)
+                                {
+                                    if(i + idx < numParticlesInSupercell)
+                                    {
+                                        auto particle = sourceFrame[idx];
+                                        const float_X cellDensity = densityArray[particle[localCellIdx_]];
+                                        if(accScatteringFunctorCtx[idx]
+                                               .scatteringCondition(acc, particle, cellDensity))
+                                        {
+                                            if(accScatteringFunctorCtx[idx].splittingCondition(acc, particle))
+                                            {
+                                                particlesToSplitThread++;
+                                                particle[multiMask_] = 50;
+                                            }
+                                            else
+                                            {
+                                                accScatteringFunctorCtx[idx].scatterSingle(acc, particle);
+                                            }
+                                        }
+                                    }
+                                });
+                            sourceFrame = particleBox.getNextFrame(sourceFrame);
+                        }
+
+                        cupla::atomicAdd(
+                            acc,
+                            &particlesToSplit,
+                            particlesToSplitThread,
+                            ::alpaka::hierarchy::Threads{});
+                        cupla::__syncthreads(acc);
+
+                        if(particlesToSplit > 0u)
+                        {
+                            onlyMaster(
+                                [&]()
+                                {
+                                    if(particlesToSplit * maxNewParticlesOnSplit > (frameSize - fillLastSourceFrame))
+                                    {
+                                        const uint32_t requiredNewSlots = particlesToSplit * maxNewParticlesOnSplit
+                                            - (frameSize - fillLastSourceFrame);
+
+                                        uint32_t numNewFrames = requiredNewSlots / frameSize;
+                                        uint32_t newParticlesInLastFrame = requiredNewSlots % frameSize;
+                                        if(newParticlesInLastFrame > 0u)
+                                            numNewFrames++;
+
+                                        for(uint32_t ii = 0; ii < numNewFrames; ii++)
+                                        {
+                                            auto newFrame = particleBox.getEmptyFrame(acc);
+                                            particleBox.setAsLastFrame(acc, newFrame, superCellIdx);
+                                        }
+                                    }
+                                });
+                            cupla::__syncthreads(acc);
+
+                            const auto firstDestinationFrame = lastSourceFrame;
+                            sourceFrame = firstFrame;
+
+                            for(uint32_t i = 0; i < numParticlesInSupercell; i += frameSize)
+                            {
+                                forEachParticleInFrame(
+                                    [&](lockstep::Idx const idx)
+                                    {
+                                        if(i + idx < numParticlesInSupercell)
+                                        {
+                                            auto particle = sourceFrame[idx];
+                                            if(particle[multiMask_] == 50)
+                                            {
+                                                particle[multiMask_] = 1;
+                                                const uint32_t memoryDestinationBlock
+                                                    = cupla::atomicAdd(
+                                                          acc,
+                                                          &countSplittedParticles,
+                                                          1u,
+                                                          ::alpaka::hierarchy::Threads{})
+                                                    * maxNewParticlesOnSplit;
+
+                                                for(uint32_t ii = 0; ii < maxNewParticlesOnSplit; ii++)
+                                                {
+                                                    const uint32_t newParticleIdx
+                                                        = fillLastSourceFrame + memoryDestinationBlock + ii;
+                                                    /* TODO: do sth better than this. We shoudn't be going over
+                                                     * all of this frames over and over again.
+                                                     */
+                                                    auto newParticle = detail::getParticle(
+                                                        particleBox,
+                                                        firstDestinationFrame,
+                                                        newParticleIdx);
+                                                    accScatteringFunctorCtx[idx].split(acc, ii, particle, newParticle);
+                                                }
+                                                accScatteringFunctorCtx[idx].afterSplit(acc, particle);
+                                            }
+                                        }
+                                    });
+                                sourceFrame = particleBox.getNextFrame(sourceFrame);
+                            }
+#ifndef NDEBUG
+                            // syncthreads before the assertion
+                            cupla::__syncthreads(acc);
+#endif
+                            PMACC_DEVICE_ASSERT_MSG(
+                                countSplittedParticles == particlesToSplit,
+                                "[Split and Scatter particles]: CountSplittedParticles (%u) was not equal to "
+                                "particlesToSplit (%u)",
+                                countSplittedParticles,
+                                particlesToSplit);
+                        }
+                    }
+                };
+            } // namespace acc
+        } // namespace scattering
+    } // namespace particles
+} // namespace picongpu

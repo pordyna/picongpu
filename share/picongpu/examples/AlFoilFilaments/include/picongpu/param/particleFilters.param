@@ -1,0 +1,221 @@
+/* Copyright 2013-2020 Rene Widera
+ *
+ * This file is part of PIConGPU.
+ *
+ * PIConGPU is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * PIConGPU is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with PIConGPU.
+ * If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/** @file
+ *
+ * A common task in both modeling and in situ processing (output) is the
+ * selection of particles of a particle species by attributes. Users can
+ * define such selections as particle filters in this file.
+ *
+ * Particle filters are simple mappings assigning each particle of a species
+ * either `true` or `false` (ignore / filter out).
+ *
+ * All active filters need to be listed in `AllParticleFilters`. They are then
+ * combined with `VectorAllSpecies` at compile-time, e.g. for plugins.
+ */
+
+#pragma once
+
+#include "picongpu/algorithms/Gamma.def"
+#include "picongpu/traits/attribute/GetMass.hpp"
+#include "picongpu/particles/filter/filter.def"
+#include "picongpu/particles/traits/SpeciesEligibleForSolver.hpp"
+
+#include <pmacc/traits/HasIdentifiers.hpp>
+#include <pmacc/traits/HasFlag.hpp>
+
+namespace picongpu
+{
+    namespace particles
+    {
+        namespace filter
+        {
+          namespace acc
+          {
+              template<typename T_Param>
+              struct GammaInRange
+                  {
+                  static constexpr float_X threshold = T_Param::threshold;
+                  static constexpr float_X cutoff = T_Param::cutoff;
+
+                  template<typename T_Acc, typename T_Particle>
+                  HDINLINE bool operator()(T_Acc const&, T_Particle const& particle)
+                  {
+                      if(particle.isHandleValid())
+                      {
+                        float3_X momentum = particle[momentum_];
+                        float_X const mass = picongpu::traits::attribute::getMass(particle[weighting_], particle);
+                        float_X const gamma = picongpu::gamma<float_X>(momentum, mass);
+                        if(gamma >= threshold && gamma < cutoff) {return true;}
+                      }
+                      return false;
+                  }
+              };
+              template<typename T_Param>
+              struct GammaAboveThreshold
+              {
+                  static constexpr float_X threshold = T_Param::threshold;
+
+                  template<typename T_Acc, typename T_Particle>
+                  HDINLINE bool operator()(T_Acc const&, T_Particle const& particle)
+                  {
+                      if(particle.isHandleValid())
+                      {
+                      float3_X momentum = particle[momentum_];
+                      float_X const mass = picongpu::traits::attribute::getMass(particle[weighting_], particle);
+                      float_X const gamma = picongpu::gamma<float_X>(momentum, mass);
+                      if(gamma >= threshold) {return true;}
+                      }
+                      return false;
+                  }
+              };
+            } //acc
+
+            struct ScatteredImpl
+            {
+                template<typename T_Particle>
+                HDINLINE bool operator()(T_Particle const& particle)
+                {
+                    return particle[timesScattered_] > 0u;
+                }
+                static constexpr char const* name = "scattered";
+            };
+            using Scattered = generic::Free<ScatteredImpl>;
+
+            template<typename T_Param>
+            struct GammaInRange
+                {
+                static constexpr float_X threshold = T_Param::threshold;
+                static constexpr float_X cutoff = T_Param::cutoff;
+
+                template<typename T_SpeciesType>
+                struct apply
+                {
+                    using type = GammaInRange;
+                };
+
+                /** create filter for the accelerator
+                *
+                * @tparam T_WorkerCfg pmacc::mappings::threads::WorkerCfg, configuration of the worker
+                * @param localSupercellOffset offset (in superCells, without any guards) relative
+                *                        to the origin of the local domain
+                * @param configuration of the worker
+                */
+               template<typename T_WorkerCfg, typename T_Acc>
+               HDINLINE acc::GammaInRange<T_Param> operator()(
+                   T_Acc const& acc,
+                   DataSpace<simDim> const& localSuperCellOffset,
+                   T_WorkerCfg const&) const
+               {
+                   return acc::GammaInRange<T_Param>();
+               }
+
+                static HINLINE std::string getName()
+                {
+                  return "gammaFrom" + std::to_string(threshold) + "to" + std::to_string(cutoff);
+                }
+
+            };
+            template<typename T_Param>
+            struct GammaAboveThreshold
+            {
+                static constexpr float_X threshold = T_Param::threshold;
+
+                template<typename T_SpeciesType>
+                struct apply
+                {
+                    using type = GammaAboveThreshold;
+                };
+
+                /** create filter for the accelerator
+                *
+                * @tparam T_WorkerCfg pmacc::mappings::threads::WorkerCfg, configuration of the worker
+                * @param localSupercellOffset offset (in superCells, without any guards) relative
+                *                        to the origin of the local domain
+                * @param configuration of the worker
+                */
+               template<typename T_WorkerCfg, typename T_Acc>
+               HDINLINE acc::GammaAboveThreshold<T_Param> operator()(
+                   T_Acc const& acc,
+                   DataSpace<simDim> const& localSuperCellOffset,
+                   T_WorkerCfg const&) const
+               {
+                   return acc::GammaAboveThreshold<T_Param>();
+               }
+
+               static HINLINE std::string getName()
+               {
+                 return "gammaAbove" + std::to_string(threshold);
+               }
+            };
+
+
+            struct GammaInRangeParam1
+            {
+                static constexpr float_X threshold = 0.0_X;
+                static constexpr float_X cutoff = 1.5_X;
+            };
+            using GammaInRange1 = GammaInRange<GammaInRangeParam1>;
+            struct GammaInRangeParam2
+            {
+                static constexpr float_X threshold = 1.5_X;
+                static constexpr float_X cutoff = 4.0_X;
+            };
+            using GammaInRange2 = GammaInRange<GammaInRangeParam2>;
+            struct GammaAboveThresholdParam1
+            {
+                static constexpr float_X threshold = 4.0_X;
+            };
+            using GammaAboveThreshold1 = GammaAboveThreshold<GammaAboveThresholdParam1>;
+
+            /** Plugins: collection of all available particle filters
+             *
+             * Create a list of all filters here that you want to use in plugins.
+             *
+             * Note: filter All is defined in picongpu/particles/filter/filter.def
+             */
+            using AllParticleFilters = MakeSeq_t<All, GammaInRange1, GammaInRange2, GammaAboveThreshold1, Scattered>;
+
+        } // namespace filter
+
+        namespace traits
+        {
+            /* if needed for generic "free" filters,
+             * place `SpeciesEligibleForSolver` traits for filters here
+             */
+            template<typename T_Species, typename T_Params>
+            struct SpeciesEligibleForSolver<T_Species, filter::GammaInRange<T_Params>>
+            {
+                using FrameType = typename T_Species::FrameType;
+                // This filter needs at least the momentum and weighting.
+                using RequiredIdentifiers = MakeSeq_t<weighting, momentum>;
+
+                using SpeciesHasIdentifiers = typename pmacc::traits::HasIdentifiers<FrameType, RequiredIdentifiers>::type;
+                using type = SpeciesHasIdentifiers;
+            };
+
+            template<typename T_Species>
+            struct SpeciesEligibleForSolver<T_Species, filter::Scattered>
+            {
+                using type = typename pmacc::traits::
+                    HasIdentifiers<typename T_Species::FrameType, MakeSeq_t<timesScattered>>::type;
+            };
+        } // namespace traits
+    } // namespace particles
+} // namespace picongpu

@@ -1,0 +1,58 @@
+/* Copyright 2021 Pawel Ordyna
+ *
+ * This file is part of PIConGPU.
+ *
+ * PIConGPU is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * PIConGPU is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with PIConGPU.
+ * If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#pragma once
+
+#include "picongpu/particles/scattering/generic/FreeRng.def"
+
+namespace picongpu
+{
+    namespace particles
+    {
+        namespace scattering
+        {
+            namespace condition
+            {
+                namespace acc
+                {
+                    /* Scattering probability linearly proportional to scatterer density.
+                     *
+                     *  p = a * n , with p - probability, a - factor, n - number density in PIConGPU units;
+                     * @tparam T_ParamClass param class with the proportionality factor
+                     *      propFactor.
+                     *      Example:
+                     *      @code{c++}
+                     *      struct Param
+                     *      {
+                     *          static constexpr float_X propFactor = 0.1_X;
+                     *      };
+                     *      @endcode
+                     */
+                    template<typename T_ParamClass, uint32_t maxScattering>
+                    struct ProbLinToDens;
+                } // namespace acc
+
+                template<typename T_ParamClass, uint32_t maxScattering = 0>
+                using ProbLinToDens = picongpu::particles::scattering::generic::FreeRng<
+                    acc::ProbLinToDens<T_ParamClass, maxScattering>,
+                    pmacc::random::distributions::Uniform<float_X>>;
+            } // namespace condition
+        } // namespace scattering
+    } // namespace particles
+} // namespace picongpu

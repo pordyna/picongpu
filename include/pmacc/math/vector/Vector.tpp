@@ -28,6 +28,7 @@
 #include "pmacc/algorithms/TypeCast.hpp"
 #include "pmacc/algorithms/math.hpp"
 #include "pmacc/math/Vector.hpp"
+#include "pmacc/math/complex/Complex.hpp"
 #include "pmacc/mpi/GetMPI_StructAsArray.hpp"
 #include "pmacc/traits/GetComponentsType.hpp"
 #include "pmacc/traits/GetInitializedInstance.hpp"
@@ -328,6 +329,24 @@ namespace pmacc
             };
 
             template<int T_dim>
+            struct GetMPI_StructAsArray<::pmacc::math::Vector<pmacc::math::Complex<float>, T_dim>>
+            {
+                MPI_StructAsArray operator()() const
+                {
+                    return MPI_StructAsArray(MPI_FLOAT, 2 * T_dim);
+                }
+            };
+
+            template<int T_dim, int T_N>
+            struct GetMPI_StructAsArray<::pmacc::math::Vector<pmacc::math::Complex<float>, T_dim>[T_N]>
+            {
+                MPI_StructAsArray operator()() const
+                {
+                    return MPI_StructAsArray(MPI_FLOAT, 2 * T_dim * T_N);
+                }
+            };
+
+            template<int T_dim>
             struct GetMPI_StructAsArray<::pmacc::math::Vector<double, T_dim>>
             {
                 MPI_StructAsArray operator()() const
@@ -344,6 +363,25 @@ namespace pmacc
                     return {MPI_DOUBLE, T_dim * T_N};
                 }
             };
+
+            template<int T_dim>
+            struct GetMPI_StructAsArray<::pmacc::math::Vector<pmacc::math::Complex<double>, T_dim>>
+            {
+                MPI_StructAsArray operator()() const
+                {
+                    return MPI_StructAsArray(MPI_DOUBLE, 2 * T_dim);
+                }
+            };
+
+            template<int T_dim, int T_N>
+            struct GetMPI_StructAsArray<::pmacc::math::Vector<pmacc::math::Complex<double>, T_dim>[T_N]>
+            {
+                MPI_StructAsArray operator()() const
+                {
+                    return MPI_StructAsArray(MPI_DOUBLE, 2 * T_dim * T_N);
+                }
+            };
+
 
         } // namespace def
     } // namespace mpi

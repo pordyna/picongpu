@@ -145,11 +145,12 @@ namespace picongpu
                     openSeries(::openPMD::Access::CREATE);
                     openPMDSeries->setMeshesPath("scatteringData");
                     openPMDSeries->setAttribute("totalSimulationCells", totalSimulationCells);
-                    closeSeries();
+                   // closeSeries();
                 }
 
                 virtual ~XrayScatteringWriter()
                 {
+                    closeSeries();
                     if(outputMemoryLayout == OutputMemoryLayout::Distribute)
                     {
                         if(mpiCommunicator != MPI_COMM_NULL)
@@ -261,7 +262,7 @@ namespace picongpu
                     std::vector<T_ValueType>& realVec,
                     std::vector<T_ValueType>& imagVec)
                 {
-                    openSeries(::openPMD::Access::READ_WRITE);
+                    // openSeries(::openPMD::Access::READ_WRITE);
 
                     ::openPMD::Mesh mesh = prepareMesh(currentStep);
                     ::openPMD::MeshRecordComponent mrc_real = prepareMRC(Component::Real, mesh);
@@ -282,7 +283,7 @@ namespace picongpu
                     // openPMD.
                     __getTransactionEvent().waitForFinished();
                     // Close openPMD Series, most likely the actual write point.
-                    closeSeries();
+                   // closeSeries();
                 }
 
 
@@ -305,7 +306,7 @@ namespace picongpu
                     std::vector<T_ValueType>& realVec,
                     std::vector<T_ValueType>& imagVec)
                 {
-                    openSeries(::openPMD::Access::READ_WRITE);
+                   // openSeries(::openPMD::Access::READ_WRITE);
 
                     // Get openPMD mesh record components for the real and imaginary
                     // parts.
@@ -367,7 +368,7 @@ namespace picongpu
                     // openPMD.
                     __getTransactionEvent().waitForFinished();
                     // Close the openPMD Series, most likely the actual write point.
-                    closeSeries();
+                    //closeSeries();
                 }
             };
         } // namespace xrayScattering

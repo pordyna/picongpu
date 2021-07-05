@@ -1,0 +1,166 @@
+/* Copyright 2020-2021 Pawel Ordyna
+ *
+ * This file is part of PIConGPU.
+ *
+ * PIConGPU is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * PIConGPU is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with PIConGPU.
+ * If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#pragma once
+
+#include "picongpu/param/grid.param"
+#include "picongpu/particles/externalBeam/functors.def"
+#include "picongpu/particles/manipulators/IUnary.def"
+#include "picongpu/plugins/externalBeam/CoordinateTransform.def"
+#include "picongpu/plugins/externalBeam/ProbingBeam.def"
+#include "picongpu/plugins/externalBeam/SecondaryRotation.def"
+#include "picongpu/plugins/externalBeam/Side.def"
+#include "picongpu/plugins/externalBeam/beamProfiles/profiles.def"
+#include "picongpu/plugins/externalBeam/beamShapes/shapes.def"
+
+#include <pmacc/preprocessor/struct.hpp>
+
+#include <pmacc/math/vector/compile-time/Int.hpp>
+
+
+#ifndef PARAM_NEW_PHOTONS_PER_CELL
+#   define PARAM_NEW_PHOTONS_PER_CELL 10u
+#endif
+
+#ifndef PARAM_PROP_DIR
+#    define PARAM_PROP_DIR ZSide
+#endif
+
+#ifndef PARAM_BEAM_DELAY
+#    define PARAM_BEAM_DELAY 100.0e-15_X
+#endif
+
+namespace picongpu
+{
+    namespace plugins
+    {
+        namespace externalBeam
+        {
+            using namespace picongpu::plugins::externalBeam;
+            /* Choose from:
+             *  - ZSide
+             *  - YSide
+             *  - XSide
+             * - ZRSide
+             * - YRSide
+             * - XRSide
+             */
+            using ProbingSide = picongpu::plugins::externalBeam::PARAM_PROP_DIR;
+
+            PMACC_STRUCT(
+                RotationParam,
+                (PMACC_C_VALUE(float_X, yawAngle, 0._X / 180.0_X * pmacc::math::Pi<float_X>::value))(
+                    PMACC_C_VALUE(float_X, pitchAngle, 0.0_X / 180.0_X * pmacc::math::Pi<float_X>::value)));
+
+            PMACC_STRUCT(
+                OffsetParam,
+                (PMACC_C_VECTOR_DIM(float_X, DIM2, beamOffset_SI, 0.0_X, 0.0_X))(
+                    PMACC_C_VALUE(float_X, beamDelay_SI, PARAM_BEAM_DELAY)));
+
+
+            struct GaussianPulseParam
+            {
+                static constexpr bool limitStart = true;
+                static constexpr bool limitEnd = true;
+                static constexpr float_64 FWHM_SI = 30e-15; // 3fs
+
+                static constexpr float_64 cutTimeFront_SI = 1.5 * FWHM_SI;
+                // does nothing since the limit is disabled
+                static constexpr float_64 cutTimeBack_SI = 1.5 * FWHM_SI;
+                static constexpr float_64 timeOffset_SI = cutTimeFront_SI;
+            };
+
+            struct GaussianProfileParam
+            {
+                static constexpr float_64 sigmaX_SI = 20e-6 / 2.3548200450309493;
+                static constexpr float_64 sigmaY_SI = sigmaX_SI;
+            };
+
+            // using DbgBeamProfile = externalBeam::beamProfiles::GaussianProfile<DbgGaussParam>;
+            using BeamProfile = externalBeam::beamProfiles::GaussianProfile<GaussianProfileParam>;
+            using BeamShape = externalBeam::beamShapes::GaussianPulse<GaussianPulseParam>;
+
+            using BeamCoordinates = picongpu::plugins::externalBeam::CoordinateTransform<
+                ProbingSide,
+                picongpu::plugins::externalBeam::SecondaryRotation<RotationParam>,
+                OffsetParam>;
+            using PhotonBeam = picongpu::plugins::externalBeam::ProbingBeam<BeamProfile, BeamShape, BeamCoordinates>;
+            using DebugBeam = PhotonBeam;
+        } // namespace externalBeam
+    } // namespace plugins
+
+    namespace particles
+    {
+        namespace externalBeam
+        {
+            namespace density
+            {
+                struct ProbingBeamDensityParam
+                {
+                private:
+                    static constexpr float_64 cellVolumeSI
+                        = SI::CELL_HEIGHT_SI * SI::CELL_WIDTH_SI * SI::CELL_DEPTH_SI;
+
+                public:
+                    using ProbingBeam = plugins::externalBeam::PhotonBeam;
+                    // Just a test value -> one 100000 photons per full cell
+                    static constexpr float_64 photonFluxAtMaxBeamIntensity_SI{2.86e36};
+                    static constexpr bool limitInY = true;
+                    static constexpr float_64 minY = 2.5e-6;
+                    static constexpr bool maxY = 6.5e-6;
+                };
+                using ProbingBeamDensity = ProbingBeamImpl<ProbingBeamDensityParam>;
+            } // namespace density
+            namespace startPosition
+            {
+                struct RandomProbingBeamParam
+                {
+                    using ProbingBeam = typename picongpu::plugins::externalBeam::PhotonBeam;
+                    static constexpr uint32_t numParticlesPerCell = PARAM_NEW_PHOTONS_PER_CELL;
+                    static constexpr float_X minWeighting = 0.1;
+                };
+                using RandomBeam = RandomProbingBeamImpl<RandomProbingBeamParam>;
+            } // namespace startPosition
+            namespace momentum
+            {
+                struct BeamMomentumParam
+                {
+                    using ProbingBeam = typename picongpu::plugins::externalBeam::PhotonBeam;
+                    static constexpr float_64 photonEnergySI = 8.0 * UNITCONV_keV_to_Joule; // 0.1nm
+                };
+                using BeamMomentum = PhotonMomentum<BeamMomentumParam>;
+            } // namespace momentum
+            namespace initPhase
+            {
+                struct Param
+                {
+                    using ProbingBeam = typename picongpu::plugins::externalBeam::PhotonBeam;
+                    static constexpr float_64 phi0 = 0.0;
+                };
+                // switch thsi manually:
+                using BeamPhase = FromSpeciesWavelength<Param>;
+            } // namespace initPhase
+            using BeamStartAttributes = StartAttributesImpl<
+                startPosition::RandomBeam,
+                momentum::BeamMomentum,
+                initPhase::BeamPhase>;
+
+        } // namespace externalBeam
+    } // namespace particles
+} // namespace picongpu

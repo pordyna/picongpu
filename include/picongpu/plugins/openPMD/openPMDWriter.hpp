@@ -31,6 +31,7 @@
 #include "picongpu/particles/particleToGrid/CombinedDerive.def"
 #include "picongpu/particles/particleToGrid/ComputeFieldValue.hpp"
 #include "picongpu/particles/traits/SpeciesEligibleForSolver.hpp"
+#include "picongpu/plugins/common/asStandardVector.hpp"
 #include "picongpu/plugins/common/openPMDVersion.def"
 #include "picongpu/plugins/common/openPMDWriteMeta.hpp"
 #include "picongpu/plugins/misc/ComponentNames.hpp"
@@ -116,19 +117,6 @@ namespace picongpu
             return recordComponent;
         }
 
-
-        template<typename T_Vec, typename T_Ret>
-        T_Ret asStandardVector(T_Vec const& v)
-        {
-            using __T_Vec = typename std::remove_reference<T_Vec>::type;
-            constexpr auto dim = __T_Vec::dim;
-            T_Ret res(dim);
-            for(unsigned i = 0; i < dim; ++i)
-            {
-                res[dim - i - 1] = v[i];
-            }
-            return res;
-        }
 
         ::openPMD::Series& ThreadParams::openSeries(::openPMD::Access at)
         {
@@ -638,7 +626,7 @@ make sure that environment variable OPENPMD_BP_BACKEND is not set to ADIOS1.
                             params->currentStep,
                             1u);
                     // wait for unfinished asynchronous communication
-                    if(eventPtr != nullptr)
+                    if(eventPtr.has_value())
                         __setTransactionEvent(*eventPtr);
                     /* copy data to host that we can write same to disk*/
                     fieldTmp->getGridBuffer().deviceToHost();

@@ -1,0 +1,14 @@
+{
+  "adios2": {
+    "engine": {
+      "parameters": {
+        "RendezvousReaderCount": "2",
+        "ControlTransport": "sockets",
+        "DataTransport": "WAN",
+        "BufferGrowthFactor": "1.1", 
+        "InitialBufferSize": "36Gb",
+        "Profile": "Off"
+      }
+    }
+  }
+}

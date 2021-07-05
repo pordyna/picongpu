@@ -1,0 +1,93 @@
+/* Copyright 2020-2021 Pawel Ordyna
+ *
+ * This file is part of PIConGPU.
+ *
+ * PIConGPU is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * PIConGPU is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with PIConGPU.
+ * If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#pragma once
+
+#include "picongpu/simulation_defines.hpp"
+
+#include "picongpu/particles/scattering/functors.def"
+/* preprocessor struct generator */
+#include <pmacc/preprocessor/struct.hpp>
+
+#ifndef PARAM_MAX_POLAR_ANGLE
+#    define PARAM_MAX_POLAR_ANGLE 0.02
+#endif
+
+#ifndef PARAM_NEW_PARTICLES_ON_SPLIT
+#    define PARAM_NEW_PARTICLES_ON_SPLIT 256u
+#endif
+
+#ifndef PARAM_CONDITION_FUNCTOR
+#    define PARAM_CONDITION_FUNCTOR ConditionFunctorSingle
+#endif
+
+#ifndef PARAM_SPLIT_GENERATION_LIMIT
+#    define PARAM_SPLIT_GENERATION_LIMIT 0u
+#endif
+
+#ifndef PARAM_PHOTON_SCATTERER
+#    define PARAM_PHOTON_SCATTERER PhotonScattererSplit
+#endif
+
+
+namespace picongpu
+{
+    namespace particles
+    {
+        namespace scattering
+        {
+
+            struct ConditionParam
+            {
+                static constexpr float_64 totalCrossSection_SI = 6.65e-29;  // thomson scattering
+            };
+
+            struct DirectionParam
+            {
+                static constexpr float_64 maxPolarAngle = PARAM_MAX_POLAR_ANGLE; // all should hit the detector
+                static constexpr float_64 minPolarAngle = 0.0;
+            };
+
+            using ConditionFunctorSingle = condition::RandomThompson<ConditionParam, 1u>;
+            using ConditionFunctorDouble = condition::RandomThompson<ConditionParam, 2u>;
+            using ConditionFunctorMulti = condition::RandomThompson<ConditionParam, 0u>;
+
+            using DirectionFunctorUniform = direction::Random<DirectionParam>;
+
+            using ConditionFunctor = PARAM_CONDITION_FUNCTOR;
+            using DirectionFunctor = DirectionFunctorUniform;
+
+            template<typename T_Densities>
+            using PhotonScattererSplit = SplitScatterer<
+                T_Densities,
+                ConditionFunctor,
+                splitCondition::GenerationLimit<PARAM_SPLIT_GENERATION_LIMIT>,
+                DirectionFunctor,
+                PARAM_NEW_PARTICLES_ON_SPLIT>;
+
+            template<typename T_Densities>
+            using PhotonScattererSimple
+                = ScatterFunctor<T_Densities, ConditionFunctor, DirectionFunctor>;
+
+            template<typename T_Densities>
+            using PhotonScatterer = PARAM_PHOTON_SCATTERER<T_Densities>;
+
+        } // namespace scattering
+    } // namespace particles
+} // namespace picongpu

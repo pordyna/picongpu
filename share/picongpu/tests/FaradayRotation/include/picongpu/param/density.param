@@ -1,0 +1,97 @@
+/* Copyright 2013-2021 Axel Huebl, Heiko Burau, Rene Widera, Felix Schmitt,
+ *                     Richard Pausch
+ *
+ * This file is part of PIConGPU.
+ *
+ * PIConGPU is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * PIConGPU is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with PIConGPU.
+ * If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/** @file
+ *
+ * Configure existing or define new normalized density profiles here.
+ * During particle species creation in speciesInitialization.param,
+ * those profiles can be translated to spatial particle distributions.
+ */
+
+#pragma once
+
+#include "picongpu/particles/densityProfiles/profiles.def"
+/* preprocessor struct generator */
+#include <pmacc/preprocessor/struct.hpp>
+
+
+namespace picongpu
+{
+    namespace SI
+    {
+        /** Base density in particles per m^3 in the density profiles.
+         *
+         * This is often taken as reference maximum density in normalized profiles.
+         * Individual particle species can define a `densityRatio` flag relative
+         * to this value.
+         *
+         * unit: ELEMENTS/m^3
+         */
+        constexpr float_64 BASE_DENSITY_SI = 1.e30;
+    } // namespace SI
+
+    HDINLINE float_X gaussian3d(float3_X const& x, float3_X const& mu, float3_X const& sigma)
+    {
+        const float3_X val = x - mu / sigma;
+        const float_X exponent = precisionCast<float_X>(-0.5 * pmacc::math::abs2(val));
+        return math::exp(exponent);
+    }
+
+    namespace densityProfiles
+    {
+        struct FreeFormulaFunctor
+        {
+            /** This formula uses SI quantities only.
+             *  The profile will be multiplied by BASE_DENSITY_SI.
+             *
+             * @param position_SI total offset including all slides [meter]
+             * @param cellSize_SI cell sizes [meter]
+             *
+             * @return float_X density [normalized to 1.0]
+             */
+            HDINLINE float_X operator()(floatD_64 const& position_SI,  float3_64 const& cellSize_SI)
+            {
+                const float3_X position = precisionCast<float_X>(position_SI / cellSize_SI);
+
+                const float3_X mu1{10, 30, 230};
+                const float3_X mu2{30, 60, 120};
+                const float3_X mu3{49, 78, 68};
+                const float3_X mu4{32, 64, 128};
+
+                const float3_X sigma1{10, 50, 120};
+                const float3_X sigma2{20, 70, 60};
+                const float3_X sigma3{45, 23, 44};
+                const float3_X sigma4{15, 15, 15};
+
+                float_X s = 1.0_X;
+                s += gaussian3d(position, mu1, sigma1);
+                s += gaussian3d(position, mu2, sigma2);
+                s += gaussian3d(position, mu3, sigma3);
+                s += gaussian3d(position, mu4, sigma4);
+
+                s *= float_X(s >= 0.0);
+                return s;
+            }
+        };
+
+        /* definition of free formula profile */
+        using FreeFormula = FreeFormulaImpl<FreeFormulaFunctor>;
+    } // namespace densityProfiles
+} // namespace picongpu

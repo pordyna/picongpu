@@ -117,7 +117,7 @@ namespace picongpu
                  *                   **optional**: can implement **one** host side constructor
                  *                   `T_Functor()` or `T_Functor(uint32_t currentTimeStep)`
                  */
-                template<typename T_Functor>
+                template<typename T_Functor, typename T_Species = bmpl::_1>
                 struct FreeBoundary;
 
             } // namespace generic

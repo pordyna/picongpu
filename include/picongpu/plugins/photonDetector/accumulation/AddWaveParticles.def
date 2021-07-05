@@ -1,0 +1,106 @@
+/* Copyright 2021 Pawel Ordyna
+ *
+ * This file is part of PIConGPU.
+ *
+ * PIConGPU is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * PIConGPU is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with PIConGPU.
+ * If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#pragma once
+#include "picongpu/simulation_defines.hpp"
+
+#include "picongpu/particles/traits/SpeciesEligibleForSolver.hpp"
+#include "picongpu/plugins/externalBeam/AxisSwap.def"
+#include "picongpu/plugins/photonDetector/DetectorParams.def"
+
+#include <pmacc/math/Complex.hpp>
+#include <pmacc/traits/HasFlag.hpp>
+#include <pmacc/traits/HasIdentifiers.hpp>
+
+#include <boost/mpl/and.hpp>
+#include <boost/mpl/or.hpp>
+
+#include <complex>
+namespace picongpu
+{
+    namespace plugins
+    {
+        namespace photonDetector
+        {
+            namespace accumulation
+            {
+                namespace acc
+                {
+                    template<typename T_Species>
+                    struct AddWaveParticles;
+                } // namespace acc
+
+                template<typename T_Species>
+                struct AddWaveParticles;
+            } // namespace accumulation
+            namespace particleHandlers
+            {
+                /** Sum amplitude and phase of wave like particles hitting a detector cell
+                 *
+                 * A particle accumulation policy for a particle detector.
+                 */
+                struct AddWaveParticles
+                {
+                    //! Get a functor factory type for a give particle species type
+                    template<typename T_Species>
+                    struct apply
+                    {
+                        using type = picongpu::plugins::photonDetector::accumulation::AddWaveParticles<T_Species>;
+                    };
+                };
+            } // namespace particleHandlers
+
+        } // namespace photonDetector
+    } // namespace plugins
+
+    namespace particles
+    {
+        namespace traits
+        {
+            //! Check if a particle species has all the required identifiers and flags for the AddWaveParticles policy
+            template<typename T_Species>
+            struct SpeciesEligibleForSolver<
+                T_Species,
+                picongpu::plugins::photonDetector::particleHandlers::AddWaveParticles>
+            {
+                using FrameType = typename T_Species::FrameType;
+
+                // This accumulations strategy always needs position and weighting.
+                using AlwaysRequiredIdentifiers = MakeSeq_t<position<>, weighting, startPhase>;
+                // Particles has the phase attribute. This should be updated by pusher on each time step.
+                // Wavelength is calculated per particle from particle momentum.
+                using DynamicWavelengthScenarioAttributes = MakeSeq_t<momentum>;
+
+                using SpeciesHasBaseIdentifiers =
+                    typename pmacc::traits::HasIdentifiers<FrameType, AlwaysRequiredIdentifiers>::type;
+
+                using SpeciesHasConstScenarioIdentifiers =
+                    typename pmacc::traits::HasFlag<FrameType, wavelength<>>::type;
+
+                using SpeciesHasDynamicScenarioIdentifiers =
+                    typename pmacc::traits::HasIdentifiers<FrameType, DynamicWavelengthScenarioAttributes>::type;
+
+                using type = typename bmpl::and_<
+                    SpeciesHasBaseIdentifiers,
+                    typename bmpl::or_<SpeciesHasConstScenarioIdentifiers, SpeciesHasDynamicScenarioIdentifiers>::
+                        type>::type;
+            };
+        } // namespace traits
+    } // namespace particles
+} // namespace picongpu

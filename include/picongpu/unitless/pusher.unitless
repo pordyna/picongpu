@@ -74,6 +74,7 @@ namespace picongpu
             {
             };
 
+
             struct ReducedLandauLifshitz : public particlePusherReducedLandauLifshitz::Push<Velocity, Gamma<>>
             {
             };
