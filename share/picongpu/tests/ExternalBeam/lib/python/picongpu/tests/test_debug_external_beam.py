@@ -34,7 +34,7 @@ from verify_results import verify_results
                              ('z', (5, 2), 30.0, 40.0),  # 14
                              ('zr', (5, 2), 30.0, 40.0)  # 15
                          ])
-def test_detect_single_particle(tmp_path, side_str,
+def test_external_beam(tmp_path, side_str,
                                 offset, yaw,
                                 pitch):
     # use pic create to create a tmp example dir
