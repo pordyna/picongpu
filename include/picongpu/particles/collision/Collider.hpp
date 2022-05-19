@@ -50,7 +50,6 @@ namespace picongpu
                             ApplyGuard<typename T_Collider::Functor>,
                             pmacc::meta::accessors::First<bmpl::_1>,
                             pmacc::meta::accessors::Second<bmpl::_1>,
-                            typename T_Collider::Params,
                             typename T_Collider::FilterPair>>{}(deviceHeap, currentStep);
                 }
             };

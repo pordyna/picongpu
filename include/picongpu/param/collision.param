@@ -32,6 +32,10 @@ namespace picongpu
             {
                 using float_COLL = float_64;
             } // namespace precision
+
+            constexpr uint32_t screeningLengthSlot = 0u;
+            constexpr bool calculateScreeningLength = false;
+            using CollisionScreeningSpecies = VectorAllSpecies;
             /** CollisionPipeline defines in which order species interact with each other
              *
              * the functors are called in order (from first to last functor)

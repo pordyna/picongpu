@@ -1,4 +1,4 @@
-/* Copyright 2015-2022 Rene Widera, Pawel Ordyna
+/* Copyright 2021 Pawel Ordyna
  *
  * This file is part of PIConGPU.
  *
@@ -17,20 +17,17 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 #pragma once
-
 namespace picongpu
 {
     namespace particles
     {
         namespace collision
         {
-            namespace binary
-            {
-                struct RelativisticBinaryCollision;
-
-            } // namespace binary
+            template<uint32_t T_numWorkers, bool screeningLength>
+            struct InterCollision;
+            template<uint32_t T_numWorkers, bool screeningLength>
+            struct IntraCollision;
         } // namespace collision
     } // namespace particles
 } // namespace picongpu

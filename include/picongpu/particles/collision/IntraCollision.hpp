@@ -39,9 +39,22 @@ namespace picongpu
     {
         namespace collision
         {
-            template<uint32_t T_numWorkers>
+            template<uint32_t T_numWorkers, bool useScreeningLength>
             struct IntraCollision
             {
+                HINLINE IntraCollision()
+                {
+                    if constexpr(useScreeningLength)
+                    {
+                        constexpr uint32_t slot = screeningLengthSlot;
+                        DataConnector& dc = Environment<>::get().DataConnector();
+                        auto field = dc.get<FieldTmp>(FieldTmp::getUniqueId(slot), true);
+                        invScreeningLengthSquared = field->getGridBuffer().getDeviceBuffer().getDataBox();
+                    }
+                }
+
+            private:
+                PMACC_ALIGN(invScreeningLengthSquared, FieldTmp::DataBoxType);
                 /* Get the duplication correction for a collision
                  *
                  * A particle duplication is how many times a particle collides in the current time step.
@@ -64,6 +77,7 @@ namespace picongpu
                         return (idx == 0u || idx == sizeAll - 1u) ? 2u : 1u;
                 }
 
+            public:
                 template<
                     typename T_ParBox,
                     typename T_Mapping,
@@ -79,7 +93,6 @@ namespace picongpu
                     T_DeviceHeapHandle deviceHeapHandle,
                     T_RngHandle rngHandle,
                     T_CollisionFunctor const collisionFunctor,
-                    float_X coulombLog,
                     T_Filter filter) const
                 {
                     using namespace pmacc::particles::operations;
@@ -145,8 +158,7 @@ namespace picongpu
                         alpaka::core::declval<lockstep::Worker<frameSize> const>(),
                         alpaka::core::declval<float_X const>(),
                         alpaka::core::declval<float_X const>(),
-                        alpaka::core::declval<uint32_t const>(),
-                        alpaka::core::declval<float_X const>()))>(forEachFrameElem);
+                        alpaka::core::declval<uint32_t const>()))>(forEachFrameElem);
 
                     forEachFrameElem(
                         [&](lockstep::Idx const idx)
@@ -163,8 +175,15 @@ namespace picongpu
                                 lockstep::Worker<T_numWorkers>{workerIdx},
                                 densityArray[idx],
                                 densityArray[idx],
-                                potentialPartners,
-                                coulombLog);
+                                potentialPartners);
+                            if constexpr(useScreeningLength)
+                            {
+                                auto const shifted = invScreeningLengthSquared.shift(superCellIdx);
+                                auto const idxInSuperCell
+                                    = DataSpaceOperations<simDim>::template map<SuperCellSize>(idx);
+                                collisionFunctorCtx[idx].coulombLogFunctor.screeningLengthSquared_m
+                                    = 1._X / shifted(idxInSuperCell)[0];
+                            }
                             for(uint32_t i = 0; i < sizeAll; i += 2)
                             {
                                 auto parEven = detail::getParticle(pb, firstFrame, listAll[i]);
@@ -193,19 +212,18 @@ namespace picongpu
              *
              * @tparam T_CollisionFunctor A binary particle functor defining a single macro particle collision in the
              *     binary-collision algorithm.
-             * @tparam T_Params A struct defining `coulombLog` for the collisions.
              * @tparam T_FilterPair A pair of particle filters, each for each species
              *     in the colliding pair.
              * @tparam T_Species0 Colliding species.
              * @tparam T_Species1 2nd colliding species.
              */
-            template<typename T_CollisionFunctor, typename T_Params, typename T_FilterPair, typename T_Species>
+            template<typename T_CollisionFunctor, typename T_FilterPair, typename T_Species>
             struct DoIntraCollision;
 
             // A single template specialization. This ensures that the code won't compile if the FilterPair contains
             // two different filters. That wouldn't make much sense for internal collisions.
-            template<typename T_CollisionFunctor, typename T_Params, typename T_Filter, typename T_Species>
-            struct DoIntraCollision<T_CollisionFunctor, T_Params, FilterPair<T_Filter, T_Filter>, T_Species>
+            template<typename T_CollisionFunctor, typename T_Filter, typename T_Species>
+            struct DoIntraCollision<T_CollisionFunctor, FilterPair<T_Filter, T_Filter>, T_Species>
             {
                 /* Run kernel
                  *
@@ -229,15 +247,14 @@ namespace picongpu
 
                     /* random number generator */
                     using RNGFactory = pmacc::random::RNGProvider<simDim, random::Generator>;
-                    constexpr float_X coulombLog = T_Params::coulombLog;
-                    PMACC_KERNEL(IntraCollision<numWorkers>{})
+                    using Kernel = typename CollisionFunctor::template CallingIntraKernel<numWorkers>;
+                    PMACC_KERNEL(Kernel{})
                     (mapper.getGridDim(), numWorkers)(
                         species->getDeviceParticlesBox(),
                         mapper,
                         deviceHeap->getAllocatorHandle(),
                         RNGFactory::createHandle(),
                         CollisionFunctor(currentStep),
-                        coulombLog,
                         particles::filter::IUnary<Filter>{currentStep});
                 }
             };

@@ -1,4 +1,4 @@
-/* Copyright 2019-2022 Rene Widera, Pawel Ordyna
+/* Copyright 2015-2022 Rene Widera, Pawel Ordyna
  *
  * This file is part of PIConGPU.
  *
@@ -17,9 +17,8 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "picongpu/particles/collision/IBinary.def"
 #pragma once
-
-#include <pmacc/functor/Interface.hpp>
 
 namespace picongpu
 {
@@ -27,21 +26,15 @@ namespace picongpu
     {
         namespace collision
         {
-            namespace acc
+            namespace relativistic
             {
-                template<typename T_BinaryFunctor>
-                using IBinary = pmacc::functor::acc::Interface<T_BinaryFunctor, 2u, void>;
-            }
-            /**  interface for a binary particle functor
-             *
-             *
-             * @tparam T_BinaryFunctor binary particle acc functor, must contain
-             *         `void operator()(P1 & particle1, P2 & particle2, ...)`
-             *          and support at least two particles
-             */
-            template<typename T_BinaryFunctor>
-            using IBinary = pmacc::functor::Interface<T_BinaryFunctor, 2u, void>;
+                //! Host side binary collision functor
+                template<typename T_Param>
+                struct RelativisticCollisionConstLogImpl;
 
+                template<typename T_Param>
+                using RelativisticCollisionConstLog = RelativisticCollisionConstLogImpl<T_Param>;
+            } // namespace binary
         } // namespace collision
     } // namespace particles
 } // namespace picongpu

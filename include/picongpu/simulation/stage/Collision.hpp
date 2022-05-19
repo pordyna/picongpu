@@ -21,8 +21,13 @@
 
 #include "picongpu/simulation_defines.hpp"
 
+
 #include "picongpu/fields/FieldJ.hpp"
+#include "picongpu/fields/FieldTmp.hpp"
+
 #include "picongpu/particles/collision/collision.hpp"
+#include "picongpu/particles/particleToGrid/ComputeFieldValue.hpp"
+#include "picongpu/particles/particleToGrid/combinedAttributes/CombinedAttributes.def"
 
 #include <pmacc/Environment.hpp>
 #include <pmacc/dataManagement/DataConnector.hpp>
@@ -47,12 +52,74 @@ namespace picongpu
                 {
                 }
 
+                template<typename T_Species>
+                struct AddNextField
+                {
+                    HINLINE void operator()(
+                        FieldTmp& fieldTmp1,
+                        FieldTmp& fieldTmp2,
+                        uint32_t const& currentStep,
+                        uint32_t const& extraSlotNr) const
+                    {
+                        DataConnector& dc = Environment<>::get().DataConnector();
+                        using DeriveOperation = particles::particleToGrid::CreateFieldTmpOperation_t<
+                            T_Species,
+                            particles::particleToGrid::combinedAttributes::ScreeningInvSqrt>;
+                        using Solver = typename DeriveOperation::Solver;
+                        using Filter = typename DeriveOperation::Filter;
+                        auto eventPtr
+                            = particles::particleToGrid::ComputeFieldValue<CORE + BORDER, Solver, T_Species, Filter>()(
+                                fieldTmp2,
+                                currentStep,
+                                extraSlotNr);
+                        // wait for unfinished asynchronous communication
+                        if(eventPtr != nullptr)
+                            __setTransactionEvent(*eventPtr);
+                        fieldTmp1.template modifyByField<CORE + BORDER, pmacc::math::operation::Add>(fieldTmp2);
+                    }
+                };
+
                 /** Perform particle particle collision
                  *
                  * @param step index of time iteration
                  */
                 void operator()(uint32_t const step) const
                 {
+                    if constexpr(particles::collision::calculateScreeningLength)
+                    {
+                        using Species = picongpu::particles::collision::CollisionScreeningSpecies;
+                        using FirstSpecies = typename bmpl::at_c<Species, 0>::type;
+                        using RemainingSpecies = typename bmpl::pop_front<Species>::type;
+
+                        using DeriveOperation = particles::particleToGrid::CreateFieldTmpOperation_t<
+                            FirstSpecies,
+                            particles::particleToGrid::combinedAttributes::ScreeningInvSqrt>;
+                        using Solver = typename DeriveOperation::Solver;
+                        using Filter = typename DeriveOperation::Filter;
+                        DataConnector& dc = Environment<>::get().DataConnector();
+                        constexpr uint32_t slot = picongpu::particles::collision::screeningLengthSlot;
+                        auto fieldTmp1 = dc.get<FieldTmp>(FieldTmp::getUniqueId(slot), true);
+                        auto eventPtr = particles::particleToGrid::ComputeFieldValue<
+                            CORE + BORDER,
+                            Solver,
+                            FirstSpecies,
+                            Filter>()(*fieldTmp1, step, slot + 1u);
+                        // wait for unfinished asynchronous communication
+                        if(eventPtr != nullptr)
+                            __setTransactionEvent(*eventPtr);
+
+                        if constexpr(!bmpl::empty<RemainingSpecies>::value)
+                        {
+                            auto fieldTmp2 = dc.get<FieldTmp>(FieldTmp::getUniqueId(slot + 1), true);
+                            pmacc::meta::ForEach<RemainingSpecies, AddNextField<bmpl::_1>>{}(
+                                *fieldTmp1,
+                                *fieldTmp2,
+                                step,
+                                slot + 2u);
+                            fieldTmp2.reset();
+                        }
+                    }
+
                     pmacc::meta::ForEach<
                         particles::collision::CollisionPipeline,
                         particles::collision::CallCollider<bmpl::_1>>{}(m_heap, step);

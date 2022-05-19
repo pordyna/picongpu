@@ -24,6 +24,7 @@
 #include "picongpu/particles/collision/detail/CollisionContext.hpp"
 #include "picongpu/particles/collision/detail/ListEntry.hpp"
 #include "picongpu/particles/collision/detail/cellDensity.hpp"
+#include "picongpu/particles/collision/kernels.def"
 
 #include <pmacc/lockstep.hpp>
 #include <pmacc/mappings/kernel/AreaMapping.hpp>
@@ -40,9 +41,22 @@ namespace picongpu
     {
         namespace collision
         {
-            template<uint32_t T_numWorkers>
+            template<uint32_t T_numWorkers, bool useScreeningLength>
             struct InterCollision
             {
+                HINLINE InterCollision()
+                {
+                    if constexpr(useScreeningLength)
+                    {
+                        constexpr uint32_t slot = screeningLengthSlot;
+                        DataConnector& dc = Environment<>::get().DataConnector();
+                        auto field = dc.get<FieldTmp>(FieldTmp::getUniqueId(slot), true);
+                        invScreeningLengthSquared = field->getGridBuffer().getDeviceBuffer().getDataBox();
+                    }
+                }
+
+            private:
+                PMACC_ALIGN(invScreeningLengthSquared, FieldTmp::DataBoxType);
                 /* Get the duplication correction for a collision
                  *
                  * A particle duplication is how many times a particle collides in the current time step.
@@ -72,6 +86,7 @@ namespace picongpu
                     return duplication_correction;
                 }
 
+            public:
                 template<
                     typename T_ParBox0,
                     typename T_ParBox1,
@@ -90,7 +105,6 @@ namespace picongpu
                     T_DeviceHeapHandle deviceHeapHandle,
                     T_RngHandle rngHandle,
                     T_CollisionFunctor const collisionFunctor,
-                    float_X coulombLog,
                     T_Filter0 filter0,
                     T_Filter1 filter1) const
                 {
@@ -114,6 +128,7 @@ namespace picongpu
 
                     DataSpace<simDim> const superCellIdx
                         = mapper.getSuperCellIndex(DataSpace<simDim>(cupla::blockIdx(acc)));
+
 
                     // offset of the superCell (in cells, without any guards) to the
                     // origin of the local domain
@@ -182,8 +197,7 @@ namespace picongpu
                         alpaka::core::declval<lockstep::Worker<frameSize> const>(),
                         alpaka::core::declval<float_X const>(),
                         alpaka::core::declval<float_X const>(),
-                        alpaka::core::declval<uint32_t const>(),
-                        alpaka::core::declval<float_X const>()))>(forEachFrameElem);
+                        alpaka::core::declval<uint32_t const>()))>(forEachFrameElem);
 
                     forEachFrameElem(
                         [&](lockstep::Idx const idx)
@@ -196,6 +210,7 @@ namespace picongpu
                                     rngHandle,
                                     collisionFunctor,
                                     localSuperCellOffset,
+                                    superCellIdx,
                                     workerIdx,
                                     densityArray0[linearIdx],
                                     densityArray1[linearIdx],
@@ -207,7 +222,6 @@ namespace picongpu
                                     pb1,
                                     firstFrame0,
                                     firstFrame1,
-                                    coulombLog,
                                     collisionFunctorCtx,
                                     idx);
                             }
@@ -218,6 +232,7 @@ namespace picongpu
                                     rngHandle,
                                     collisionFunctor,
                                     localSuperCellOffset,
+                                    superCellIdx,
                                     workerIdx,
                                     densityArray1[linearIdx],
                                     densityArray0[linearIdx],
@@ -229,7 +244,6 @@ namespace picongpu
                                     pb0,
                                     firstFrame1,
                                     firstFrame0,
-                                    coulombLog,
                                     collisionFunctorCtx,
                                     idx);
                             }
@@ -264,6 +278,7 @@ namespace picongpu
                     T_RngHandle& rngHandle,
                     T_CollisionFunctor const& collisionFunctor,
                     DataSpace<simDim> const& localSuperCellOffset,
+                    DataSpace<simDim> const& superCellIdx,
                     uint32_t const& workerIdx,
                     float_X const& densityLong,
                     float_X const& densityShort,
@@ -275,7 +290,6 @@ namespace picongpu
                     T_PBoxShort const& pBoxShort,
                     T_FrameLong const& frameLong,
                     T_FrameShort const& frameShort,
-                    float_X const& coulombLog,
                     T_CollisionFunctorCtx& collisionFunctorCtx,
                     lockstep::Idx idx
 
@@ -287,8 +301,17 @@ namespace picongpu
                         lockstep::Worker<T_numWorkers>{workerIdx},
                         densityLong,
                         densityShort,
-                        sizeLong,
-                        coulombLog);
+                        sizeLong);
+
+
+                    if constexpr(useScreeningLength)
+                    {
+                        auto const shifted = invScreeningLengthSquared.shift(superCellIdx);
+                        auto const idxInSuperCell = DataSpaceOperations<simDim>::template map<SuperCellSize>(idx);
+                        collisionFunctorCtx[idx].coulombLogFunctor.screeningLengthSquared_m
+                            = 1._X / shifted(idxInSuperCell)[0];
+                    }
+
                     if(sizeShort == 0u)
                         return;
                     for(uint32_t i = 0; i < sizeLong; ++i)
@@ -305,18 +328,12 @@ namespace picongpu
              *
              * @tparam T_CollisionFunctor A binary particle functor defining a single macro particle collision in the
              *     binary-collision algorithm.
-             * @tparam T_Params A struct defining `coulombLog` for the collisions.
              * @tparam T_FilterPair A pair of particle filters, each for each species
              *     in the colliding pair.
              * @tparam T_Species0 1st colliding species.
              * @tparam T_Species1 2nd colliding species.
              */
-            template<
-                typename T_CollisionFunctor,
-                typename T_Params,
-                typename T_FilterPair,
-                typename T_Species0,
-                typename T_Species1>
+            template<typename T_CollisionFunctor, typename T_FilterPair, typename T_Species0, typename T_Species1>
             struct DoInterCollision
             {
                 /* Run kernel
@@ -349,9 +366,8 @@ namespace picongpu
 
                     //! random number generator
                     using RNGFactory = pmacc::random::RNGProvider<simDim, random::Generator>;
-                    constexpr float_X coulombLog = T_Params::coulombLog;
-
-                    PMACC_KERNEL(InterCollision<numWorkers>{})
+                    using Kernel = typename CollisionFunctor::template CallingInterKernel<numWorkers>;
+                    PMACC_KERNEL(Kernel{})
                     (mapper.getGridDim(), numWorkers)(
                         species0->getDeviceParticlesBox(),
                         species1->getDeviceParticlesBox(),
@@ -359,7 +375,6 @@ namespace picongpu
                         deviceHeap->getAllocatorHandle(),
                         RNGFactory::createHandle(),
                         CollisionFunctor(currentStep),
-                        coulombLog,
                         particles::filter::IUnary<Filter0>{currentStep},
                         particles::filter::IUnary<Filter1>{currentStep});
                 }
