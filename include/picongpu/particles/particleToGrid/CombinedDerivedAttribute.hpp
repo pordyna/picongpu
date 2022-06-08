@@ -42,7 +42,75 @@ namespace picongpu
                 typename T_AttributeDescription>
             struct CombinedDeriveAttribute
             {
+                float1_64 getUnit() const
+                {
+                    return T_AttributeDescription().getUnit();
+                }
+
+                std::vector<float_64> getUnitDimension() const
+                {
+                    return T_AttributeDescription().getUnitDimension();
+                }
+
+                static std::string getName()
+                {
+                    return T_AttributeDescription::getName();
+                }
             };
+
+            template<typename T_ListFieldOperations, typename T_ListOperations, typename T_FieldDescription>
+            struct MultiAttributeFieldOperation
+            {
+                PMACC_STATIC_ASSERT_MSG(
+                    bmpl::size<T_ListFieldOperations>::value == bmpl::size<T_ListOperations>::value + 1u,
+                    operationsList_must_have_one_less_element_as_fieldOperationsList);
+
+                float1_64 getUnit() const
+                {
+                    return T_FieldDescription().getUnit();
+                }
+
+                std::vector<float_64> getUnitDimension() const
+                {
+                    return T_FieldDescription().getUnitDimension();
+                }
+
+                static std::string getName()
+                {
+                    return T_FieldDescription::getName();
+                }
+            };
+
+            template<typename T_ListFieldOperations, typename T_Name>
+            struct MakeSumFieldOperation
+            {
+                struct FieldDescription
+                {
+                    using FirstOperation = typename bmpl::first<T_ListFieldOperations>::type;
+                    float1_64 getUnit() const
+                    {
+                        return FirstOperation::Solver().getUnit();
+                    }
+
+                    std::vector<float_64> getUnitDimension() const
+                    {
+                        return FirstOperation::Solver().getUnitDimension();
+                    }
+
+                    static std::string getName()
+                    {
+                        return bmpl::c_str<T_Name>::value;
+                    }
+                };
+                using ListOperations = MakeSeqWithIdenticalElements<
+                    bmpl::size<T_ListFieldOperations>::value - 1,
+                    pmacc::math::operation::Add>;
+                using type = MultiAttributeFieldOperation<T_ListFieldOperations, ListOperations, FieldDescription>;
+            };
+
+            template<typename T_ListAttributes, typename T_Name>
+            using MakeSumFieldOperation_t = typename MakeSumFieldOperation<T_ListAttributes, T_Name>::type;
+
         } // namespace particleToGrid
     } // namespace particles
 } // namespace picongpu

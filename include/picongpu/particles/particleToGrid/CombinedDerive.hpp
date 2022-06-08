@@ -74,6 +74,44 @@ namespace picongpu
             {
                 return T_AttributeDescription::getName();
             }
+
+            template<
+                typename T_SolversList,
+                typename T_ModifyingOperation,
+                typename T_AttributeDescription>
+            HDINLINE float1_64 ListDeriveSolver<
+                T_SolversList,
+                T_ModifyingOperation,
+                T_AttributeDescription>::getUnit() const
+            {
+                return T_AttributeDescription().getUnit();
+            }
+
+            template<
+                typename T_SolversList,
+                typename T_ModifyingOperation,
+                typename T_AttributeDescription>
+            HINLINE std::vector<float_64> ListDeriveSolver<
+                T_SolversList,
+                T_ModifyingOperation,
+                T_AttributeDescription>::getUnitDimension() const
+            {
+                return T_AttributeDescription().getUnitDimension();
+            }
+
+            template<
+                typename T_SolversList,
+                typename T_ModifyingOperation,
+                typename T_AttributeDescription>
+            HINLINE std::string ListDeriveSolver<
+                T_SolversList,
+                T_ModifyingOperation,
+                T_AttributeDescription>::getName()
+            {
+                return T_AttributeDescription::getName();
+            }
+
+
         } // namespace particleToGrid
     } // namespace particles
 } // namespace picongpu

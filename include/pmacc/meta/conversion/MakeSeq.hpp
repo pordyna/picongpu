@@ -25,6 +25,7 @@
 
 #include "pmacc/meta/conversion/MakeSeqFromNestedSeq.hpp"
 
+#include <boost/mpl/range_c.hpp>
 #include <boost/mpl/vector.hpp>
 
 namespace pmacc
@@ -52,4 +53,15 @@ namespace pmacc
     template<typename... T_Args>
     using MakeSeq_t = typename MakeSeq<T_Args...>::type;
 
+    /** create a vector with n elements of type T
+     *
+     * @tparam n number of elements
+     * @tparam T sequence element
+     */
+    template<size_t n, typename T>
+    struct MakeSeqWithIdenticalElements
+    {
+        using type = typename bmpl::
+            fold<typename bmpl::range_c<size_t, 0, n>::type, bmpl::vector0<>, JoinToSeq<bmpl::_1, T>>::type;
+    };
 } // namespace pmacc

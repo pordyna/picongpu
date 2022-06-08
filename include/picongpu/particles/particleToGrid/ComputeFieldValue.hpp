@@ -143,22 +143,30 @@ namespace picongpu
             template<uint32_t AREA, typename T_Species, typename T_Filter, typename... T>
             struct ComputeFieldValue<AREA, ListDeriveSolver<T...>, T_Species, T_Filter>
             {
-                template<typename T_Solver>
-                HINLINE void applyField(FieldTmp& fieldTmp1, uint32_t const& currentStep, uint32_t const& extraSlotNr)
-                    const:
+                template<typename T_ParamPack>
+                struct ApplyField
                 {
-                    auto fieldTmp2 = dc.get<FieldTmp>(FieldTmp::getUniqueId(extraSlotNr), true);
-                    auto eventPtr = particles::particleToGrid::
-                        ComputeFieldValue<CORE + BORDER, FirstSolver, T_Species, T_Filter>()(
-                            *fieldTmp2,
-                            currentStep,
-                            extraSlotNr + 1u);
-                    // wait for unfinished asynchronous communication
-                    if(eventPtr != nullptr)
-                        __setTransactionEvent(*eventPtr);
-                    fieldTmp1.template modifyByField<AREA, typename CombinedSolver::ModifyingOperation>(*fieldTmp2);
-                }
+                    using Solver = typename bmpl::at_c<T_ParamPack, 0>::type;
+                    using Operation = typename bmpl::at_c<T_ParamPack, 1>::type;
 
+                    HINLINE void operator()(
+                        FieldTmp& fieldTmp1,
+                        uint32_t const& currentStep,
+                        uint32_t const& extraSlotNr) const
+                    {
+                        DataConnector& dc = Environment<>::get().DataConnector();
+                        auto fieldTmp2 = dc.get<FieldTmp>(FieldTmp::getUniqueId(extraSlotNr), true);
+                        auto eventPtr = particles::particleToGrid::
+                            ComputeFieldValue<CORE + BORDER, Solver, T_Species, T_Filter>()(
+                                *fieldTmp2,
+                                currentStep,
+                                extraSlotNr + 1u);
+                        // wait for unfinished asynchronous communication
+                        if(eventPtr != nullptr)
+                            __setTransactionEvent(*eventPtr);
+                        fieldTmp1.template modifyByField<AREA, Operation>(*fieldTmp2);
+                    }
+                };
                 HINLINE std::unique_ptr<EventTask> operator()(
                     FieldTmp& fieldTmp1,
                     uint32_t const& currentStep,
@@ -166,13 +174,14 @@ namespace picongpu
                 {
                     using ListSolver = ListDeriveSolver<T...>;
                     using SolversList = typename ListSolver::SolversList;
+                    using OperationsList = typename ListSolver::OperationsList;
                     using FirstSolver = typename bmpl::at_c<SolversList, 0>::type;
                     using RemainingSolvers = typename bmpl::iterator_range<
-                        bmpl::next<bmpl::begin<SolversList>::type>::type,
-                        bmpl::end<SolversList>::type>::type;
+                        typename bmpl::next<typename bmpl::begin<SolversList>::type>::type,
+                        typename bmpl::end<SolversList>::type>::type;
                     auto eventPtr = particles::particleToGrid::
                         ComputeFieldValue<CORE + BORDER, FirstSolver, T_Species, T_Filter>()(
-                            *fieldTmp1,
+                            fieldTmp1,
                             currentStep,
                             extraSlotNr);
                     // wait for unfinished asynchronous communication
@@ -180,7 +189,7 @@ namespace picongpu
                         __setTransactionEvent(*eventPtr);
                     pmacc::meta::ForEach<
                         RemainingSolvers,
-                        applyField<bmpl::_1>>{}(fieldTmp1, currentStep, extraSlotNr);
+                        ApplyField<bmpl::_1>>{}(fieldTmp1, currentStep, extraSlotNr);
                     return nullptr;
                 }
             };

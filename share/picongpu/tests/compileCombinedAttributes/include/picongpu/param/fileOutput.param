@@ -114,6 +114,8 @@ namespace picongpu
     using RelativisticDensity_Seq
         = deriveField::CreateEligible_t<PIC_Electrons, deriveField::combinedAttributes::RelativisticDensity>;
 
+    using SumEnergyDensity_t = deriveField::MakeSumAttribute_t<ChargeDensity_Seq>
+
 
     /** FieldTmpSolvers groups all solvers that create data for FieldTmp ******
      *

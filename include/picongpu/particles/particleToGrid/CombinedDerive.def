@@ -64,13 +64,29 @@ namespace picongpu
                 HINLINE static std::string getName();
             };
 
-            /** Returns a solver type for a given CombinedAttribute and Species
-             *
-             * @tparam CombinedDeriveAttribute combined attribute type
-             * @tparam T_Species species type
-             */
-            template<typename CombinedDeriveAttribute, typename T_Species>
-            struct GetCombinedSolver;
+            template<typename T_SolversList, typename T_ModifyingOperation, typename T_AttributeDescription>
+            struct ListDeriveSolver
+            {
+                using SolversList = T_SolversList;
+                using OperationsList = T_ModifyingOperation;
+
+                using LowerMargin = typename bmpl::accumulate<
+                    SolversList,
+                    typename pmacc::math::CT::make_Int<simDim, 0>::type,
+                    pmacc::math::CT::max<bmpl::_1, GetLowerMargin<bmpl::_2>>>::type;
+                using UpperMargin = typename bmpl::accumulate<
+                    SolversList,
+                    typename pmacc::math::CT::make_Int<simDim, 0>::type,
+                    pmacc::math::CT::max<bmpl::_1, GetUpperMargin<bmpl::_2>>>::type;
+
+
+                HDINLINE float1_64 getUnit() const;
+
+                HINLINE std::vector<float_64> getUnitDimension() const;
+
+                HINLINE static std::string getName();
+            };
+
 
             template<
                 typename T_BaseDerivedAttribute,
@@ -78,7 +94,7 @@ namespace picongpu
                 typename T_ModifyingOperation,
                 typename T_AttributeDescription,
                 typename T_Species>
-            struct GetCombinedSolver<
+            struct GetSolver<
                 CombinedDeriveAttribute<
                     T_BaseDerivedAttribute,
                     T_ModifyingDerivedAttribute,
@@ -99,13 +115,21 @@ namespace picongpu
                     T_AttributeDescription>;
             };
 
-            template<typename T_Species, typename T_Filter, typename... T>
-            struct CreateFieldTmpOperation<T_Species, CombinedDeriveAttribute<T...>, T_Filter>
+            template<
+                typename T_ListAttributes,
+                typename T_ListOperations,
+                typename T_AttributeDescription,
+                typename T_Species>
+            struct GetSolver<
+                ListDeriveAttribute<T_ListAttributes, T_ListOperations, T_AttributeDescription>,
+                T_Species>
             {
-                using DerivedAttribute = CombinedDeriveAttribute<T...>;
+                using SolversList =
+                    typename bmpl::transform<T_ListAttributes, typename GetSolver<bmpl::_1, T_Species>::type>::type;
+                using OperationsList =
+                    typename bmpl::transform<T_ListOperations, bmpl::apply1<bmpl::_1, T_Species>>::type;
 
-                using Solver = typename GetCombinedSolver<DerivedAttribute, T_Species>::type;
-                using type = FieldTmpOperation<Solver, T_Species, T_Filter>;
+                using type = ListDeriveSolver<SolversList, OperationsList, T_AttributeDescription>;
             };
 
 
@@ -123,6 +147,29 @@ namespace picongpu
             struct RequiredExtraSlots<CombinedDeriveSolver<T_SolverArgs...>>
             {
                 using type = std::integral_constant<uint32_t, 1u>;
+            };
+
+            template<typename... T_SolverArgs>
+            struct RequiredExtraSlots<ListDeriveSolver<T_SolverArgs...>>
+            {
+                /*
+                 * Calculation needs 2 slots (1 extra) if all attributes are not combined or if just the first one is
+                 * not combined, otherwise needs 3 slots (2 extra).
+                 */
+                using SolversList = typename ListDeriveSolver<T_SolverArgs...>::SolversList;
+                using AllButFirstSolver = typename bmpl::iterator_range<
+                    typename bmpl::next<typename bmpl::begin<SolversList>::type>::type,
+                    typename bmpl::end<SolversList>::type>::type;
+
+                template<typename T_Solver>
+                struct GetSlots
+                {
+                    using type = bmpl::int_<RequiredExtraSlots<T_Solver>::type::value>;
+                };
+
+                using MaxExtraSlots = typename bmpl::
+                    accumulate<AllButFirstSolver, bmpl::int_<0>, bmpl::max<bmpl::_1, GetSlots<bmpl::_2>>>::type;
+                using type = std::integral_constant<uint32_t, 2u + MaxExtraSlots::value>;
             };
 
 
@@ -143,6 +190,15 @@ namespace picongpu
                 using EligibleForModifierAttribute =
                     typename particles::traits::SpeciesEligibleForSolver<T_Species, T_ModifyingDerivedAttribute>::type;
                 using type = typename bmpl::and_<EligibleForBaseAttribute, EligibleForModifierAttribute>;
+            };
+            template<typename T_Species, typename T_ListAttributes, typename... T>
+            struct SpeciesEligibleForSolver<T_Species, particleToGrid::ListDeriveAttribute<T_ListAttributes, T...>>
+            {
+                using EligibleForSolvers = typename bmpl::transform<
+                    T_ListAttributes,
+                    typename particles::traits::SpeciesEligibleForSolver<T_Species, bmpl::_1>::type>::type;
+                using type = typename bmpl::
+                    accumulate<EligibleForSolvers, bmpl::bool_<true>, bmpl::and_<bmpl::_1, bmpl::_2>>::type;
             };
         } // namespace traits
     } // namespace particles

@@ -131,6 +131,18 @@ namespace picongpu
 
             } // namespace detail
 
+            /** Returns a solver type for a given Attribute and Species
+             *
+             * @tparam Attribute attribute type
+             * @tparam T_Species species type
+             */
+            template<typename T_Attribute, typename T_Species>
+            struct GetSolver
+            {
+                using Shape = detail::GetAttributeShape_t<T_Species, T_Attribute>;
+                using type = ComputeGridValuePerFrame<Shape, T_Attribute>;
+            };
+
             /** Solver Operation for Particle to Grid Projections
              *
              * Derives a scalar field from a (filtered) particle species at runtime.
@@ -151,10 +163,8 @@ namespace picongpu
             template<typename T_Species, typename T_DerivedAttribute, typename T_Filter = filter::All>
             struct CreateFieldTmpOperation
             {
-                using shapeType = detail::GetAttributeShape_t<T_Species, T_DerivedAttribute>;
-
-                using OperationPerFrame = ComputeGridValuePerFrame<shapeType, T_DerivedAttribute>;
-                using type = FieldTmpOperation<OperationPerFrame, T_Species, T_Filter>;
+                using type
+                    = FieldTmpOperation<typename GetSolver<T_DerivedAttribute, T_Species>::type, T_Species, T_Filter>;
             };
             template<typename T_Species, typename T_DerivedAttribute, typename T_Filter = filter::All>
             using CreateFieldTmpOperation_t =
