@@ -50,3 +50,8 @@
     identifier(                                                                                                       \
         name, using type = in_type; static HDINLINE type getValue()                                                   \
         { return in_default; } static std::string getName() { return std::string(#name); })
+
+#define value_identifier_constexpr(in_type, name, in_default)                                                         \
+    identifier(                                                                                                       \
+        name, using type = in_type; static constexpr HDINLINE type getValue()                                         \
+        { return in_default; } static std::string getName() { return std::string(#name); })
