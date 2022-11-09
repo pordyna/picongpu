@@ -28,6 +28,7 @@
 #include "picongpu/traits/attribute/GetMass.hpp"
 #include "picongpu/traits/frame/GetCharge.hpp"
 #include "picongpu/traits/frame/GetMass.hpp"
+#include "picongpu/particles/boundary/IgnorePeriodicExchangeOrAbsorb.hpp"
 
 
 namespace picongpu
