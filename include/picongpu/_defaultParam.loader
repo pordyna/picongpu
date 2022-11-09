@@ -57,6 +57,7 @@
 #include "picongpu/param/radiation.param"
 #include "picongpu/param/transitionRadiation.param"
 #include "picongpu/param/species.param"
+#include "picongpu/param/scattering.param"
 #include "picongpu/param/speciesDefinition.param"
 #include "picongpu/param/speciesInitialization.param"
 #include "picongpu/param/iterationStart.param"

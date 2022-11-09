@@ -158,6 +158,16 @@ namespace picongpu
      */
     value_identifier(DataSpace<simDim>, totalCellIdx, DataSpace<simDim>());
 
+    //! counts how often a particle was scattered
+    value_identifier(uint32_t, timesScattered, 0u);
+
+    /** time step at which the last scattering event hapened.
+     *
+     * Initialized with the maximum uint32 value since it is unlikely to have 4'294'967'295 simulation steps
+     * and it is useful to have a value reserved for when there was no event yet.
+     */
+    value_identifier(uint32_t, lastEventStep, std::numeric_limits<uint32_t>::max());
+
     //! alias for particle shape, see also species.param
     alias(shape);
 
@@ -166,6 +176,9 @@ namespace picongpu
 
     //! alias for particle ionizers, see also ionizer.param
     alias(ionizers);
+
+    //! alias for particle scatterer
+    alias(scatterer);
 
     //! alias for ionization energy container, see also ionizationEnergies.param
     alias(ionizationEnergies);
@@ -263,4 +276,6 @@ namespace picongpu
      */
     alias(boundaryCondition);
 
+    //! particle generation for scattering with splitting
+    value_identifier(uint32_t, generation, 0u);
 } // namespace picongpu

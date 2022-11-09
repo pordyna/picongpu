@@ -38,6 +38,7 @@
 #include "picongpu/unitless/pusher.unitless"
 #include "picongpu/unitless/ionizer.unitless"
 #include "picongpu/unitless/speciesAttributes.unitless"
+#include "picongpu/unitless/scattering.unitless"
 #include "picongpu/unitless/speciesDefinition.unitless"
 #include "picongpu/unitless/speciesInitialization.unitless"
 #include "picongpu/unitless/fieldBackground.unitless"
