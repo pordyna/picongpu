@@ -68,8 +68,8 @@ namespace picongpu
 
                 } // namespace acc
 
-                template<typename T_Functor>
-                struct FreeBoundary : protected T_Functor
+                template<typename T_Functor, typename T_Species>
+                struct FreeBoundary : protected bmpl::apply1<T_Functor, T_Species>::type
                 {
                     using RNGFactory = pmacc::random::RNGProvider<simDim, random::Generator>;
                     using RngHandle = typename RNGFactory::Handle;
@@ -78,12 +78,12 @@ namespace picongpu
                     RngHandle rngHandle;
                     uint32_t m_currentStep;
 
-                    using Functor = T_Functor;
+                    using Functor = typename bmpl::apply1<T_Functor, T_Species>::type;
 
                     template<typename T_SpeciesType>
                     struct apply
                     {
-                        using type = FreeBoundary;
+                        using type = FreeBoundary<T_Functor, T_SpeciesType>;
                     };
 
                     /** constructor

@@ -20,6 +20,7 @@
 #pragma once
 
 #include "picongpu/param/grid.param"
+#include "picongpu/particles/externalBeam/functors.def"
 #include "picongpu/plugins/externalBeam/CoordinateTransform.def"
 #include "picongpu/plugins/externalBeam/ProbingBeam.def"
 #include "picongpu/plugins/externalBeam/SecondaryRotation.def"
@@ -72,5 +73,68 @@ namespace picongpu
             using DebugBeam
                 = picongpu::plugins::externalBeam::ProbingBeam<DbgBeamProfile, DbgBeamShape, DbgBeamCoordinates>;
         } // namespace externalBeam
+        namespace particles
+        {
+            namespace externalBeam
+            {
+                namespace density
+                {
+                    struct ProbingBeamDensityParam
+                    {
+                    private:
+                        static constexpr float_64 cellVolumeSI
+                            = SI::CELL_HEIGHT_SI * SI::CELL_WIDTH_SI * SI::CELL_DEPTH_SI;
+
+                    public:
+                        using ProbingBeam = plugins::externalBeam::DebugBeam;
+                        // Just a test value -> one 100000 photons per full cell
+                        static constexpr float_64 photonFluxAtMaxBeamIntensity{
+                            100000.0 / cellVolumeSI * SI::SPEED_OF_LIGHT_SI};
+                    };
+                    using ProbingBeamDensity = ProbingBeamImpl<ProbingBeamDensityParam>;
+                } // namespace density
+                namespace startPosition
+                {
+                    struct QuietProbingBeamParam
+                    {
+                        using ProbingBeam = typename picongpu::plugins::externalBeam::DebugBeam;
+                        /** Number of particles in each dimension initialized in a cell (in the beam coordinate
+                         * system).
+                         *
+                         * Keep in mind that the particles are not spaced across the complete cell but rather a reduced
+                         * cell. The cell dimensions along the beam x and y coordinates stay the same but along the
+                         * beam z direction the cell depth is reduced to DELTA_T * SPED_OF_LIGHT.
+                         *
+                         * All 3 components need to be specified.  In the case of a 2 dimensional simulation, the
+                         * component corresponding to the picongpu z direction will be discarded later.
+                         */
+                        static constexpr float_X minWeighting = 0.001;
+                        using numParticlesPerDimension = mCT::Int<3, 3, 1>;
+                    };
+                    using QuietBeam = QuietProbingBeam<QuietProbingBeamParam>;
+                } // namespace startPosition
+                namespace momentum
+                {
+                    struct BeamMomentumParam
+                    {
+                        using ProbingBeam = typename picongpu::plugins::externalBeam::DebugBeam;
+                        static constexpr float_64 photonEnergySI = 6.0 * UNITCONV_keV_to_Joule;
+                    };
+                    using BeamMomentum = PhotonMomentum<BeamMomentumParam>;
+                } // namespace momentum
+                namespace initPhase
+                {
+                    struct Param
+                    {
+                        using ProbingBeam = typename picongpu::plugins::externalBeam::DebugBeam;
+                        static constexpr float_64 phi0 = 0.0;
+                    };
+                    // using BeamPhase = FromPhotonMomentum<Param>;
+                    using BeamPhase = FromSpeciesWavelength<Param>;
+                } // namespace initPhase
+                using BeamStartAttributes
+                    = StartAttributesImpl<startPosition::QuietBeam, momentum::BeamMomentum, initPhase::BeamPhase>;
+            } // namespace externalBeam
+        } // namespace particles
     } // namespace plugins
 } // namespace picongpu
