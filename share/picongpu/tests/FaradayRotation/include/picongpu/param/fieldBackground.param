@@ -1,0 +1,162 @@
+/* Copyright 2014-2021 Axel Huebl, Alexander Debus, Richard Pausch
+ *
+ * This file is part of PIConGPU.
+ *
+ * PIConGPU is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * PIConGPU is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with PIConGPU.
+ * If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/** @file fieldBackground.param
+ *
+ * Load external background fields
+ */
+
+#pragma once
+
+#include "picongpu/param/density.param"
+
+namespace picongpu
+{
+    class FieldBackgroundE
+    {
+    public:
+        /* Add this additional field for pushing particles */
+        static constexpr bool InfluenceParticlePusher = false;
+
+        /* We use this to calculate your SI input back to our unit system */
+        PMACC_ALIGN(m_unitField, const float3_64);
+
+        HDINLINE FieldBackgroundE(const float3_64 unitField) : m_unitField(unitField)
+        {
+        }
+
+        /** Specify your background field E(r,t) here
+         *
+         * @param cellIdx The total cell id counted from the start at t = 0
+         * @param currentStep The current time step */
+        HDINLINE float3_X operator()(const DataSpace<simDim>& cellIdx, const uint32_t currentStep) const
+        {
+            /* example: periodicity of 20 microns ( = 2.0e-5 m) */
+            constexpr float_64 period_SI(20.0e-6);
+            /* calculate cells -> SI [m] */
+            const float_64 y_SI = cellIdx.y() * SI::CELL_HEIGHT_SI;
+            /* note: you can also transform the time step to seconds by
+             *       multiplying with DELTA_T_SI */
+
+            /* specify your E-Field in V/m and convert to PIConGPU units */
+            const float_X sinArg = precisionCast<float_X>(y_SI / period_SI * 2.0 * PI);
+            return float3_X(0.0, math::sin(sinArg) / m_unitField[1], 0.0);
+        }
+    };
+
+    class FieldBackgroundB
+    {
+    public:
+        /* Add this additional field for pushing particles */
+        static constexpr bool InfluenceParticlePusher = true;
+
+        /* We use this to calculate your SI input back to our unit system */
+        PMACC_ALIGN(m_unitField, const float3_64);
+
+        HDINLINE FieldBackgroundB(const float3_64 unitField) : m_unitField(unitField)
+        {
+        }
+
+        /** Specify your background field B(r,t) here
+         *
+         * @param cellIdx The total cell id counted from the start at t=0
+         * @param currentStep The current time step */
+        HDINLINE float3_X operator()(const DataSpace<simDim>& cellIdx, const uint32_t currentStep) const
+        {
+            const float3_X position{
+                static_cast<float_X>(cellIdx.x()),
+                static_cast<float_X>(cellIdx.y()),
+                static_cast<float_X>(cellIdx.z())};
+
+            // time dependence
+
+            const float_X wavelength = 10.0_X; // cells
+            const float_X period = 20.0_X; // timesteps
+            float3_X propDir{1.0, 2.0, 3.0};
+            propDir /= math::abs(propDir);
+
+            const float_X k = pmacc::math::Pi<float_X>::doubleValue / wavelength;
+            const float_X v = wavelength / period;
+            const float_X arg = k * (pmacc::math::dot(position, propDir) - v * currentStep);
+            const float_X sinus = math::sin(arg);
+            const float_X envelope = sinus * sinus;
+
+            const float3_X mu1{35, 90, 40};
+            const float3_X mu2{48, 80, 10};
+            const float3_X mu3{12, 120, 23};
+            const float3_X mu4{32, 64, 128};
+
+            const float3_X sigma1{50, 14, 250};
+            const float3_X sigma2{84, 90, 65};
+            const float3_X sigma3{24, 178, 99};
+            const float3_X sigma4{15, 15, 15};
+
+
+            float_X s = gaussian3d(position, mu1, sigma1);
+            s += gaussian3d(position, mu2, sigma2);
+            s += gaussian3d(position, mu3, sigma3);
+            s += gaussian3d(position, mu4, sigma4);
+
+            constexpr float_X modifierPeriod = 100e-15 / UNIT_TIME;
+            const float_X time = currentStep * SI::DELTA_T_SI / UNIT_TIME;
+            const float_X sinModifier = math::sin(pmacc::math::Pi<float_X>::doubleValue  / modifierPeriod * time);
+            const float_X modifier = 1.0_X + 10.0_X * sinModifier * sinModifier;
+            const float_X fieldVal = envelope * modifier * 1.0e9_X * (-1.0_X + s);
+
+            return float3_X(
+                2.0_X * fieldVal / m_unitField[0],
+                fieldVal / m_unitField[1],
+                0.5_X * fieldVal / m_unitField[2]);
+        }
+    };
+
+
+    class FieldBackgroundJ
+    {
+    public:
+        /* Add this additional field? */
+        static constexpr bool activated = false;
+
+        /* We use this to calculate your SI input back to our unit system */
+        PMACC_ALIGN(m_unitField, const float3_64);
+
+        HDINLINE FieldBackgroundJ(const float3_64 unitField) : m_unitField(unitField)
+        {
+        }
+
+        /** Specify your background field J(r,t) here
+         *
+         * @param cellIdx The total cell id counted from the start at t=0
+         * @param currentStep The current time step */
+        HDINLINE float3_X operator()(const DataSpace<simDim>& cellIdx, const uint32_t currentStep) const
+        {
+            /* example: periodicity of 20 microns ( = 2.0e-5 m) */
+            constexpr float_64 period_SI(20.0e-6);
+            /* calculate cells -> SI -> m to microns*/
+            const float_64 y_SI = cellIdx.y() * SI::CELL_HEIGHT_SI * 1.0e6;
+            /* note: you can also transform the time step to seconds by
+             *       multiplying with DELTA_T_SI */
+
+            /* specify your J-Field in A/m^2 and convert to PIConGPU units */
+            const float_X sinArg = precisionCast<float_X>(y_SI / period_SI * 2.0 * PI);
+            return float3_X(0.0, math::cos(sinArg) / m_unitField[1], 0.0);
+        }
+    };
+
+} // namespace picongpu
