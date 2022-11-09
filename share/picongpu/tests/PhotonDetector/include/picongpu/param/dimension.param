@@ -1,4 +1,4 @@
-/* Copyright 2014-2022 Rene Widera, Axel Huebl
+/* Copyright 2014-2021 Axel Huebl, Rene Widera
  *
  * This file is part of PIConGPU.
  *
@@ -19,10 +19,13 @@
 
 #pragma once
 
-#include "picongpu/particles/manipulators/generic/Free.hpp"
-#include "picongpu/particles/manipulators/generic/FreeRng.hpp"
-#include "picongpu/particles/manipulators/unary/Drift.hpp"
-#include "picongpu/particles/manipulators/unary/FreeTotalCellOffset.hpp"
-#include "picongpu/particles/manipulators/unary/FreeTotalCellOffsetRng.hpp"
-#include "picongpu/particles/manipulators/unary/PhotonDrift.hpp"
-#include "picongpu/particles/manipulators/unary/Temperature.hpp"
+#ifndef PARAM_DIMENSION
+#    define PARAM_DIMENSION DIM3
+#endif
+
+#define SIMDIM PARAM_DIMENSION
+
+namespace picongpu
+{
+    constexpr uint32_t simDim = SIMDIM;
+} // namespace picongpu
