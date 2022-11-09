@@ -1,4 +1,4 @@
-/* Copyright 2020-2022 Pawel Ordyna
+/* Copyright 2021 Pawel Ordyna
  *
  * This file is part of PIConGPU.
  *
@@ -21,26 +21,28 @@
 
 #include "picongpu/simulation_defines.hpp"
 
+#include <complex>
 namespace picongpu
 {
-    namespace plugins
+    namespace openPMD
     {
-        namespace xrayScattering
+        template<typename PIConGPUType>
+        struct GetOpenPMDStoredType
         {
-            namespace beam
-            {
-                namespace beamProfiles
-                {
-                    //! Homogeneous beam profile.
-                    struct ConstProfile
-                    {
-                        static HDINLINE constexpr float_X getFactor(const float_X& positionX, const float_X& positionY)
-                        {
-                            return float_X(1.0);
-                        }
-                    };
-                } // namespace beamProfiles
-            } // namespace beam
-        } // namespace xrayScattering
-    } // namespace plugins
+            using type = PIConGPUType;
+        };
+
+        template<>
+        struct GetOpenPMDStoredType<pmacc::math::Complex<picongpu::float_32>>
+        {
+            using type = std::complex<float_32>;
+        };
+        template<>
+        struct GetOpenPMDStoredType<pmacc::math::Complex<picongpu::float_64>>
+        {
+            using type = std::complex<float_64>;
+        };
+
+
+    } // namespace openPMD
 } // namespace picongpu

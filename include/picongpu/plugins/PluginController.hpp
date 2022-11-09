@@ -52,6 +52,7 @@
 
 #if(ENABLE_OPENPMD == 1) && (SIMDIM == DIM3)
 #    include "picongpu/plugins/externalBeam/DebugExternalBeam.hpp"
+#    include "picongpu/plugins/photonDetector/PhotonDetector.hpp"
 #endif
 
 #if(PMACC_CUDA_ENABLED == 1)
@@ -184,7 +185,7 @@ namespace picongpu
         using AllFields = bmpl::vector<FieldB, FieldE, FieldJ>;
 
         /* define species plugins */
-        using UnspecializedSpeciesPlugins = bmpl::vector<
+        using UnspecializedSpeciesPluginsBase = bmpl::vector<
             plugins::multi::Master<EnergyParticles<bmpl::_1>>,
             plugins::multi::Master<CalcEmittance<bmpl::_1>>,
             plugins::multi::Master<BinEnergyParticles<bmpl::_1>>,
@@ -213,6 +214,30 @@ namespace picongpu
 #endif
             >;
 
+#if(ENABLE_OPENPMD == 1) && (SIMDIM==DIM3)
+        struct NonSpecializedPhotonDetector
+        {
+            template<typename T_DetectorConfig, typename T_Species>
+            struct apply
+            {
+                using type
+                    = plugins::multi::Master<plugins::photonDetector::PhotonDetector<T_DetectorConfig, T_Species>>;
+            };
+        };
+
+        template<typename T_Config>
+        struct AssignDetectorConfig : bmpl::apply2<NonSpecializedPhotonDetector, T_Config, bmpl::_1>
+        {
+        };
+        using UnspecializedSpeciesPhotonDetectorPlugins = typename bmpl::
+            transform<plugins::photonDetector::SeqAllDetectorConfigs, AssignDetectorConfig<bmpl::_1>>::type;
+
+
+        using UnspecializedSpeciesPlugins
+            = MakeSeq_t<UnspecializedSpeciesPluginsBase, UnspecializedSpeciesPhotonDetectorPlugins>;
+#else
+        using UnspecializedSpeciesPlugins = UnspecializedSpeciesPluginsBase;
+#endif
         using CombinedUnspecializedSpeciesPlugins =
             typename AllCombinations<bmpl::vector<VectorAllSpecies, UnspecializedSpeciesPlugins>>::type;
 
