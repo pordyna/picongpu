@@ -1,4 +1,4 @@
-/* Copyright 2020-2022 Pawel Ordyna
+/* Copyright 2020-2021 Pawel Ordyna
  *
  * This file is part of PIConGPU.
  *
@@ -19,4 +19,21 @@
 
 #pragma once
 
-#include "picongpu/plugins/xrayScattering/beam/beamShapes/ConstShape.hpp"
+namespace picongpu
+{
+    namespace plugins
+    {
+        namespace externalBeam
+        {
+            template<typename T_StaticFunctor>
+            struct SqrtWrapper
+            {
+                template<typename... T_Args>
+                static HDINLINE float_X getFactor(T_Args && ...  args )
+                {
+                    return math::sqrt(T_StaticFunctor::getFactor(args...));
+                }
+            };
+        } // namespace externalBeam
+    } // namespace plugins
+} // namespace picongpu

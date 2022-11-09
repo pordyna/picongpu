@@ -32,8 +32,8 @@
 #include "picongpu/plugins/xrayScattering/DetermineElectronDensitySolver.hpp"
 #include "picongpu/plugins/xrayScattering/GetScatteringVector.hpp"
 #include "picongpu/plugins/xrayScattering/XrayScattering.kernel"
+#include "picongpu/plugins/xrayScattering/XrayScatteringBeam.hpp"
 #include "picongpu/plugins/xrayScattering/XrayScatteringWriter.hpp"
-#include "picongpu/plugins/xrayScattering/beam/XrayScatteringBeam.hpp"
 #include "picongpu/plugins/xrayScattering/xrayScatteringUtilities.hpp"
 
 #include <pmacc/assert.hpp>
@@ -45,6 +45,7 @@
 #include <pmacc/pluginSystem/containsStep.hpp>
 #include <pmacc/traits/GetNumWorkers.hpp>
 #include <pmacc/traits/HasFlag.hpp>
+#include <pmacc/traits/Resolve.hpp>
 
 #include <boost/filesystem.hpp>
 #include <boost/mpl/bool.hpp>
@@ -86,7 +87,7 @@ namespace picongpu
                 uint32_t currentStep;
 
                 //! Probing beam characterization
-                std::unique_ptr<beam::XrayScatteringBeam> probingBeam;
+                std::unique_ptr<pmacc::traits::Resolve<beam::XrayScatteringBeam>::type> probingBeam;
 
                 // memory:
                 using ComplexBuffer = GridBuffer<complex_X, DIM1>;
@@ -655,7 +656,12 @@ namespace picongpu
 
                     // Write to disk.
                     if(pluginSystem::containsStep(outputPeriod, currentStep))
+                    {
                         writeOutput();
+                        // zero out the device buffer
+                        // TODO: update documentation
+                        amplitude->getDeviceBuffer().setValue(0.0);
+                    }
                     // Update the total number of rotations ( data passes ).
                     if(outputLayout == OutputMemoryLayout::Distribute)
                         accumulatedRotations += countRanks - 1;

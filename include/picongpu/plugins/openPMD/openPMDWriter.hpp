@@ -32,6 +32,7 @@
 #include "picongpu/particles/particleToGrid/ComputeFieldValue.hpp"
 #include "picongpu/particles/traits/SpeciesEligibleForSolver.hpp"
 #include "picongpu/plugins/common/openPMDDefaultExtension.hpp"
+#include "picongpu/plugins/common/asStandardVector.hpp"
 #include "picongpu/plugins/common/openPMDVersion.def"
 #include "picongpu/plugins/common/openPMDWriteMeta.hpp"
 #include "picongpu/plugins/misc/ComponentNames.hpp"
@@ -117,19 +118,6 @@ namespace picongpu
             return recordComponent;
         }
 
-
-        template<typename T_Vec, typename T_Ret>
-        T_Ret asStandardVector(T_Vec const& v)
-        {
-            using __T_Vec = typename std::remove_reference<T_Vec>::type;
-            constexpr auto dim = __T_Vec::dim;
-            T_Ret res(dim);
-            for(unsigned i = 0; i < dim; ++i)
-            {
-                res[dim - i - 1] = v[i];
-            }
-            return res;
-        }
 
         ::openPMD::Series& ThreadParams::openSeries(::openPMD::Access at)
         {

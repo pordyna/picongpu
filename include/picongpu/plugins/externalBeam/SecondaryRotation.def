@@ -1,4 +1,4 @@
-/* Copyright 2020-2022 Pawel Ordyna
+/* Copyright 2020-2021 Pawel Ordyna
  *
  * This file is part of PIConGPU.
  *
@@ -19,28 +19,20 @@
 
 #pragma once
 
-#include "picongpu/simulation_defines.hpp"
-
 namespace picongpu
 {
     namespace plugins
     {
-        namespace xrayScattering
-        {
-            namespace beam
-            {
-                namespace beamShapes
-                {
-                    //! Beam intensity homogeneous along the propagation direction.
-                    struct ConstShape
-                    {
-                        static HDINLINE constexpr float_X getFactor(const float_X& time)
-                        {
-                            return 1.0_X;
-                        }
-                    };
-                } // namespace beamShapes
-            } // namespace beam
-        } // namespace xrayScattering
+        namespace externalBeam
+        { /** Defines a coordinate system rotation.
+           *
+           * The whole rotation consists of two rotations --- first by the yaw angle
+           *  and then by a the pitch angle.
+           *
+           * @tparam T_ParamClass Param class defining the angles.
+           */
+            template<typename T_ParamClass>
+            struct SecondaryRotation;
+        } // namespace externalBeam
     } // namespace plugins
 } // namespace picongpu

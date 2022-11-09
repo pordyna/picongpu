@@ -19,6 +19,8 @@
 
 #pragma once
 
+#include "picongpu/plugins/common/asStandardVector.hpp"
+#include "picongpu/plugins/common/openPMDVersion.def"
 #include "picongpu/plugins/openPMD/openPMDWriter.def"
 
 #include <pmacc/Environment.hpp>

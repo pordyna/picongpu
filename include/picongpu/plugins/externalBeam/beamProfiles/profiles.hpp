@@ -19,5 +19,5 @@
 
 #pragma once
 
-#include "picongpu/plugins/xrayScattering/beam/beamProfiles/ConstProfile.hpp"
-#include "picongpu/plugins/xrayScattering/beam/beamProfiles/GaussianProfile.hpp"
+#include "picongpu/plugins/externalBeam/beamProfiles/ConstProfile.hpp"
+#include "picongpu/plugins/externalBeam/beamProfiles/GaussianProfile.hpp"

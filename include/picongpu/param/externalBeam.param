@@ -1,0 +1,76 @@
+/* Copyright 2020-2021 Pawel Ordyna
+ *
+ * This file is part of PIConGPU.
+ *
+ * PIConGPU is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * PIConGPU is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with PIConGPU.
+ * If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#pragma once
+
+#include "picongpu/param/grid.param"
+#include "picongpu/plugins/externalBeam/CoordinateTransform.def"
+#include "picongpu/plugins/externalBeam/ProbingBeam.def"
+#include "picongpu/plugins/externalBeam/SecondaryRotation.def"
+#include "picongpu/plugins/externalBeam/Side.def"
+#include "picongpu/plugins/externalBeam/beamProfiles/profiles.def"
+#include "picongpu/plugins/externalBeam/beamShapes/shapes.def"
+
+#include <pmacc/preprocessor/struct.hpp>
+
+#include <pmacc/math/vector/compile-time/Int.hpp>
+
+namespace picongpu
+{
+    namespace plugins
+    {
+        namespace externalBeam
+        {
+            using namespace picongpu::plugins::externalBeam;
+            /* Choose from:
+             *  - ZSide
+             *  - YSide
+             *  - XSide
+             * - ZRSide
+             * - YRSide
+             * - XRSide
+             */
+            using DbgProbingSide = picongpu::plugins::externalBeam::ZSide;
+
+            PMACC_STRUCT(
+                DbgRotationParam,
+                (PMACC_C_VALUE(float_X, yawAngle, 0._X / 180.0_X * pmacc::math::Pi<float_X>::value))(
+                    PMACC_C_VALUE(float_X, pitchAngle, 0.0_X / 180.0_X * pmacc::math::Pi<float_X>::value)));
+
+            PMACC_STRUCT(
+                DbgGaussParam,
+                (PMACC_C_VALUE(float_X, sigmaX_SI, 0.0_X))(PMACC_C_VALUE(float_X, sigmaY_SI, 0.0_X)));
+            PMACC_STRUCT(
+                DbgOffsetParam,
+                (PMACC_C_VECTOR_DIM(float_32, DIM2, beamOffset_SI, 0.0_X, 0.0_X))(
+                    PMACC_C_VALUE(float_X, beamDelay_SI, 0.0_X)));
+
+            // using DbgBeamProfile = externalBeam::beamProfiles::GaussianProfile<DbgGaussParam>;
+            using DbgBeamProfile = externalBeam::beamProfiles::ConstProfile;
+            using DbgBeamShape = externalBeam::beamShapes::ConstShape<>;
+
+            using DbgBeamCoordinates = picongpu::plugins::externalBeam::CoordinateTransform<
+                DbgProbingSide,
+                picongpu::plugins::externalBeam::SecondaryRotation<DbgRotationParam>,
+                DbgOffsetParam>;
+            using DebugBeam
+                = picongpu::plugins::externalBeam::ProbingBeam<DbgBeamProfile, DbgBeamShape, DbgBeamCoordinates>;
+        } // namespace externalBeam
+    } // namespace plugins
+} // namespace picongpu

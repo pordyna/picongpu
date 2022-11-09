@@ -50,6 +50,10 @@
 #    include "picongpu/plugins/xrayScattering/XrayScattering.hpp"
 #endif
 
+#if(ENABLE_OPENPMD == 1) && (SIMDIM == DIM3)
+#    include "picongpu/plugins/externalBeam/DebugExternalBeam.hpp"
+#endif
+
 #if(PMACC_CUDA_ENABLED == 1)
 #    include "picongpu/plugins/ChargeConservation.hpp"
 #    include "picongpu/plugins/PositionsParticles.hpp"
@@ -152,6 +156,12 @@ namespace picongpu
 #if(ENABLE_OPENPMD == 1)
             ,
             plugins::multi::Master<openPMD::openPMDWriter>
+
+#endif
+
+#if(ENABLE_OPENPMD == 1) && (SIMDIM == DIM3)
+            ,
+            plugins::externalBeam::DebugExternalBeam
 #endif
 
 #if(PMACC_CUDA_ENABLED == 1)
