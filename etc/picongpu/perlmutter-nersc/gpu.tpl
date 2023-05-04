@@ -39,6 +39,36 @@
 #SBATCH -o stdout
 #SBATCH -e stderr
 
+help()
+{
+  echo "PIConGPU submit script generated with tbg"
+  echo ""
+  echo "usage: $0 [--verify]"
+  echo ""
+  echo "--validate      - validate picongpu call instead of running the simulation"
+  echo "--h | --help    - print this help message"
+}
+
+VALIDATE_MODE=false
+for arg in "$@"; do
+  case $arg in
+  --validate)
+    VALIDATE_MODE=true
+    shift # Remove --skip-verification from `$@`
+    ;;
+  -h | --help)
+    echo -e "$(help)"
+    shift
+    exit 0
+    ;;
+  *)
+    echo "unrecognized argument"
+    echo -e "$(help)"
+    exit 1
+    ;;
+  esac
+done
+
 export MPICH_GPU_SUPPORT_ENABLED=1
 
 ## calculations will be performed by tbg ##
@@ -73,7 +103,7 @@ export MPICH_GPU_SUPPORT_ENABLED=1
 
 ## end calculations ##
 
-echo 'Running program...'
+echo "Preparing environment..."
 
 cd !TBG_dstPath
 
@@ -88,22 +118,30 @@ mkdir simOutput 2> /dev/null
 cd simOutput
 ln -s ../stdout output
 
-# test if cuda_memtest binary is available and we have the node exclusive
-#if [ -f !TBG_dstPath/input/bin/cuda_memtest ] && [ !TBG_numHostedGPUPerNode -eq !TBG_gpusPerNode ] ; then
-#  # Run CUDA memtest to check GPU's health
-#  srun !TBG_dstPath/input/bin/cuda_memtest.sh
-#else
-#  echo "Note: GPU memory test was skipped as no binary 'cuda_memtest' available or compute node is not exclusively allocated. This does not affect PIConGPU, starting it now" >&2
-#fi
+if [[ $VALIDATE_MODE == true ]]; then
+  echo "Validating PIConGPU call..."
+  !TBG_dstPath/input/bin/picongpu !TBG_author !TBG_programParams --validate
+  if [ $? -ne 0 ] ; then
+    exit 1;
+  fi
+else
+  # Mpiinfo doesn't work on perlmutter so CUDA memtest will fail
+  # test if cuda_memtest binary is available and we have the node exclusive
+  #if [ -f !TBG_dstPath/input/bin/cuda_memtest ] && [ !TBG_numHostedGPUPerNode -eq !TBG_gpusPerNode ] ; then
+  #  # Run CUDA memtest to check GPU's health
+  #  srun !TBG_dstPath/input/bin/cuda_memtest.sh
+  #else
+  #  echo "Note: GPU memory test was skipped as no binary 'cuda_memtest' available or compute node is not exclusively allocated. This does not affect PIConGPU, starting it now" >&2
+  #fi
 
-export OMP_NUM_THREADS=!TBG_coresPerGPU
+  export OMP_NUM_THREADS=!TBG_coresPerGPU
 
-# In accordance with the example at
-# https://docs.nersc.gov/systems/perlmutter/running-jobs/#4-nodes-16-tasks-16-gpus-1-gpu-visible-to-each-task
+  # In accordance with the example at
+  # https://docs.nersc.gov/systems/perlmutter/running-jobs/#4-nodes-16-tasks-16-gpus-1-gpu-visible-to-each-task
 
-export SLURM_CPU_BIND="cores"
-if [ $? -eq 0 ] ; then
-  # Run PIConGPU
-  srun --cpu-bind=cores  --gpu-bind=single:1                \
-       !TBG_dstPath/input/bin/picongpu !TBG_author !TBG_programParams
+  export SLURM_CPU_BIND="cores"
+  if [ $? -eq 0 ] ; then
+    # Run PIConGPU
+    srun --cpu-bind=cores  --gpu-bind=single:1 !TBG_dstPath/input/bin/picongpu !TBG_author !TBG_programParams
+  fi
 fi
