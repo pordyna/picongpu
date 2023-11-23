@@ -67,7 +67,8 @@ namespace picongpu::particles::collision
              */
             DINLINE auto operator[](uint32_t idx) const
             {
-                return m_framePtrList[idx / frameSize][idx % frameSize];
+                const uint32_t inSuperCellIdx = m_parIdxList[idx];
+                return m_framePtrList[inSuperCellIdx / frameSize][inSuperCellIdx % frameSize];
             }
         };
 
