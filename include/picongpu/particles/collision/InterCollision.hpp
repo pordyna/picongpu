@@ -285,11 +285,9 @@ namespace picongpu::particles::collision
             uint32_t const size1 = parAccessor1.size();
             uint32_t const minListLength = math::min(size0, size1);
             uint32_t const maxListLength = math::max(size0, size1);
-            float_X const densityLongList = maxListLength == size0 ? density0 : density1;
-            float_X const densityShortList = densityLongList == density1 ? density0 : density1;
 
             auto destCollisionFunctor
-                = srcCollisionFunctor(worker, localSuperCellOffset, densityLongList, densityShortList, maxListLength);
+                = srcCollisionFunctor(worker, localSuperCellOffset, density0, density1, maxListLength);
 
             if constexpr(useScreeningLength)
             {
@@ -314,6 +312,8 @@ namespace picongpu::particles::collision
                 {
                     auto par0 = parAccessor0[i % size0];
                     auto par1 = parAccessor1[i % size1];
+                    destCollisionFunctor.duplicationCorrection
+                        = duplicationCorrection(i, minListLength, maxListLength);
                     destCollisionFunctor(detail::makeCollisionContext(worker, rngHandle), par0, par1);
                 }
             }
