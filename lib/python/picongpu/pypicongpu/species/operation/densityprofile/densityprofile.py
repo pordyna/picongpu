@@ -86,8 +86,9 @@ class DensityProfile(RenderedObject):
         from .uniform import Uniform
         from .foil import Foil
         from .gaussian import Gaussian
+        from .cylinder import Cylinder
 
-        template_name_by_type = {Uniform: "uniform", Foil: "foil", Gaussian: "gaussian"}
+        template_name_by_type = {Uniform: "uniform", Foil: "foil", Gaussian: "gaussian", Cylinder: "cylinder"}
         if self.__class__ not in template_name_by_type:
             raise RuntimeError("unkown type: {}".format(self.__class__))
 
