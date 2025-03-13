@@ -21,7 +21,6 @@ from .interaction.ionization.fieldionization import (
     Keldysh,
 )
 from .interaction.ionization.electroniccollisionalequilibrium import ThomasFermi
-
 import picmistandard
 
 import sys
@@ -48,6 +47,7 @@ __all__ = [
     "Interaction",
     "diagnostics",
     "CylyndricalDistribution",
+    "output",
 ]
 
 

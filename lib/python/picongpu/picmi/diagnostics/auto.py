@@ -40,6 +40,7 @@ class Auto:
     def get_as_pypicongpu(
         self,
         # not used here, but needed for the interface
+        self,
         dict_species_picmi_to_pypicongpu: dict[PICMISpecies, PyPIConGPUSpecies],
         time_step_size,
         num_steps,
