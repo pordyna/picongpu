@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include "picongpu/particles/densityProfiles/CylyndricalImpl.def"
 #include "picongpu/particles/densityProfiles/EveryNthCellImpl.def"
 #include "picongpu/particles/densityProfiles/FreeFormulaImpl.def"
 #include "picongpu/particles/densityProfiles/FromOpenPMDImpl.def"
