@@ -59,6 +59,10 @@ TBG_wallTime="1:00:00"
   TBG_gridSize="{{{x}}} {{{y}}} {{{z}}}"
 {{/grid.cell_cnt}}
 
+{{#grid.grid_dist}}
+TBG_gridDist="--gridDist '{{#x}}{{{device_cells}}}{{^_last}},{{/_last}}{{/x}}' '{{#y}}{{{device_cells}}}{{^_last}},{{/_last}}{{/y}}' '{{#z}}{{{device_cells}}}{{^_last}},{{/_last}}{{/z}}'"
+{{/grid.grid_dist}}
+
 TBG_steps="{{{time_steps}}}"
 
 #################################

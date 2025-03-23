@@ -10,11 +10,18 @@ from ..pypicongpu import util
 
 import picmistandard
 import typeguard
+import numpy as np
 
 
 @typeguard.typechecked
 class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
-    def __init__(self, picongpu_n_gpus: list[int] | None = None, **kw):
+    def __init__(
+        self,
+        picongpu_n_gpus: list[int] | None = None,
+        picongpu_grid_dist: tuple[list[int], list[int], list[int]] | None = None,
+        picongpu_super_cell_size: tuple[int, int, int] = (8, 8, 4),
+        **kw,
+    ):
         """overwriting PICMI init to extract gpu distribution for PIConGPU
         :param picongpu_n_gpus: number of gpus for each dimension
             None matches to a single GPU (1, 1, 1)
@@ -22,6 +29,8 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
             a 3-integer-long list is distributed directly as (Nx, Ny, Nz)
         """
         self.picongpu_n_gpus = picongpu_n_gpus
+        self.picongpu_grid_dist = picongpu_grid_dist
+        self.picongpu_super_cell_size = picongpu_super_cell_size
 
         # continue with regular init
         super().__init__(**kw)
@@ -90,9 +99,16 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
         else:
             raise ValueError("picongpu_n_gpus was neither None, " "a 1-integer-list or a 3-integer-list")
 
+        if self.picongpu_grid_dist is not None:
+            for i in range(3):
+                assert (
+                    sum(self.picongpu_grid_dist[i]) == self.number_of_cells[i]
+                ), f"sum of grid distribution in dimension {i} must match number of cells"
+                assert (
+                    len(self.picongpu_grid_dist[i]) == g.n_gpus[i]
+                ), f"number of grid distributions in dimension {i} must match number of gpus"
+
         # check if gpu distribution fits grid
-        # TODO: super_cell_size still hard coded
-        super_cell_size = [8, 8, 4]
         cells = [
             self.number_of_cells[0],
             self.number_of_cells[1],
@@ -100,10 +116,20 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
         ]
         dim_name = ["x", "y", "z"]
         for dim in range(3):
-            assert ((cells[dim] // g.n_gpus[dim]) // super_cell_size[dim]) * g.n_gpus[dim] * super_cell_size[
-                dim
-            ] == cells[dim], "GPU- and/or super-cell-distribution in {} dimension does " "not match grid size".format(
-                dim_name[dim]
-            )
+            if self.picongpu_grid_dist is None:
+                assert ((cells[dim] // g.n_gpus[dim]) // self.picongpu_super_cell_size[dim]) * g.n_gpus[
+                    dim
+                ] * self.picongpu_super_cell_size[dim] == cells[dim], (
+                    "GPU- and/or super-cell-distribution in {} dimension does " "not match grid size".format(
+                        dim_name[dim]
+                    )
+                )
+            else:
+                # any returns true if there is at least one non zero (True) element
+                assert not np.any(
+                    np.mod(self.picongpu_grid_dist[dim], self.picongpu_super_cell_size[dim])
+                ), f"grid distribution in {dim_name[dim]} dimension must be multiple of super cell size"
+        g.super_cell_size = self.picongpu_super_cell_size
+        g.grid_dist = self.picongpu_grid_dist
 
         return g

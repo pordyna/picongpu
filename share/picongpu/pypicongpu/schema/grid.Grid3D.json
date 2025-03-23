@@ -49,6 +49,29 @@
         }
       }
     },
+    "super_cell_size": {
+      "description": "super cell size in cells",
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": [
+        "x",
+        "y",
+        "z"
+      ],
+      "properties": {
+        "x": {
+          "$anchor": "super_cell_cnt_component",
+          "type": "integer",
+          "minimum": 1
+        },
+        "y": {
+          "$ref": "#super_cell_cnt_component"
+        },
+        "z": {
+          "$ref": "#super_cell_cnt_component"
+        }
+      }
+    },
     "gpu_cnt": {
       "description": "number of gpus",
       "type": "object",
@@ -94,12 +117,49 @@
           "$ref": "#boundary_condition_component"
         }
       }
+    },
+    "grid_dist": {
+      "description": " grid distributionover devices in cells",
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": [
+        "x",
+        "y",
+        "z"
+      ],
+      "properties": {
+        "x": {
+          "$anchor": "grid_dist_component",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "device_cells"
+            ],
+            "unevaluatedProperties": false,
+            "properties": {
+              "device_cells": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        },
+        "y": {
+          "$ref": "#grid_dist_component"
+        },
+        "z": {
+          "$ref": "#grid_dist_component"
+        }
+      }
     }
   },
   "required": [
     "cell_size",
     "cell_cnt",
-    "boundary_condition"
+    "boundary_condition",
+    "super_cell_size"
   ],
   "unevaluatedProperties": false
 }
