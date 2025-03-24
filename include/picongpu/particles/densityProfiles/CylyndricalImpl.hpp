@@ -72,7 +72,7 @@ namespace picongpu
 
                 float_X density = 0.0;
                 // prePlasma ramp
-                if constexpr(ParamClass::prePlasmaLength == 0.0 || ParamClass::prePlasmaCutoff == 0.0)
+                if constexpr(ParamClass::prePlasmaLength_SI == 0.0 || ParamClass::prePlasmaCutoff_SI == 0.0)
                 {
                     density = (r <= radius) ? 1.0 : 0.0;
                 }
