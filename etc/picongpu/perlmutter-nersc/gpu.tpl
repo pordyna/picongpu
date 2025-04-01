@@ -91,6 +91,8 @@ mkdir simOutput 2> /dev/null
 cd simOutput
 ln -s ../stdout output
 
+ro_dst_path=$(echo "!TBG_dstPath" | sed 's|^/global/cfs|/dvs_ro/cfs|')
+
 export OMP_NUM_THREADS=!TBG_coresPerGPU
 
 # In accordance with the example at
