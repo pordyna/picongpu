@@ -47,7 +47,6 @@ __all__ = [
     "Interaction",
     "diagnostics",
     "CylyndricalDistribution",
-    "output",
 ]
 
 
