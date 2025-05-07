@@ -173,7 +173,8 @@ namespace picongpu
                  * The value represents an aggregation over one cell, so any value is correct for the mesh position.
                  * Just use the center.
                  */
-                record.setPosition(std::vector<float>{0.5, 0.5});
+                std::vector<float> positionVector(binningData.getNAxes(), 0.5f);
+                record.setPosition(positionVector);
 
                 ::openPMD::Offset histOffset;
                 ::openPMD::Extent histExtent;
