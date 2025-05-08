@@ -29,6 +29,7 @@
 #SBATCH --ntasks=!TBG_tasks
 #SBATCH --cpus-per-task=!TBG_coresPerGPU
 #SBATCH --chdir=!TBG_dstPath
+#SBATCH --exclusive
 
 # Sets batch job's name
 #SBATCH --job-name=!TBG_jobName
