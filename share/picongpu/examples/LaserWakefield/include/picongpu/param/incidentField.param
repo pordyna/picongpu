@@ -298,10 +298,26 @@ namespace picongpu
                 static constexpr float_64 RAMP_INIT = 8.0;
             };
 
+            /** Example of a free temporal envelope functor
+             *
+             * This functor reproduces the standard Gaussian envelope
+             */
+            struct FreeEnvelopeExample
+            {
+                HDINLINE float_X operator()(float_64 const& time_SI)
+                {
+                    auto const time = time_SI - 0.5 * 15.0 * PARAM_PULSE_DURATION_SI;
+                    auto const exponent = time / (2.0 * PARAM_PULSE_DURATION_SI);
+                    return precisionCast<float_X>(math::exp(-exponent * exponent));
+                }
+            };
+
             using GaussianProfile = profiles::GaussianPulse<GaussianPulseParam>;
             using GaussianBeamWithContrastCurve = profiles::GaussianPulse<
                 GaussianPulseParam,
                 profiles::ExpRampWithPrepulseLongitudinal<ExpRampWithPrepulseEnvelopeParam>>;
+            using GaussianBeamWithFreeEnvelope
+                = profiles::GaussianPulse<GaussianPulseParam, profiles::FreeEnvelope<FreeEnvelopeExample>>;
 
             /**@{*/
             //! Incident field profile types along each boundary, these 6 types (or aliases) are required.
