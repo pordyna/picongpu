@@ -121,6 +121,8 @@ namespace picongpu::fields::incidentField::profiles
 
     /** User temporal envelope Functor
      *
+     * This functor describes the E field evelope (sqrt(I))
+     * 1.0 corresponds to the a_0 set in the gaussian param struct
      * @tparam T_Func user functor
      * @example
      * @code{.cpp}
