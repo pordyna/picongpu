@@ -136,6 +136,7 @@ namespace picongpu::fields::incidentField
                  */
                 HINLINE GaussianPulseFunctorIncidentE(float_X const currentStep, float3_64 const unitField)
                     : Base(currentStep, unitField)
+                    , longitudinalEnvelope(LongitudinalEnvelope())
                 {
                     // This check is done here on HOST, since std::numeric_limits<float_X>::epsilon() does not
                     // compile on laserTransversal(), which is on DEVICE.
@@ -283,7 +284,7 @@ namespace picongpu::fields::incidentField
                     // is crossing the beam axis.
                     auto const shiftedTime = time - r / sim.pic.getSpeedOfLight();
 
-                    etrans *= LongitudinalEnvelope::getEnvelope(shiftedTime);
+                    etrans *= longitudinalEnvelope.getEnvelope(shiftedTime);
 
                     auto etrans_norm = 0.0_X;
                     for(uint32_t m = 0; m < laguerreModes.size(); ++m)
@@ -323,6 +324,9 @@ namespace picongpu::fields::incidentField
                     }
                     return laguerreN;
                 }
+
+            private:
+                PMACC_ALIGN(longitudinalEnvelope, LongitudinalEnvelope);
             };
         } // namespace detail
 

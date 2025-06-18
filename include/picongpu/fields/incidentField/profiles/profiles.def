@@ -24,6 +24,7 @@
 #include "picongpu/fields/incidentField/profiles/Free.def"
 #include "picongpu/fields/incidentField/profiles/GaussianPulse.def"
 #if (ENABLE_OPENPMD == 1)
+#    include "picongpu/fields/incidentField/profiles/EnvelopeFromOpenPMD.def"
 #    include "picongpu/fields/incidentField/profiles/FromOpenPMDPulse.def"
 #endif
 #include "picongpu/fields/incidentField/profiles/None.def"

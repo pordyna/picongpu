@@ -1,0 +1,93 @@
+/* Copyright 2024-2025 Fabia Dietrich
+ *
+ * This file is part of PIConGPU.
+ *
+ * PIConGPU is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * PIConGPU is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with PIConGPU.
+ * If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#if (ENABLE_OPENPMD == 1)
+
+#    pragma once
+
+namespace picongpu
+{
+    namespace fields
+    {
+        namespace incidentField
+        {
+            namespace profiles
+            {
+                namespace defaults
+                {
+                    struct EnvelopeFromOpenPMDParam
+                    {
+                        static constexpr char const* filename = "/path/to/file%T.bp5";
+
+                        /** Iteration inside the file (where the whole field is stored in, not related to the current
+                         * simulation time iteration)
+                         */
+                        static constexpr uint32_t iteration = 0;
+
+                        /** Name of the field envelope dataset inside the input file
+                         *
+                         * Note that only C dataOrder is supported.
+                         *
+                         * @warning it is only the dataset itself, a simple text name and not something like
+                         * "/[directories]/[iteration]/meshes/E".
+                         */
+                        static constexpr char const* datasetEnvelopeName = "field_envelope";
+
+                        /** Name of the field envelope time coordinate inside the input file
+                         *
+                         * This is to support non linspaced data, since openPMD only natively supports
+                         * regular grids
+                         *
+                         * Note that only C dataOrder is supported.
+                         *
+                         * @warning it is only the dataset itself, a simple text name and not something like
+                         * "/[directories]/[iteration]/meshes/E".
+                         */
+                        static constexpr char const* datasetTimeName = "t";
+
+                        /** Datatype of the field envelope record
+                         *
+                         * openPMD needs this information at compile time.
+                         * @attention: supported are float, double.
+                         */
+                        using dataTypeEnvelope = double;
+
+                        /** Datatype of the field envelope time coordinate record
+                         *
+                         * openPMD needs this information at compile time.
+                         * @attention: supported are float, double.
+                         */
+                        using dataTypeTime = double;
+                    };
+                } // namespace defaults
+
+                /** Experimental laser profile from openPMD
+                 *
+                 * @tparam T_Params class parameter to configure the experimental laser profile,
+                 *                  see members of defaults::FromOpenPMDPulseParam
+                 *                  for required members
+                 */
+                template<typename T_Params = defaults::EnvelopeFromOpenPMDParam>
+                struct EnvelopeFromOpenPMD;
+            } // namespace profiles
+        } // namespace incidentField
+    } // namespace fields
+} // namespace picongpu
+
+#endif
