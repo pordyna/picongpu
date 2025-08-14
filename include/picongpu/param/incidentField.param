@@ -24,7 +24,6 @@
  * Available profiles:
  *  - profiles::DispersivePulse<>     : Gaussian pulse allowing to set first-, second-, and third-order dispersion
  * in focus. That is, SD, AD, GDD, and TOD, respectively.
- *  - profiles::ExpRampWithPrepulse<> : exponential ramp with prepulse wavepacket with given parameters
  *  - profiles::Free<>                : custom profile with user-provided functors to calculate incident E and B
  *  - profiles::FromOpenPMDPulse<>    : reads a field chunk defined in space-time domain (= (2+1)-dimensional) from
  * openPMD into the simulation; requires openPMD API dependency
