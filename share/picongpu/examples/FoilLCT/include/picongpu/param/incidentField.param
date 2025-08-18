@@ -266,8 +266,10 @@ namespace picongpu
             {
                 HDINLINE float_X operator()(float_64 const& time_SI)
                 {
-                    auto const time = time_SI - 0.5 * 15.0 * PARAM_PULSE_DURATION_SI;
-                    auto const exponent = time / (2.0 * PARAM_PULSE_DURATION_SI);
+                    constexpr float_64 PULSE_DURATION_SI = 25.0e-15 / 2.354820045;
+                    constexpr float_64 PULSE_INIT = 15.0;
+                    auto const time = time_SI - 0.5 * PULSE_INIT * PULSE_DURATION_SI;
+                    auto const exponent = time / (2.0 * PULSE_DURATION_SI);
                     return precisionCast<float_X>(math::exp(-exponent * exponent));
                 }
             };
