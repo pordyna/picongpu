@@ -254,7 +254,7 @@ namespace picongpu
                 };
             };
 
-            using GaussianProfile = profiles::GaussianPulse<GaussianPulseParam>;
+            using GaussianBeam = profiles::GaussianPulse<GaussianPulseParam>;
 
             /** Example of a free temporal envelope functor
              *
