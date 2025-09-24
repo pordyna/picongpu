@@ -32,10 +32,10 @@
 flags[0]=""
 
 # limit examles if we run CI tests
-#if [ -z  "$PIC_CI_MAINLINE" ] ; then
-flags[1]="-DPARAM_OVERWRITES:LIST='-DPARAM_LASERPROFILE=GaussianBeamWithFreeEnvelope;-DPARAM_IONIZATIONCURRENT=EnergyConservation'"
-flags[2]="-DPARAM_OVERWRITES:LIST='-DPARAM_LASERPROFILE=GaussianBeam'"
-#fi
+if [ -z  "$PIC_CI_MAINLINE" ] ; then
+  flags[1]="-DPARAM_OVERWRITES:LIST='-DPARAM_LASERPROFILE=GaussianBeamWithFreeEnvelope;-DPARAM_IONIZATIONCURRENT=EnergyConservation'"
+  flags[2]="-DPARAM_OVERWRITES:LIST='-DPARAM_LASERPROFILE=GaussianBeam'"
+fi
 
 ################################################################################
 # execution
