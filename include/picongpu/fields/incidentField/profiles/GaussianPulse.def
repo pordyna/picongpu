@@ -119,6 +119,27 @@ namespace picongpu::fields::incidentField::profiles
     template<typename T_Param>
     struct GaussianPulseEnvelope;
 
+    /** User temporal envelope Functor
+     *
+     * This functor describes the E field evelope (sqrt(I))
+     * 1.0 corresponds to the a_0 set in the gaussian param struct
+     * @tparam T_Func user functor
+     * @example
+     * @code{.cpp}
+     * struct FreeEnvelopeImpl
+     * {
+     *     HDINLINE float_X operator()(float_64 const& time_SI)
+     *     {
+     *         return 1.0_X;
+     *     }
+     * };
+     * using MyFunctor = FreeEnvelope<FreeEnvelopeImpl>;
+     * @endcode
+     */
+    template<typename T_Func>
+    struct FreeEnvelope;
+
+
     /** GaussianPulse laser profile with finite pulse duration tag
      *
      * @tparam T_Params class parameter to configure the GaussianPulse profile,

@@ -1,6 +1,6 @@
-/* Copyright 2013-2024 Axel Huebl, Heiko Burau, Anton Helm, Rene Widera,
+/* Copyright 2013-2025 Axel Huebl, Heiko Burau, Anton Helm, Rene Widera,
  *                     Richard Pausch, Alexander Debus, Sergei Bastrakov,
- *                     Julian Lenz, Klaus Steiniger
+ *                     Julian Lenz, Klaus Steiniger, Pawel Ordyna
  *
  * This file is part of PIConGPU.
  *
@@ -384,6 +384,22 @@ namespace picongpu::fields::incidentField
             HINLINE static std::string getName()
             {
                 return "GaussianPulse";
+            }
+        };
+
+        template<typename T_Func>
+        struct FreeEnvelope
+        {
+            static constexpr float_X TIME_SHIFT = 0.0_X;
+
+            HDINLINE static float_X getEnvelope(float_X const time)
+            {
+                return T_Func{}(time * sim.unit.time());
+            }
+
+            HINLINE static std::string getName()
+            {
+                return "FreeEnvelope";
             }
         };
 

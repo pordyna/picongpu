@@ -20,7 +20,6 @@
 #pragma once
 
 #include "picongpu/fields/incidentField/profiles/DispersivePulse.hpp"
-#include "picongpu/fields/incidentField/profiles/ExpRampWithPrepulse.hpp"
 #include "picongpu/fields/incidentField/profiles/Free.hpp"
 #include "picongpu/fields/incidentField/profiles/GaussianPulse.hpp"
 #if (ENABLE_OPENPMD == 1)

@@ -24,7 +24,6 @@
  * Available profiles:
  *  - profiles::DispersivePulse<>     : Gaussian pulse allowing to set first-, second-, and third-order dispersion
  * in focus. That is, SD, AD, GDD, and TOD, respectively.
- *  - profiles::ExpRampWithPrepulse<> : exponential ramp with prepulse wavepacket with given parameters
  *  - profiles::Free<>                : custom profile with user-provided functors to calculate incident E and B
  *  - profiles::GaussianPulse<>       : Pulse with Gaussian profile in all three dimensions with given parameters
  *  - profiles::None                  : no incident field
@@ -214,90 +213,69 @@ namespace picongpu
 
             using PlaneWaveBeam = profiles::PlaneWave<PlaneWaveParams>;
 
-            //! Laser Profile is taking plane wave param configuration and is overwriting only a few settings
-            struct ExpRampWithPrepulseParam : public PlaneWaveParams
+            //! Extends plane wave setup with a gassian pulse paramters
+            struct GaussianPulseParam : public PlaneWaveParams
             {
-                /** Intensities of prepulse and exponential preramp
-                 *
-                 * @{
-                 */
-                static constexpr float_X INT_RATIO_PREPULSE = 0.;
-                static constexpr float_X INT_RATIO_POINT_1 = 1.e-8;
-                static constexpr float_X INT_RATIO_POINT_2 = 1.e-4;
-                static constexpr float_X INT_RATIO_POINT_3 = 1.e-4;
-                /** @} */
-
-                /** Time-positions of prepulse and preramps points
-                 *
-                 * @{
-                 */
-                static constexpr float_64 TIME_PREPULSE_SI = -950.0e-15;
-                static constexpr float_64 TIME_PEAKPULSE_SI = 0.0e-15;
-                static constexpr float_64 TIME_POINT_1_SI = -1000.0e-15;
-                static constexpr float_64 TIME_POINT_2_SI = -300.0e-15;
-                static constexpr float_64 TIME_POINT_3_SI = -100.0e-15;
-                /** @} */
-
-                /** Beam waist: distance from the axis where the pulse intensity (E^2)
+                /** Beam waist distance from the axis where the pulse intensity (E^2)
                  *              decreases to its 1/e^2-th part,
                  *              at the focus position of the laser
-                 *
-                 * AXIS_1 is directed according to POLARISATION_DIRECTION parameters.
-                 * AXIS_2 is a cross product of the propagation direction and AXIS_1.
-                 *
-                 * For 2d simulations W0_AXIS_2_SI must be defined but its value has no effect.
+                 * W0_SI = FWHM_of_Intensity / sqrt{ 2* ln(2) }
+                 *                             [   1.17741    ]
                  *
                  * unit: meter
                  */
-                static constexpr float_64 W0_AXIS_1_SI = 2.5 * WAVE_LENGTH_SI;
-                static constexpr float_64 W0_AXIS_2_SI = W0_AXIS_1_SI;
+                static constexpr float_64 W0_SI = 5.0e-6 / 1.17741;
 
-                //***** Overwritten settings from plane wave params *****
-
-                /** The laser pulse will be initialized RAMP_INIT times the PULSE_DURATION before
-                 * plateau and half at the end of the plateau
+                /** The laser pulse will be initialized PULSE_INIT times of the PULSE_DURATION
                  *
-                 * unit: none
-                 */
-                static constexpr float_64 RAMP_INIT = 8.0;
-
-                /** Pulse duration: sigma of std. gauss for intensity (E^2)
-                 *  PULSE_DURATION_SI = FWHM_of_Intensity   / [ 2*sqrt{ 2* ln(2) } ]
-                 *                                          [    2.354820045     ]
-                 *  Info:             FWHM_of_Intensity = FWHM_Illumination
-                 *                      = what a experimentalist calls "pulse duration"
-                 *  unit: seconds (1 sigma)
+                 *  Will be ignored if used with a free functor temporal envelope
                  *
-                 *  @attention half of the time in which E falls to half its initial value (then I falls to half its
-                 *             value in 15fs, approx 6 wavelengths). Those are 4.8 wavelenghts.
+                 *  unit: none
                  */
-                static constexpr float_64 PULSE_DURATION_SI = 3.0e-14 / 2.35482;
+                static constexpr float_64 PULSE_INIT = 15.0;
 
-                /** Pulse duration: sigma of std. gauss for intensity (E^2)
-                 *  PREPULSE_DURATION_SI = FWHM_of_Intensity   / [ 2*sqrt{ 2* ln(2) } ]
-                 *                                          [    2.354820045     ]
-                 *  Info:             FWHM_of_Intensity = FWHM_Illumination
-                 *                      = what an experimentalist calls "pulse duration"
-                 *  unit: seconds (1 sigma)
+                /** Laguerre mode parameters
+                 *
+                 * @{
                  */
-                static constexpr float_64 PREPULSE_DURATION_SI = PULSE_DURATION_SI;
+                //! Use only the 0th Laguerremode for a standard Gaussian
+                static constexpr uint32_t numModes = 0;
+                static constexpr auto laguerreModes = floatN_X<numModes + 1>(1.0);
+                static constexpr auto laguerrePhases = floatN_X<numModes + 1>(0.0);
+
+                /** @} */
+
+                template<typename T_Self = GaussianPulseParam>
+                static auto metadata()
+                {
+                    // static member functions do not bind to the derived type when inherited, so we have to refer to
+                    // our type explicitly
+                    return profiles::defaults::GaussianPulseParam::metadata<T_Self>();
+                };
             };
 
-            using ExpRampWithPrepulseBeam = profiles::ExpRampWithPrepulse<ExpRampWithPrepulseParam>;
+            using GaussianBeam = profiles::GaussianPulse<GaussianPulseParam>;
 
-            namespace profiles
+            /** Example of a free temporal envelope functor
+             *
+             * Describes the E field evelope (sqrt(I))
+             * 1.0 corresponds to the a_0 set in the gaussian param struct
+             * This functor reproduces the standard Gaussian envelope
+             */
+            struct FreeEnvelopeExample
             {
-                /* This setup is using by default periodic boundaries in X direction.
-                 * Defining this trait will stretch the Huygens surface to create lesser artefacts in the first cell on
-                 * the outer boundaries. Note: For ExpRampWithPrepulseBeam the fields in the transversal direction are
-                 * not constant therefore  the artefacts can not be avoided.
-                 */
-                template<>
-                struct MakePeriodicTransversalHuygensSurfaceContiguous<ExpRampWithPrepulseBeam>
+                HDINLINE float_X operator()(float_64 const& time_SI)
                 {
-                    static constexpr bool value = true;
-                };
-            } // namespace profiles
+                    constexpr float_64 PULSE_DURATION_SI = 25.0e-15 / 2.354820045;
+                    constexpr float_64 PULSE_INIT = 15.0;
+                    auto const time = time_SI - 0.5 * PULSE_INIT * PULSE_DURATION_SI;
+                    auto const exponent = time / (2.0 * PULSE_DURATION_SI);
+                    return precisionCast<float_X>(math::exp(-exponent * exponent));
+                }
+            };
+
+            using GaussianBeamWithFreeEnvelope
+                = profiles::GaussianPulse<GaussianPulseParam, profiles::FreeEnvelope<FreeEnvelopeExample>>;
 
             /**@{*/
             //! Incident field profile types along each boundary, these 6 types (or aliases) are required.
