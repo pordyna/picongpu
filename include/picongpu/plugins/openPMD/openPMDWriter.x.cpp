@@ -1348,8 +1348,18 @@ make sure that environment variable OPENPMD_BP_BACKEND is not set to ADIOS1.
                 /* load all particles */
                 meta::ForEach<FileCheckpointParticles, LoadSpecies<boost::mpl::_1>> ForEachLoadSpecies;
                 ForEachLoadSpecies(&mThreadParams, restartStep, restartChunkSize);
-
-                loadRngStates(&mThreadParams, restartStep);
+#    ifdef DO_NOT_LOAD_RNG_RESTART_STEP
+                if(restartStep != DO_NOT_LOAD_RNG_RESTART_STEP)
+                {
+#    endif
+                    loadRngStates(&mThreadParams, restartStep);
+#    ifdef DO_NOT_LOAD_RNG_RESTART_STEP
+                }
+                else
+                {
+                    log<picLog::INPUT_OUTPUT>("openPMD: Skiping loading RNG states on request!");
+                }
+#    endif
 
                 DataConnector& dc = Environment<>::get().DataConnector();
                 auto idProvider = dc.get<IdProvider>("globalId");
