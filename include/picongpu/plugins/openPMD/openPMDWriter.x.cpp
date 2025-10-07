@@ -1357,7 +1357,7 @@ make sure that environment variable OPENPMD_BP_BACKEND is not set to ADIOS1.
                 }
                 else
                 {
-                    log<picLog::INPUT_OUTPUT>("openPMD: Skiping loading RNG states on request!");
+                    log<picLog::CRITICAL>("openPMD: Skiping loading RNG states on request!");
                 }
 #    endif
 
