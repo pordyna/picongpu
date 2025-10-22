@@ -1385,7 +1385,9 @@ make sure that environment variable OPENPMD_BP_BACKEND is not set to ADIOS1.
 
                 auto fieldBackground = dc.get<simulation::stage::FieldBackground>("FieldBackground");
                 ::openPMD::Container<::openPMD::Mesh>& meshes = iteration.meshes;
-                fieldBackground->restart(meshes.getAttribute("BackgroundFieldIncluded").get<bool>());
+                // fieldBackground->restart(meshes.getAttribute("BackgroundFieldIncluded").get<bool>());
+                fieldBackground->restart(false);
+
                 // avoid deadlock between not finished pmacc tasks and mpi calls in
                 // openPMD
                 eventSystem::getTransactionEvent().waitForFinished();
