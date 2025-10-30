@@ -510,13 +510,8 @@ class Simulation(picmistandard.PICMI_Simulation):
         if len(self.laser_injection_methods) != self.laser_injection_methods.count(None):
             pypicongpu.util.unsupported("laser injection method", self.laser_injection_methods, [])
 
-        # pypicongpu interface currently only supports one laser, @todo change Brian Marre, 2024
-        if len(self.lasers) > 1:
-            pypicongpu.util.unsupported("more than one laser")
-
-        if len(self.lasers) == 1:
-            # check requires grid, so grid is translated (and thereby also checked) above
-            s.laser = self.lasers[0].get_as_pypicongpu()
+        if len(self.lasers) > 0:
+            s.laser = [ll.get_as_pypicongpu() for ll in self.lasers]
         else:
             # explictly disable laser (as required by pypicongpu)
             s.laser = None

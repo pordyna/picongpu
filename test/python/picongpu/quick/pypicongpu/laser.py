@@ -19,20 +19,21 @@ import typeguard
 
 class TestGaussianLaser(unittest.TestCase):
     def setUp(self):
-        self.laser = GaussianLaser()
-        self.laser.wavelength = 1.2
-        self.laser.waist = 3.4
-        self.laser.duration = 5.6
-        self.laser.focal_position = [0, 7.8, 0]
-        self.laser.phi0 = 2.9
-        self.laser.E0 = 9.0
-        self.laser.pulse_init = 1.3
-        self.laser.propagation_direction = [0.0, 1.0, 0.0]
-        self.laser.polarization_type = PolarizationType.LINEAR
-        self.laser.polarization_direction = [0.0, 1.0, 0.0]
-        self.laser.laguerre_modes = [1.0]
-        self.laser.laguerre_phases = [0.0]
-        self.laser.huygens_surface_positions = [[1, -1], [1, -1], [1, -1]]
+        laser = GaussianLaser()
+        laser.wavelength = 1.2
+        laser.waist = 3.4
+        laser.duration = 5.6
+        laser.focal_position = [0, 7.8, 0]
+        laser.phi0 = 2.9
+        laser.E0 = 9.0
+        laser.pulse_init = 1.3
+        laser.propagation_direction = [0.0, 1.0, 0.0]
+        laser.polarization_type = PolarizationType.LINEAR
+        laser.polarization_direction = [0.0, 1.0, 0.0]
+        laser.laguerre_modes = [1.0]
+        laser.laguerre_phases = [0.0]
+        laser.huygens_surface_positions = [[1, -1], [1, -1], [1, -1]]
+        self.laser = [laser]
 
     def test_types(self):
         """invalid types are rejected"""
@@ -93,7 +94,7 @@ class TestGaussianLaser(unittest.TestCase):
         """Huygens surfaces must be described as
         [[x_min:int, x_max:int], [y_min:int,y_max:int],
         [z_min:int, z_max:int]]"""
-        laser = self.laser
+        laser = self.laser[0]
 
         invalid_elements = [None, [], [1.2, 3.4]]
         valid_rump = [[5, 6], [7, 8]]
@@ -111,7 +112,7 @@ class TestGaussianLaser(unittest.TestCase):
 
     def test_invalid_laguerre_modes_empty(self):
         """laguerre modes must be set non-empty"""
-        laser = self.laser
+        laser = self.laser[0]
         laser.laguerre_modes = []
         with self.assertRaisesRegex(ValueError, ".*mode.*empty.*"):
             laser.get_rendering_context()
@@ -122,7 +123,7 @@ class TestGaussianLaser(unittest.TestCase):
 
     def test_invalid_laguerre_modes_invalid_length(self):
         """num of laguerre modes/phases must be equal"""
-        laser = self.laser
+        laser = self.laser[0]
         laser.laguerre_modes = [1.0]
         laser.laguerre_phases = [2, 3]
 
@@ -135,7 +136,7 @@ class TestGaussianLaser(unittest.TestCase):
 
     def test_positive_definite_laguerre_modes(self):
         """test whether laguerre modes are positive definite"""
-        laser = self.laser
+        laser = self.laser[0]
         laser.laguerre_modes = [-1.0]
         with self.assertLogs(level="WARNING") as caught_logs:
             # valid, but warns
@@ -156,36 +157,36 @@ class TestGaussianLaser(unittest.TestCase):
     def test_translation(self):
         """is translated to context object"""
         # note: implicitly checks against schema
-        context = self.laser.get_rendering_context()["data"]
-        self.assertEqual(context["wave_length_si"], self.laser.wavelength)
-        self.assertEqual(context["waist_si"], self.laser.waist)
-        self.assertEqual(context["pulse_duration_si"], self.laser.duration)
+        context = self.laser[0].get_rendering_context()["data"]
+        self.assertEqual(context["wave_length_si"], self.laser[0].wavelength)
+        self.assertEqual(context["waist_si"], self.laser[0].waist)
+        self.assertEqual(context["pulse_duration_si"], self.laser[0].duration)
         self.assertEqual(
             context["focus_pos_si"],
             [
-                {"component": self.laser.focal_position[0]},
-                {"component": self.laser.focal_position[1]},
-                {"component": self.laser.focal_position[2]},
+                {"component": self.laser[0].focal_position[0]},
+                {"component": self.laser[0].focal_position[1]},
+                {"component": self.laser[0].focal_position[2]},
             ],
         )
-        self.assertEqual(context["phase"], self.laser.phi0)
-        self.assertEqual(context["E0_si"], self.laser.E0)
-        self.assertEqual(context["pulse_init"], self.laser.pulse_init)
+        self.assertEqual(context["phase"], self.laser[0].phi0)
+        self.assertEqual(context["E0_si"], self.laser[0].E0)
+        self.assertEqual(context["pulse_init"], self.laser[0].pulse_init)
         self.assertEqual(
             context["propagation_direction"],
             [
-                {"component": self.laser.propagation_direction[0]},
-                {"component": self.laser.propagation_direction[1]},
-                {"component": self.laser.propagation_direction[2]},
+                {"component": self.laser[0].propagation_direction[0]},
+                {"component": self.laser[0].propagation_direction[1]},
+                {"component": self.laser[0].propagation_direction[2]},
             ],
         )
-        self.assertEqual(context["polarization_type"], self.laser.polarization_type.get_cpp_str())
+        self.assertEqual(context["polarization_type"], self.laser[0].polarization_type.get_cpp_str())
         self.assertEqual(
             context["polarization_direction"],
             [
-                {"component": self.laser.polarization_direction[0]},
-                {"component": self.laser.polarization_direction[1]},
-                {"component": self.laser.polarization_direction[2]},
+                {"component": self.laser[0].polarization_direction[0]},
+                {"component": self.laser[0].polarization_direction[1]},
+                {"component": self.laser[0].polarization_direction[2]},
             ],
         )
         self.assertEqual(context["laguerre_modes"], [{"single_laguerre_mode": 1.0}])
@@ -195,16 +196,16 @@ class TestGaussianLaser(unittest.TestCase):
             context["huygens_surface_positions"],
             {
                 "row_x": {
-                    "negative": self.laser.huygens_surface_positions[0][0],
-                    "positive": self.laser.huygens_surface_positions[0][1],
+                    "negative": self.laser[0].huygens_surface_positions[0][0],
+                    "positive": self.laser[0].huygens_surface_positions[0][1],
                 },
                 "row_y": {
-                    "negative": self.laser.huygens_surface_positions[1][0],
-                    "positive": self.laser.huygens_surface_positions[1][1],
+                    "negative": self.laser[0].huygens_surface_positions[1][0],
+                    "positive": self.laser[0].huygens_surface_positions[1][1],
                 },
                 "row_z": {
-                    "negative": self.laser.huygens_surface_positions[2][0],
-                    "positive": self.laser.huygens_surface_positions[2][1],
+                    "negative": self.laser[0].huygens_surface_positions[2][0],
+                    "positive": self.laser[0].huygens_surface_positions[2][1],
                 },
             },
         )

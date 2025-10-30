@@ -53,21 +53,22 @@ class TestSimulation(unittest.TestCase):
         self.s.init_manager = species.InitManager()
         self.s.base_density = 1.0e25
 
-        self.laser = GaussianLaser()
-        self.laser.wavelength = 1.2
-        self.laser.waist = 3.4
-        self.laser.duration = 5.6
-        self.laser.focal_position = [0, 7.8, 0]
-        self.laser.centroid_position = [0, 0, 0]
-        self.laser.phi0 = 2.9
-        self.laser.E0 = 9.0
-        self.laser.pulse_init = 1.3
-        self.laser.propagation_direction = [0, 1, 0]
-        self.laser.polarization_type = PolarizationType.LINEAR
-        self.laser.polarization_direction = [0, 0, 1]
-        self.laser.laguerre_modes = [1.2, 2.4]
-        self.laser.laguerre_phases = [2.4, 3.4]
-        self.laser.huygens_surface_positions = [[1, -1], [1, -1], [1, -1]]
+        laser = GaussianLaser()
+        laser.wavelength = 1.2
+        laser.waist = 3.4
+        laser.duration = 5.6
+        laser.focal_position = [0, 7.8, 0]
+        laser.centroid_position = [0, 0, 0]
+        laser.phi0 = 2.9
+        laser.E0 = 9.0
+        laser.pulse_init = 1.3
+        laser.propagation_direction = [0, 1, 0]
+        laser.polarization_type = PolarizationType.LINEAR
+        laser.polarization_direction = [0, 0, 1]
+        laser.laguerre_modes = [1.2, 2.4]
+        laser.laguerre_phases = [2.4, 3.4]
+        laser.huygens_surface_positions = [[1, -1], [1, -1], [1, -1]]
+        self.laser = [laser]
 
         self.customData_1 = [{"test_data_1": 1}, "tag_1"]
         self.customData_2 = [{"test_data_2": 2}, "tag_2"]
@@ -206,8 +207,8 @@ class TestSimulation(unittest.TestCase):
         sim = self.s
         sim.laser = self.laser
         context = sim.get_rendering_context()
-        laser_context = sim.laser.get_rendering_context()
-        self.assertEqual(context["laser"], laser_context)
+        laser_context = sim.laser[0].get_rendering_context()
+        self.assertEqual(context["laser"][0], laser_context)
 
     def test_output_auto_short_duration(self):
         """period is always at least one"""

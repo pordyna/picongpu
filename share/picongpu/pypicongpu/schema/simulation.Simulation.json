@@ -40,7 +40,10 @@
           "type": "null"
         },
         {
-          "$ref": "https://registry.hzdr.de/crp/picongpu/schema/picongpu.pypicongpu.laser.Laser"
+          "type": "array",
+          "items": {
+            "$ref": "https://registry.hzdr.de/crp/picongpu/schema/picongpu.pypicongpu.laser.Laser"
+          }
         }
       ]
     },

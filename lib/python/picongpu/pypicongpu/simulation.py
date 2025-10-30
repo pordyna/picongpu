@@ -24,6 +24,9 @@ import logging
 import datetime
 
 
+AnyLaser = DispersivePulseLaser | FromOpenPMDPulseLaser | GaussianLaser | PlaneWaveLaser
+
+
 @typeguard.typechecked
 class Simulation(RenderedObject):
     """
@@ -47,9 +50,7 @@ class Simulation(RenderedObject):
     grid = util.build_typesafe_property(typing.Union[Grid3D])
     """Used grid Object"""
 
-    laser = util.build_typesafe_property(
-        typing.Union[DispersivePulseLaser, FromOpenPMDPulseLaser, GaussianLaser, PlaneWaveLaser, None]
-    )
+    laser = util.build_typesafe_property(typing.Optional[list[AnyLaser]])
     """Used (gaussian) Laser"""
 
     solver = util.build_typesafe_property(Solver)
@@ -139,7 +140,7 @@ class Simulation(RenderedObject):
             serialized["output"] = None
 
         if self.laser is not None:
-            serialized["laser"] = self.laser.get_rendering_context()
+            serialized["laser"] = [ll.get_rendering_context() for ll in self.laser]
         else:
             serialized["laser"] = None
 

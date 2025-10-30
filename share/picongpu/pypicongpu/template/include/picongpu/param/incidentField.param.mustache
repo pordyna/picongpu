@@ -25,9 +25,8 @@ namespace picongpu::fields::incidentField
 {
     {{#laser}}
     {{#laser.data}}
-
     {{^laser.typeID.fromOpenPMDPulse}}
-    struct PyPIConGPULaserBaseParam : public profiles::BaseParam
+    struct PyPIConGPULaserBaseParam_{{{laser._idx}}} : public profiles::BaseParam
     {
         static constexpr float_64 WAVE_LENGTH_SI = {{{wave_length_si}}}; // m
         static constexpr float_64 AMPLITUDE_SI = {{{E0_si}}}; // V/m
@@ -66,7 +65,7 @@ namespace picongpu::fields::incidentField
     {{/laser.typeID.fromOpenPMDPulse}}
 
     {{#typeID.gaussian}}
-    struct PyPIConGPUGaussianPulseParam : public PyPIConGPULaserBaseParam
+    struct PyPIConGPUGaussianPulseParam_{{{laser._idx}}} : public PyPIConGPULaserBaseParam_{{{laser._idx}}}
     {
         static constexpr float_64 W0_SI = {{{waist_si}}};
         static constexpr float_64 PULSE_INIT = {{{pulse_init}}};
@@ -85,7 +84,7 @@ namespace picongpu::fields::incidentField
     {{/typeID.gaussian}}
 
     {{#typeID.planewave}}
-    struct PyPIConGPUPlaneWaveParam : public PyPIConGPULaserBaseParam
+    struct PyPIConGPUPlaneWaveParam_{{{laser._idx}}} : public PyPIConGPULaserBaseParam_{{{laser._idx}}}
     {
         static constexpr float_64 RAMP_INIT = {{{pulse_init}}};
         static constexpr float_64 LASER_NOFOCUS_CONSTANT_SI = {{{laser_nofocus_constant_si}}};
@@ -93,7 +92,7 @@ namespace picongpu::fields::incidentField
     {{/typeID.planewave}}
 
     {{#typeID.dispersive}}
-    struct PyPIConGPUDispersivePulseParam : public PyPIConGPULaserBaseParam
+    struct PyPIConGPUDispersivePulseParam_{{{laser._idx}}} : public PyPIConGPULaserBaseParam_{{{laser._idx}}}
     {
         static constexpr float_64 W0_SI = {{{waist_si}}};
         static constexpr float_64 PULSE_INIT = {{{pulse_init}}};
@@ -106,7 +105,7 @@ namespace picongpu::fields::incidentField
     {{/typeID.dispersive}}
 
     {{#typeID.fromOpenPMDPulse}}
-    struct PyPIConGPUFromOpenPMDPulseParam
+    struct PyPIConGPUFromOpenPMDPulseParam_{{{laser._idx}}}
     {
         static constexpr char const* filename = "{{{file_path}}}";
         static constexpr uint32_t iteration = {{{iteration}}};
@@ -139,7 +138,21 @@ namespace picongpu::fields::incidentField
     };
     {{/typeID.fromOpenPMDPulse}}
 
+    {{#typeID.gaussian}}
+    using LaserProfile_{{{laser._idx}}} = profiles::GaussianPulse<PyPIConGPUGaussianPulseParam_{{{laser._idx}}}>;
+    {{/typeID.gaussian}}
+    {{#typeID.planewave}}
+    using LaserProfile_{{{laser._idx}}} = profiles::PlaneWave<PyPIConGPUPlaneWaveParam_{{{laser._idx}}}>;
+    {{/typeID.planewave}}
+    {{#typeID.dispersive}}
+    using LaserProfile_{{{laser._idx}}} = profiles::DispersivePulse<PyPIConGPUDispersivePulseParam_{{{laser._idx}}}>;
+    {{/typeID.dispersive}}
+    {{#typeID.fromOpenPMDPulse}}
+    using LaserProfile_{{{laser._idx}}} = profiles::FromOpenPMDPulse<PyPIConGPUFromOpenPMDPulseParam_{{{laser._idx}}}>;
+    {{/typeID.fromOpenPMDPulse}}
 
+    // TODO: find a better solution and move it into simulation class, or add a check that all lasers use the same positions
+    {{#laser._first}}
     /** Position in cells of the Huygens surface relative to start of the total domain
      *
      * The position is set as an offset, in cells, counted from the start of the total domain.
@@ -172,23 +185,21 @@ namespace picongpu::fields::incidentField
         {{/row_z}}
         {{/huygens_surface_positions}}
     };
+    {{/laser._first}}
 
     /**@{*/
     //! Incident field profile types along each boundary, these 6 types (or aliases) are required.
-    {{#typeID.gaussian}}
-    using YMin = profiles::GaussianPulse<PyPIConGPUGaussianPulseParam>;
-    {{/typeID.gaussian}}
-    {{#typeID.planewave}}
-    using YMin = profiles::PlaneWave<PyPIConGPUPlaneWaveParam>;
-    {{/typeID.planewave}}
-    {{#typeID.dispersive}}
-    using YMin = profiles::DispersivePulse<PyPIConGPUDispersivePulseParam>;
-    {{/typeID.dispersive}}
-    {{#typeID.fromOpenPMDPulse}}
-    using YMin = profiles::FromOpenPMDPulse<PyPIConGPUFromOpenPMDPulseParam>;
-    {{/typeID.fromOpenPMDPulse}}
     {{/laser.data}}
     {{/laser}}
+
+
+    using YMin = MakeSeq_t<
+    {{#laser}}
+        LaserProfile_{{{laser._idx}}},
+    {{/laser}}
+    profiles::None
+    >;
+
     {{^laser}}
     // no laser defined case
     constexpr int32_t POSITION[3][2] = {
@@ -197,7 +208,6 @@ namespace picongpu::fields::incidentField
                 {16, -16} // z direction [negative, positive]
     };
 
-    using YMin = profiles::None;
     {{/laser}}
     using XMin = profiles::None;
     using XMax = profiles::None;

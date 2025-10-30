@@ -129,6 +129,7 @@ class Renderer:
                     elem = Renderer.__get_context_preprocessed_recursive(value[i])
                     elem["_first"] = 0 == i
                     elem["_last"] = len(value) - 1 == i
+                    elem["_idx"] = i
                     new_list.append(elem)
                 pp[key] = new_list
             elif type(value) in [int, float]:
