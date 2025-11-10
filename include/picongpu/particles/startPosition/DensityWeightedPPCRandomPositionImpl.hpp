@@ -58,7 +58,7 @@ namespace picongpu
                     HDINLINE uint32_t numberOfMacroParticles(float_X const realParticlesPerCell)
                     {
                         float_X const cellVolume
-                            = sim.pic.getCellSize.x() * sim.pic.getCellSize.y() * sim.pic.getCellSize.z();
+                            = sim.pic.getCellSize().x() * sim.pic.getCellSize().y() * sim.pic.getCellSize().z();
                         float_X const cellDensity = realParticlesPerCell / cellVolume;
                         float_X const densInBaseDens = cellDensity / sim.pic.getBaseDensity();
                         constexpr auto particlesPerBaseDensity = T_ParamClass::particlesPerBaseDensity;
