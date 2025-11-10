@@ -1,4 +1,4 @@
-/* Copyright 2014-2024 Rene Widera
+/* Copyright 2014-2025 Rene Widera, Pawel Ordyna
  *
  * This file is part of PIConGPU.
  *
@@ -25,5 +25,6 @@
 #include "picongpu/particles/startPosition/RandomBinomialImpl.def"
 #include "picongpu/particles/startPosition/RandomImpl.def"
 #include "picongpu/particles/startPosition/RandomPositionAndWeightingImpl.def"
+#include "picongpu/particles/startPosition/generic/DensityWeightedPPCRandomPositionImpl.def"
 #include "picongpu/particles/startPosition/generic/Free.def"
 #include "picongpu/particles/startPosition/generic/FreeRng.def"
