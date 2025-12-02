@@ -137,8 +137,6 @@ namespace pmacc::simulationControl
                 ("checkpoint.directory", po::value<std::string>(&checkpointDirectory)->default_value(checkpointDirectory),
                     "Directory for checkpoints");
             // clang-format on
-            // translate checkpointPeriod string into checkpoint intervals
-            seqCheckpointPeriod = pluginSystem::toTimeSlice(checkpointPeriod);
         }
 
         void addCheckpoint(uint32_t signalMaxTimestep)
@@ -205,6 +203,9 @@ namespace pmacc::simulationControl
 
         void startTimeBasedCheckpointing()
         {
+            // translate checkpointPeriod string into checkpoint intervals
+            seqCheckpointPeriod = pluginSystem::toTimeSlice(checkpointPeriod);
+
             // register concurrent thread to perform checkpointing periodically after a user defined time
             if(checkpointPeriodMinutes != 0)
                 checkpointTimeThread = std::thread(
