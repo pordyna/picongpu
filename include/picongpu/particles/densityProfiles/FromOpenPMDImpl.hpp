@@ -123,8 +123,13 @@ namespace picongpu
                     auto const filename = getFilename();
                     log<picLog::PHYSICS>("Loading density for species \"%1%\" from file \"%2%\"")
                         % SpeciesType::FrameType::getName() % filename;
+                    // TODO: Is this called also on non used nodes in moving window? If not we should have a different
+                    // communicator
+                    eventSystem::getTransactionEvent().waitForFinished();
+                    log<picLog::INPUT_OUTPUT>("openPMD: open file: %1%") % filename;
                     auto series
                         = ::openPMD::Series{filename, ::openPMD::Access::READ_ONLY, gc.getCommunicator().getMPIComm()};
+                    log<picLog::INPUT_OUTPUT>("openPMD: successfully opened file: %1%") % filename;
                     auto mesh = series.iterations[ParamClass::iteration].meshes[ParamClass::datasetName];
                     ::openPMD::MeshRecordComponent dataset = mesh[::openPMD::RecordComponent::SCALAR];
                     auto const indexConverter = IndexConverter{mesh};
@@ -162,6 +167,7 @@ namespace picongpu
                             indexConverter.xyzToOpenPMD(chunkExtent));
                     }
                     // This is MPI collective and so has to be done by all ranks
+                    eventSystem::getTransactionEvent().waitForFinished();
                     series.flush();
 
                     if(readFromFile)
@@ -183,6 +189,10 @@ namespace picongpu
                     // Copy host data to the device
                     fieldBuffer.hostToDevice();
                     eventSystem::getTransactionEvent().waitForFinished();
+                    log<picLog::INPUT_OUTPUT>("openPMD: close file: %1%") % filename;
+                    series.close();
+                    MPI_Barrier(gc.getCommunicator().getMPIComm());
+                    log<picLog::INPUT_OUTPUT>("openPMD: successfully closed file: %1%") % filename;
                 }
 
                 //! Get file name to load density from
