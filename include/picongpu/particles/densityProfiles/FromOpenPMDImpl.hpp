@@ -169,7 +169,9 @@ namespace picongpu
                     // This is MPI collective and so has to be done by all ranks
                     eventSystem::getTransactionEvent().waitForFinished();
                     series.flush();
-
+                    log<picLog::INPUT_OUTPUT>(
+                        "openPMD: finished loading local density chunk  species \"%1%\""
+                        % SpeciesType::FrameType::getName());
                     if(readFromFile)
                     {
                         auto const* rawData = data.get();
