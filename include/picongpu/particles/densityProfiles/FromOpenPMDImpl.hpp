@@ -181,6 +181,7 @@ namespace picongpu
                             1u,
                             std::multiplies<uint32_t>());
                         auto hostDataBox = fieldBuffer.getHostBuffer().getDataBox().shift(guards + localDataBoxStart);
+#    pragma omp parallel for
                         for(uint32_t linearIdx = 0u; linearIdx < numElements; linearIdx++)
                         {
                             auto const idx = indexConverter.linearToXyz(linearIdx, chunkExtent);
