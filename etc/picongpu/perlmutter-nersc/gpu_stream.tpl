@@ -30,6 +30,8 @@
 #SBATCH --ntasks-per-node=!TBG_mpiTasksPerNode
 #SBATCH --chdir=!TBG_dstPath
 #SBATCH --mem=!TBG_memPerNode
+#SBATCH --gpu-bind=none
+
 
 # Sets batch job's name
 #SBATCH --job-name=!TBG_jobName
@@ -122,10 +124,10 @@ export SLURM_CPU_BIND="cores"
 
 if [ $node_check_err -eq 0 ] || [ $run_cuda_memtest -eq 0 ] ; then
 
-   export MPICH_GPU_SUPPORT_ENABLED=0
+   export MPICH_GPU_SUPPORT_ENABLED=1
    # Run PIConGPU
-   # the --gpu-bind option is normaly set via --gpus-per-task that can't be done when mixing with a stream reader
-   srun --exclusive --network=single_node_vni,job_vni --ntasks=!TBG_tasks --nodes=!TBG_nodes --ntasks-per-node=!TBG_gpusPerNode --gres=gpu:!TBG_gpusPerNode --cpus-per-task=!TBG_coresPerPICDevice -K1 --cpu-bind=cores --gpu-bind=per_task:1 !TBG_dstPath/input/bin/picongpu !TBG_author !TBG_programParams > ../pic.out 2> ../pic.err &
+   # the --gpu-bind has to be none due to cgroups problem on perlmutter that breaks mpi when setting gpu affinity with slurm, set the affinity manually instead
+   srun --exclusive --network=single_node_vni,job_vni --ntasks=!TBG_tasks --nodes=!TBG_nodes --ntasks-per-node=!TBG_gpusPerNode --gres=gpu:!TBG_gpusPerNode --cpus-per-task=!TBG_coresPerPICDevice -K1 --cpu-bind=cores --gpu-bind=none !TBG_dstPath/input/etc/picongpu/perlmutter-nersc/handleSlurmSignalsAndAffinity.sh !TBG_dstPath/tbg/handleSlurmSignals.sh !TBG_dstPath/input/bin/picongpu !TBG_author !TBG_programParams --mpiDirect > ../pic.out 2> ../pic.err &
 
    sleep 2
 
