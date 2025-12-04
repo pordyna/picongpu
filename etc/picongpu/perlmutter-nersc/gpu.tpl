@@ -29,6 +29,8 @@
 #SBATCH --gpu-bind=none
 #SBATCH --ntasks-per-node=!TBG_gpusPerNode
 #SBATCH --gpus-per-node=!TBG_gpusPerNode
+#SBATCH --cpus-per-task=!TBG_coresPerGPU
+
 #SBATCH --chdir=!TBG_dstPath
 
 # Sets batch job's name
