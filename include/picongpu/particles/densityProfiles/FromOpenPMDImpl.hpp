@@ -127,8 +127,11 @@ namespace picongpu
                     // communicator
                     eventSystem::getTransactionEvent().waitForFinished();
                     log<picLog::INPUT_OUTPUT>("openPMD: open file: %1%") % filename;
-                    auto series
-                        = ::openPMD::Series{filename, ::openPMD::Access::READ_ONLY, gc.getCommunicator().getMPIComm()};
+                    auto series = ::openPMD::Series{
+                        filename,
+                        ::openPMD::Access::READ_ONLY,
+                        gc.getCommunicator().getMPIComm(),
+                        R"({"adios2": {"engine": {"parameters": {"Threads": 16 }}}})"};
                     log<picLog::INPUT_OUTPUT>("openPMD: successfully opened file: %1%") % filename;
                     auto mesh = series.iterations[ParamClass::iteration].meshes[ParamClass::datasetName];
                     ::openPMD::MeshRecordComponent dataset = mesh[::openPMD::RecordComponent::SCALAR];
@@ -171,6 +174,7 @@ namespace picongpu
                     series.flush();
                     log<picLog::INPUT_OUTPUT>("openPMD: finished loading local density chunk  species \"%1%\"")
                         % SpeciesType::FrameType::getName();
+                    MPI_Barrier(gc.getCommunicator().getMPIComm());
                     if(readFromFile)
                     {
                         auto const* rawData = data.get();
