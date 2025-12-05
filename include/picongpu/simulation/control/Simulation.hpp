@@ -409,17 +409,18 @@ namespace picongpu
 #if (BOOST_LANG_CUDA || BOOST_COMP_HIP)
             size_t heapSize = freeGpuMem - reservedGpuMemorySize;
             GridController<simDim>& gc = Environment<simDim>::get().GridController();
-            if(Environment<>::get().MemoryInfo().isSharedMemoryPool(
-                   numRanksPerDevice,
-                   gc.getCommunicator().getMPIComm()))
-            {
-                heapSize /= 2u;
-                log<picLog::MEMORY>(
-                    "Shared RAM between GPU and host detected - using only half of the 'device' memory.");
-            }
-            else
-                log<picLog::MEMORY>("Device RAM is NOT shared between GPU and host.");
-
+            // if(Environment<>::get().MemoryInfo().isSharedMemoryPool(
+            //        numRanksPerDevice,
+            //        gc.getCommunicator().getMPIComm()))
+            // {
+            //     heapSize /= 2u;
+            //     log<picLog::MEMORY>(
+            //         "Shared RAM between GPU and host detected - using only half of the 'device' memory.");
+            // }
+            // else
+            //     log<picLog::MEMORY>("Device RAM is NOT shared between GPU and host.");
+            log<picLog::CRITICAL>(
+                "Skipping APU check and assuming that Device RAM is NOT shared between GPU and host.");
             // initializing the heap for particles
             deviceHeap->destructiveResize(alpakaDevice, alpakaQueue, heapSize);
             alpaka::wait(alpakaQueue);
