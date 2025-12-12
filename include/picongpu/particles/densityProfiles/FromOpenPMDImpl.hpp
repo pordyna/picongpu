@@ -127,11 +127,8 @@ namespace picongpu
                     // communicator
                     eventSystem::getTransactionEvent().waitForFinished();
                     log<picLog::INPUT_OUTPUT>("openPMD: open file: %1%") % filename;
-                    auto series = ::openPMD::Series{
-                        filename,
-                        ::openPMD::Access::READ_ONLY,
-                        gc.getCommunicator().getMPIComm(),
-                        R"({"adios2": {"engine": {"parameters": {"Threads": 16 }}}})"};
+                    auto series
+                        = ::openPMD::Series{filename, ::openPMD::Access::READ_ONLY, gc.getCommunicator().getMPIComm()};
                     log<picLog::INPUT_OUTPUT>("openPMD: successfully opened file: %1%") % filename;
                     auto mesh = series.iterations[ParamClass::iteration].meshes[ParamClass::datasetName];
                     ::openPMD::MeshRecordComponent dataset = mesh[::openPMD::RecordComponent::SCALAR];
