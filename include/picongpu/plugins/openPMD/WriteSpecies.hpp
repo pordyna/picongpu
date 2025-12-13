@@ -352,7 +352,7 @@ namespace picongpu
                 auto idProvider = dc.get<IdProvider>("globalId");
 
                 // enforce that the filter interface is fulfilled
-                particles::filter::IUnary<typename T_SpeciesFilter::Filter> particleFilter(
+                particles::filter::IUnary<typename T_SpeciesFilter::Filter::apply<ThisSpecies>::type> particleFilter(
                     currentStep,
                     idProvider->getDeviceGenerator());
                 using usedFilters = pmacc::mp_list<typename GetPositionFilter<simDim>::type>;
