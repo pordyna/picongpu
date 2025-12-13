@@ -255,9 +255,39 @@ namespace pmacc
         /* Avoid signal handling if the last signal is still processed.
          * Signal handling in the first step is always allowed.
          */
-        bool const handleSignals = handleSignalAtStep < currentStep || currentStep == 0u;
+        bool const handleSignals = (handleSignalAtStep < currentStep || currentStep == 0u) && !processingSignal;
+
+        /* Check if we should collect additional signals during processing */
+        if(!handleSignals && signal::received())
+        {
+            /* Collect additional signals that arrive during processing */
+            if(signal::createCheckpoint())
+            {
+                pendingCreateCheckpoint = true;
+                if(output)
+                    std::cout << "MPI RANK:" << getGridController().getGlobalRank()
+                              << " SIGNAL: Collecting additional checkpoint signal at step " << currentStep
+                              << " (will process after current signal completes)" << std::endl;
+            }
+            if(signal::stopSimulation())
+            {
+                pendingStopSimulation = true;
+                if(output)
+                    std::cout << "MPI RANK:" << getGridController().getGlobalRank()
+                              << " SIGNAL: Collecting additional shutdown signal at step " << currentStep
+                              << " (will process after current signal completes)" << std::endl;
+            }
+        }
+
         if(handleSignals && signal::received())
         {
+            /* Mark that we're now processing a signal and start collecting additional ones */
+            processingSignal = true;
+
+            if(output)
+                std::cout << "MPI RANK:" << getGridController().getGlobalRank() << " SIGNAL: Received at step "
+                          << currentStep << ", starting signal processing window." << std::endl;
+
             /* Signals will not trigger actions directly, wait until handleSignalAtStep before
              * a signal is translated into an explicit action. This is required to avoid dead locks
              * with blocking collective operations. Each MPI rank can be in different time steps and phases
@@ -265,10 +295,7 @@ namespace pmacc
              * time step
              */
 
-            if(true)
-                std::cout << "MPI RANK:" << getGridController().getGlobalRank() << "SIGNAL: received." << std::endl;
-
-            // wait for possible more signals
+            // wait for possible more signals - during this time we collect additional signals
             std::this_thread::sleep_for(std::chrono::milliseconds(1000u));
 
             /* After a signal is received we need to perform one more time step to avoid dead-locks if a
@@ -287,24 +314,44 @@ namespace pmacc
                 Environment<DIM>::get().GridController().getCommunicator().getMPISignalComm(),
                 &signalMPI));
 
+            /* Process initial signals received at the start of this processing window */
             if(signal::createCheckpoint())
             {
                 if(output)
-                    std::cout << "SIGNAL: Received at step " << currentStep << ". Schedule checkpointing. "
-                              << std::endl;
+                    std::cout << "SIGNAL: Received checkpoint signal at step " << currentStep
+                              << ". Schedule checkpointing. " << std::endl;
                 signalCreateCheckpoint = true;
             }
             if(signal::stopSimulation())
             {
                 if(output)
-                    std::cout << "SIGNAL: Received at step " << currentStep << ". Schedule shutdown." << std::endl;
+                    std::cout << "SIGNAL: Received shutdown signal at step " << currentStep << ". Schedule shutdown."
+                              << std::endl;
                 signalStopSimulation = true;
+            }
+
+            /* Also process any pending signals that were collected during this window */
+            if(pendingCreateCheckpoint)
+            {
+                if(output)
+                    std::cout << "SIGNAL: Processing pending checkpoint signal collected during processing window."
+                              << std::endl;
+                signalCreateCheckpoint = true;
+                pendingCreateCheckpoint = false;
+            }
+            if(pendingStopSimulation)
+            {
+                if(output)
+                    std::cout << "SIGNAL: Processing pending shutdown signal collected during processing window."
+                              << std::endl;
+                signalStopSimulation = true;
+                pendingStopSimulation = false;
             }
         }
         /* We will never handle a signal at step zero.
          * If we received a signal handleSignalAtStep will be set to currentStep + 1 (see above)
          */
-        if(currentStep != 0u && handleSignalAtStep == currentStep)
+        if(currentStep != 0u && handleSignalAtStep == currentStep && processingSignal)
         {
             // Wait for MPI without blocking the event system.
             Manager::getInstance().waitFor(
@@ -321,9 +368,9 @@ namespace pmacc
             // Translate signals into actions
             if(signalCreateCheckpoint)
             {
-                if(true)
+                if(output)
                     std::cout << "MPI RANK:" << getGridController().getGlobalRank()
-                              << "SIGNAL: Activate checkpointing for step " << signalMaxTimestep << std::endl;
+                              << " SIGNAL: Activate checkpointing for step " << signalMaxTimestep << std::endl;
                 signalCreateCheckpoint = false;
 
                 // add a new checkpoint
@@ -331,12 +378,20 @@ namespace pmacc
             }
             if(signalStopSimulation)
             {
-                if(true)
+                if(output)
                     std::cout << "MPI RANK:" << getGridController().getGlobalRank()
-                              << "SIGNAL: Shutdown simulation at step " << signalMaxTimestep << std::endl;
+                              << " SIGNAL: Shutdown simulation at step " << signalMaxTimestep << std::endl;
                 signalStopSimulation = false;
                 Environment<>::get().SimulationDescription().setRunSteps(signalMaxTimestep);
             }
+
+            /* Signal processing complete - re-enable normal signal reception */
+            processingSignal = false;
+
+            if(output)
+                std::cout << "MPI RANK:" << getGridController().getGlobalRank()
+                          << " SIGNAL: Processing complete at step " << currentStep
+                          << ", signal reception window closed." << std::endl;
         }
     }
 
