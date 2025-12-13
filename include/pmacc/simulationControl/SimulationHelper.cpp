@@ -265,8 +265,8 @@ namespace pmacc
              * time step
              */
 
-            if(output)
-                std::cout << "SIGNAL: received." << std::endl;
+            if(true)
+                std::cout << "MPI RANK:" << getGridController().getGlobalRank() << "SIGNAL: received." << std::endl;
 
             // wait for possible more signals
             std::this_thread::sleep_for(std::chrono::milliseconds(1000u));
@@ -321,8 +321,9 @@ namespace pmacc
             // Translate signals into actions
             if(signalCreateCheckpoint)
             {
-                if(output)
-                    std::cout << "SIGNAL: Activate checkpointing for step " << signalMaxTimestep << std::endl;
+                if(true)
+                    std::cout << "MPI RANK:" << getGridController().getGlobalRank()
+                              << "SIGNAL: Activate checkpointing for step " << signalMaxTimestep << std::endl;
                 signalCreateCheckpoint = false;
 
                 // add a new checkpoint
@@ -330,8 +331,9 @@ namespace pmacc
             }
             if(signalStopSimulation)
             {
-                if(output)
-                    std::cout << "SIGNAL: Shutdown simulation at step " << signalMaxTimestep << std::endl;
+                if(true)
+                    std::cout << "MPI RANK:" << getGridController().getGlobalRank()
+                              << "SIGNAL: Shutdown simulation at step " << signalMaxTimestep << std::endl;
                 signalStopSimulation = false;
                 Environment<>::get().SimulationDescription().setRunSteps(signalMaxTimestep);
             }
