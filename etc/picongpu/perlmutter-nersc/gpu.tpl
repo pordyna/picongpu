@@ -94,6 +94,16 @@ mkdir simOutput 2> /dev/null
 cd simOutput
 ln -s ../stdout output
 
+cat << EOF > select_gpu
+#!/bin/bash
+
+export CUDA_VISIBLE_DEVICES=\$((SLURM_GPUS_PER_NODE-1-SLURM_LOCALID))
+exec "\$@"
+EOF
+
+chmod +x ./select_gpu
+
+
 export OMP_NUM_THREADS=!TBG_coresPerGPU
 
 # In accordance with the example at
@@ -114,9 +124,11 @@ export SLURM_CPU_BIND="cores"
 if [ $node_check_err -eq 0 ] || [ $run_cuda_memtest -eq 0 ] ; then
    # Run PIConGPU
    export MPICH_GPU_SUPPORT_ENABLED=1
-   srun --cpu-bind=cores !TBG_dstPath/input/etc/picongpu/perlmutter-nersc/handleSlurmSignalsAndAffinity.sh !TBG_dstPath/tbg/handleSlurmSignals.sh !TBG_dstPath/input/bin/picongpu !TBG_author !TBG_programParams --mpiDirect
+   srun --cpu-bind=cores ./select_gpu !TBG_dstPath/input/bin/picongpu !TBG_author !TBG_programParams --mpiDirect
    # the sleep command is needed for automatic resubmission of preempted job
    # otherwise the job may exit before second signal is being send and it does not get the preempted slurm status
    # uncomment if using preemptive jobs
    # sleep 120
 fi
+
+rm -rf ./select_gpu
