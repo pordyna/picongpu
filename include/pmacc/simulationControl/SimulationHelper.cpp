@@ -269,7 +269,7 @@ namespace pmacc
                 std::cout << "MPI RANK:" << getGridController().getGlobalRank() << "SIGNAL: received." << std::endl;
 
             // wait for possible more signals
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000u));
+            std::this_thread::sleep_for(std::chrono::milliseconds(10000u));
 
             /* After a signal is received we need to perform one more time step to avoid dead-locks if a
              * simulation phase is using blocking MPI collectives. After the additional step we know that
