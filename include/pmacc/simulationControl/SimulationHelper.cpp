@@ -414,7 +414,7 @@ namespace pmacc
                     << std::endl;
             if(doStopSimulationConsensusCounter == totalRanks)
             {
-                if(true)
+                if(output)
                     std::cout << "MPI RANK: " << getGridController().getGlobalRank()
                               << "SIGNAL: Shutdown simulation at step " << signalMaxTimestep << std::endl;
                 signalStopSimulation = false;
