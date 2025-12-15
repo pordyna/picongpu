@@ -202,7 +202,7 @@ namespace pmacc
                 dumpOneStep(currentStep);
             }
 
-            // simulatation end
+            // simulation end
             MPI_Request simulationEndMPI = MPI_REQUEST_NULL;
             MPI_CHECK(MPI_Ibarrier(
                 Environment<DIM>::get().GridController().getCommunicator().getMPISignalComm(),
@@ -210,7 +210,7 @@ namespace pmacc
             // Keep checking signals until all ranks have finished. Since other ranks may still receive and try to
             // handle signal.
             Manager::getInstance().waitFor(
-                [&simulationEndMPI = simulationEndMPI]() -> bool
+                [&]() -> bool
                 {
                     checkSignals(currentStep);
                     MPI_Status mpiBarrierStatus;
@@ -334,7 +334,7 @@ namespace pmacc
                 std::cout << "MPI RANK: " << getGridController().getGlobalRank() << "SIGNAL: Received at step "
                           << currentStep << ". Schedule shutdown." << std::endl;
                 signalStopSimulation = true;
-                uint32_t doStopSimulationLocal = 1u;
+                doStopSimulationLocal = 1u;
             }
 
             MPI_CHECK(MPI_Iallreduce(
@@ -342,7 +342,7 @@ namespace pmacc
                 &doCheckpointConsensusCounter,
                 1,
                 MPI_UINT32_T,
-                MPI_ADD,
+                MPI_SUM,
                 Environment<DIM>::get().GridController().getCommunicator().getMPISignalComm(),
                 &checkpointSignalMPI));
 
@@ -351,7 +351,7 @@ namespace pmacc
                 &doStopSimulationConsensusCounter,
                 1,
                 MPI_UINT32_T,
-                MPI_ADD,
+                MPI_SUM,
                 Environment<DIM>::get().GridController().getCommunicator().getMPISignalComm(),
                 &endSimulationSignalMPI));
         }
