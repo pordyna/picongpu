@@ -164,8 +164,13 @@ namespace pmacc
         uint32_t handleSignalAtStep = 0u;
         /** MPI request to find largest time step in the simulation */
         MPI_Request signalMPI = MPI_REQUEST_NULL;
+        MPI_Request checkpointSignalMPI = MPI_REQUEST_NULL;
+        MPI_Request endSimulationSignalMPI = MPI_REQUEST_NULL;
+        uint32_t doCheckpointConsensusCounter = 0u;
+        uint32_t doStopSimulationConsensusCounter = 0u;
         bool signalCreateCheckpoint = false;
         bool signalStopSimulation = false;
+        bool signalSimulationStopSetAlready = false;
 
         void checkSignals(uint32_t const currentStep);
 

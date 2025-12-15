@@ -203,6 +203,23 @@ namespace pmacc
             }
 
             // simulatation end
+            MPI_Request simulationEndMPI = MPI_REQUEST_NULL;
+            MPI_CHECK(MPI_Ibarrier(
+                Environment<DIM>::get().GridController().getCommunicator().getMPISignalComm(),
+                &simulationEndMPI));
+            // Keep checking signals until all ranks have finished. Since other ranks may still receive and try to
+            // handle signal.
+            Manager::getInstance().waitFor(
+                [&simulationEndMPI = simulationEndMPI]() -> bool
+                {
+                    checkSignals(currentStep);
+                    MPI_Status mpiBarrierStatus;
+                    int flag = 0;
+                    MPI_CHECK(MPI_Test(&simulationEndMPI, &flag, &mpiBarrierStatus));
+                    return flag != 0;
+                });
+            // avoid racing condition with MPI_Test and check signals 1 more time
+            checkSignals(currentStep);
             eventSystem::waitForAllTasks();
 
             tSimCalculation.toggleEnd();
@@ -252,6 +269,19 @@ namespace pmacc
     template<unsigned DIM, typename CheckpointingClass>
     void SimulationHelper<DIM, CheckpointingClass>::checkSignals(uint32_t const currentStep)
     {
+        // TODO: check if simulation could freeze if we accidentally send a signal at the very end of a run
+        // so that some ranks may have finished already. If so fix the problem. Maybe we could run checkSignals
+        // in a while loop while waiting for an end of simulation consensus just before MPI_Finalize?
+
+        /* Avoid deadlocks in MPI_Iallreduce if all ranks has already decided on stoping the simulation soon.
+         *
+         * If the simulation receives signals after deciding to stop early some ranks may be finished and
+         *  not checking signals anymore.
+         */
+        if(signalSimulationStopSetAlready)
+        {
+            return;
+        }
         /* Avoid signal handling if the last signal is still processed.
          * Signal handling in the first step is always allowed.
          */
@@ -266,10 +296,10 @@ namespace pmacc
              */
 
             if(true)
-                std::cout << "MPI RANK:" << getGridController().getGlobalRank() << "SIGNAL: received." << std::endl;
+                std::cout << "MPI RANK: " << getGridController().getGlobalRank() << "SIGNAL: received." << std::endl;
 
             // wait for possible more signals
-            std::this_thread::sleep_for(std::chrono::milliseconds(10000u));
+            std::this_thread::sleep_for(std::chrono::milliseconds(5000u));
 
             /* After a signal is received we need to perform one more time step to avoid dead-locks if a
              * simulation phase is using blocking MPI collectives. After the additional step we know that
@@ -287,24 +317,51 @@ namespace pmacc
                 Environment<DIM>::get().GridController().getCommunicator().getMPISignalComm(),
                 &signalMPI));
 
+            uint32_t doCheckpointLocal = 0u;
+            uint32_t doStopSimulationLocal = 0u;
+
             if(signal::createCheckpoint())
             {
-                if(output)
-                    std::cout << "SIGNAL: Received at step " << currentStep << ". Schedule checkpointing. "
-                              << std::endl;
+                // TODO: put it in some log level
+                std::cout << "MPI RANK: " << getGridController().getGlobalRank() << "SIGNAL: Received at step "
+                          << currentStep << ". Schedule checkpointing. " << std::endl;
                 signalCreateCheckpoint = true;
+                doCheckpointLocal = 1u;
             }
             if(signal::stopSimulation())
             {
-                if(output)
-                    std::cout << "SIGNAL: Received at step " << currentStep << ". Schedule shutdown." << std::endl;
+                // TODO: put it in some log level
+                std::cout << "MPI RANK: " << getGridController().getGlobalRank() << "SIGNAL: Received at step "
+                          << currentStep << ". Schedule shutdown." << std::endl;
                 signalStopSimulation = true;
+                uint32_t doStopSimulationLocal = 1u;
             }
+
+            MPI_CHECK(MPI_Iallreduce(
+                &doCheckpointLocal,
+                &doCheckpointConsensusCounter,
+                1,
+                MPI_UINT32_T,
+                MPI_ADD,
+                Environment<DIM>::get().GridController().getCommunicator().getMPISignalComm(),
+                &checkpointSignalMPI));
+
+            MPI_CHECK(MPI_Iallreduce(
+                &doStopSimulationLocal,
+                &doStopSimulationConsensusCounter,
+                1,
+                MPI_UINT32_T,
+                MPI_ADD,
+                Environment<DIM>::get().GridController().getCommunicator().getMPISignalComm(),
+                &endSimulationSignalMPI));
         }
         /* We will never handle a signal at step zero.
          * If we received a signal handleSignalAtStep will be set to currentStep + 1 (see above)
+         * Also run it if there are no more steps to come since MPI Standard requires as to complete
+         * the nonblocking communication with MPI_Test or similar.
          */
-        if(currentStep != 0u && handleSignalAtStep == currentStep)
+        if((currentStep != 0u && handleSignalAtStep == currentStep)
+           || currentStep == Environment<>::get().SimulationDescription().getRunSteps())
         {
             // Wait for MPI without blocking the event system.
             Manager::getInstance().waitFor(
@@ -317,26 +374,58 @@ namespace pmacc
                     MPI_CHECK(MPI_Test(&signalMPI, &flag, &mpiReduceStatus));
                     return flag != 0;
                 });
+            Manager::getInstance().waitFor(
+                [&checkpointSignalMPI = checkpointSignalMPI]() -> bool
+                {
+                    // wait until we know the that all step agree on checkpointing
+                    MPI_Status mpiReduceStatus;
+
+                    int flag = 0;
+                    MPI_CHECK(MPI_Test(&checkpointSignalMPI, &flag, &mpiReduceStatus));
+                    return flag != 0;
+                });
+            Manager::getInstance().waitFor(
+                [&endSimulationSignalMPI = endSimulationSignalMPI]() -> bool
+                {
+                    // wait until we know the that all step agree on stoping simulation
+                    MPI_Status mpiReduceStatus;
+
+                    int flag = 0;
+                    MPI_CHECK(MPI_Test(&endSimulationSignalMPI, &flag, &mpiReduceStatus));
+                    return flag != 0;
+                });
+            int const totalRanks = Environment<DIM>::get().GridController().getCommunicator().getSize();
 
             // Translate signals into actions
-            if(signalCreateCheckpoint)
+            if(doCheckpointConsensusCounter == totalRanks)
             {
-                if(true)
-                    std::cout << "MPI RANK:" << getGridController().getGlobalRank()
+                if(output)
+                    std::cout << "MPI RANK: " << getGridController().getGlobalRank()
                               << "SIGNAL: Activate checkpointing for step " << signalMaxTimestep << std::endl;
                 signalCreateCheckpoint = false;
 
                 // add a new checkpoint
                 checkpointing.addCheckpoint(signalMaxTimestep);
             }
-            if(signalStopSimulation)
+            else if(signalCreateCheckpoint)
+                std::cout
+                    << "MPI RANK: " << getGridController().getGlobalRank()
+                    << "SIGNAL: Checkpointing signal received before but no consensus reached. Signal will be ignored!"
+                    << std::endl;
+            if(doStopSimulationConsensusCounter == totalRanks)
             {
                 if(true)
-                    std::cout << "MPI RANK:" << getGridController().getGlobalRank()
+                    std::cout << "MPI RANK: " << getGridController().getGlobalRank()
                               << "SIGNAL: Shutdown simulation at step " << signalMaxTimestep << std::endl;
                 signalStopSimulation = false;
                 Environment<>::get().SimulationDescription().setRunSteps(signalMaxTimestep);
+                signalSimulationStopSetAlready = true;
             }
+            else if(signalStopSimulation)
+                std::cout << "MPI RANK: " << getGridController().getGlobalRank()
+                          << "SIGNAL: Simulation stop signal received before but no consensus reached. Signal will be "
+                             "ignored!"
+                          << std::endl;
         }
     }
 
