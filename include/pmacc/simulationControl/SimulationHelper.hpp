@@ -166,11 +166,6 @@ namespace pmacc
         MPI_Request signalMPI = MPI_REQUEST_NULL;
         bool signalCreateCheckpoint = false;
         bool signalStopSimulation = false;
-        /** Flag to track if a signal is currently being processed */
-        bool processingSignal = false;
-        /** Accumulate multiple signals during processing */
-        bool pendingCreateCheckpoint = false;
-        bool pendingStopSimulation = false;
 
         void checkSignals(uint32_t const currentStep);
 
