@@ -172,7 +172,7 @@ namespace pmacc
         bool signalStopSimulation = false;
         bool signalSimulationStopSetAlready = false;
 
-        void checkSignals(uint32_t const currentStep);
+        void checkSignals(uint32_t const currentStep, bool const finishedSimulationLoop = false);
 
         /**
          * Set how often the elapsed time is printed.

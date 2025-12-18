@@ -269,7 +269,7 @@ namespace pmacc
     template<unsigned DIM, typename CheckpointingClass>
     void SimulationHelper<DIM, CheckpointingClass>::checkSignals(
         uint32_t const currentStep,
-        bool const finishedSimulationLoop = false)
+        bool const finishedSimulationLoop)
     {
         // TODO: Split stdoutput into normal output form master and per task output hidden in a log level (maybe
         // simulation control?)
