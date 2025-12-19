@@ -201,7 +201,8 @@ namespace pmacc
                 /* dump at the beginning of the simulated step */
                 dumpOneStep(currentStep);
                 // synchronize steps: this is a temporary fix for a potential signaling error
-                // TODO: Discuss if this is the wy to fix the issue, if so use persistant barrier instead.
+                // TODO: replace it with Ibarrier instead of Barrier in front of all collective MPI
+                // together with a checkSignals in wait
                 eventSystem::waitForAllTasks();
                 MPI_CHECK(MPI_Barrier(Environment<DIM>::get().GridController().getCommunicator()..getMPIComm()));
             }
