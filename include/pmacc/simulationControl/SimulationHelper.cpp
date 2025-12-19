@@ -202,6 +202,7 @@ namespace pmacc
                 dumpOneStep(currentStep);
                 // synchronize steps: this is a temporary fix for a potential signaling error
                 // TODO: Discuss if this is the wy to fix the issue, if so use persistant barrier instead.
+                eventSystem::waitForAllTasks();
                 MPI_CHECK(MPI_Barrier(Environment<DIM>::get().GridController().getCommunicator()..getMPIComm()));
             }
 
