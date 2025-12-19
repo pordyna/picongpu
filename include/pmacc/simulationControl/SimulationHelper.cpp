@@ -204,7 +204,7 @@ namespace pmacc
                 // TODO: replace it with Ibarrier instead of Barrier in front of all collective MPI
                 // together with a checkSignals in wait
                 eventSystem::waitForAllTasks();
-                MPI_CHECK(MPI_Barrier(Environment<DIM>::get().GridController().getCommunicator()..getMPIComm()));
+                MPI_CHECK(MPI_Barrier(Environment<DIM>::get().GridController().getCommunicator().getMPIComm()));
             }
 
             // simulation end
