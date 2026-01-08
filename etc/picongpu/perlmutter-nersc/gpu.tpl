@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright 2023-2025 Pawel Ordyna
+# Copyright 2023-2026 Pawel Ordyna
 #
 # This file is part of PIConGPU.
 #
@@ -23,11 +23,14 @@
 
 #SBATCH -q regular
 #SBATCH --constraint=gpu
-#SBATCH --gpus-per-task=1
 #SBATCH --time=!TBG_wallTime
 #SBATCH --nodes=!TBG_nodes
-#SBATCH --ntasks=!TBG_tasks
+# the --gpu-bind has to be none due to cgroups problem on perlmutter that breaks mpi when setting gpu affinity with slurm, set the affinity manually instead
+#SBATCH --gpu-bind=none
+#SBATCH --ntasks-per-node=!TBG_gpusPerNode
+#SBATCH --gpus-per-node=!TBG_gpusPerNode
 #SBATCH --cpus-per-task=!TBG_coresPerGPU
+
 #SBATCH --chdir=!TBG_dstPath
 
 # Sets batch job's name
@@ -91,6 +94,16 @@ mkdir simOutput 2> /dev/null
 cd simOutput
 ln -s ../stdout output
 
+cat << EOF > select_gpu
+#!/bin/bash
+
+export CUDA_VISIBLE_DEVICES=\$((SLURM_GPUS_PER_NODE-1-SLURM_LOCALID))
+exec "\$@"
+EOF
+
+chmod +x ./select_gpu
+
+
 export OMP_NUM_THREADS=!TBG_coresPerGPU
 
 # In accordance with the example at
@@ -109,11 +122,13 @@ export SLURM_CPU_BIND="cores"
   fi
 
 if [ $node_check_err -eq 0 ] || [ $run_cuda_memtest -eq 0 ] ; then
-   export MPICH_GPU_SUPPORT_ENABLED=1
    # Run PIConGPU
-   srun --cpu-bind=cores !TBG_dstPath/input/bin/picongpu !TBG_author !TBG_programParams
-   # the sleep comand is needed for automatic resubmission of preempted job
-   # otherwise the job may exit before second signal is beeign send and it does not get the preempted slurm status
-   # uncomment if using preemptible jobs
+   export MPICH_GPU_SUPPORT_ENABLED=1
+   srun --cpu-bind=cores ./select_gpu !TBG_dstPath/input/bin/picongpu !TBG_author !TBG_programParams --mpiDirect
+   # the sleep command is needed for automatic resubmission of preempted job
+   # otherwise the job may exit before second signal is being send and it does not get the preempted slurm status
+   # uncomment if using preemptive jobs
    # sleep 120
 fi
+
+rm -rf ./select_gpu

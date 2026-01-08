@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright 2023-2025 Pawel Ordyna
+# Copyright 2023-2026 Pawel Ordyna
 #
 # This file is part of PIConGPU.
 #
@@ -30,6 +30,8 @@
 #SBATCH --ntasks-per-node=!TBG_mpiTasksPerNode
 #SBATCH --chdir=!TBG_dstPath
 #SBATCH --mem=!TBG_memPerNode
+#SBATCH --gpu-bind=none
+
 
 # Sets batch job's name
 #SBATCH --job-name=!TBG_jobName
@@ -98,6 +100,15 @@ mkdir simOutput 2> /dev/null
 cd simOutput
 ln -s ../stdout output
 
+cat << EOF > select_gpu
+#!/bin/bash
+
+export CUDA_VISIBLE_DEVICES=\$((SLURM_GPUS_PER_NODE-1-SLURM_LOCALID))
+exec "\$@"
+EOF
+
+chmod +x ./select_gpu
+
 export OMP_NUM_THREADS=!TBG_coresPerPICDevice
 
 export FABRIC_IFACE=cxi0
@@ -122,10 +133,10 @@ export SLURM_CPU_BIND="cores"
 
 if [ $node_check_err -eq 0 ] || [ $run_cuda_memtest -eq 0 ] ; then
 
-   export MPICH_GPU_SUPPORT_ENABLED=0
+   export MPICH_GPU_SUPPORT_ENABLED=1
    # Run PIConGPU
-   # the --gpu-bind option is normaly set via --gpus-per-task that can't be done when mixing with a stream reader
-   srun --exclusive --network=single_node_vni,job_vni --ntasks=!TBG_tasks --nodes=!TBG_nodes --ntasks-per-node=!TBG_gpusPerNode --gres=gpu:!TBG_gpusPerNode --cpus-per-task=!TBG_coresPerPICDevice -K1 --cpu-bind=cores --gpu-bind=per_task:1 !TBG_dstPath/input/bin/picongpu !TBG_author !TBG_programParams > ../pic.out 2> ../pic.err &
+   # the --gpu-bind has to be none due to cgroups problem on perlmutter that breaks mpi when setting gpu affinity with slurm, set the affinity manually instead
+   srun --exclusive --network=single_node_vni,job_vni --ntasks=!TBG_tasks --nodes=!TBG_nodes --ntasks-per-node=!TBG_gpusPerNode --gres=gpu:!TBG_gpusPerNode --cpus-per-task=!TBG_coresPerPICDevice -K1 --cpu-bind=cores --gpu-bind=none  ./select_gpu !TBG_dstPath/input/bin/picongpu !TBG_author !TBG_programParams --mpiDirect > ../pic.out 2> ../pic.err &
 
    sleep 2
 
@@ -141,3 +152,5 @@ if [ $node_check_err -eq 0 ] || [ $run_cuda_memtest -eq 0 ] ; then
   # otherwise the job may exit before second signal is beeign send and it does not get the preempted slurm status
   sleep 120
 fi
+
+rm -rf ./select_gpu

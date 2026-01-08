@@ -23,20 +23,16 @@ module load gpu/1.0
 module load cmake/3.30.2
 module load craype-accel-nvidia80
 module load cray-python/3.11.7
+module load cray-hdf5-parallel
 
+export MPICH_GPU_SUPPORT_ENABLED=1
 # Additional libraries
 #
 export PARTITION_CFS=/global/cfs/cdirs/$proj/$USER
 export PARTITION_LIB=/global/cfs/cdirs/$proj/$USER/pic-libs
 mkdir -pv $PARTITION_LIB
 
-# HDF5 temporarily stored elsewhere
-HDF5_VERSION=1.14.6
-export HDF5_ROOT=$PARTITION_LIB/HDF5/$HDF5_VERSION
-export PATH=$HDF5_ROOT/bin:$PATH
-export CPATH=$HDF5_ROOT/include:$CPATH
-export LD_LIBRARY_PATH=$HDF5_ROOT/lib:$LD_LIBRARY_PATH
-#
+
 BOOST_VERSION=1.87.0
 export BOOST_ROOT=$PARTITION_LIB/BOOST/$BOOST_VERSION
 export CPATH=$BOOST_ROOT/include:$CPATH
@@ -51,20 +47,20 @@ export CPATH=$PNGwriter_ROOT/include:$CPATH
 export LD_LIBRARY_PATH=$PNGwriter_ROOT/lib:$LD_LIBRARY_PATH
 
 
-BLOSC_VERSION=2.17.0
-BLOSC_ROOT=$PARTITION_LIB/BLOSC/$BLOSC_VERSION
+BLOSC_VERSION=2.22.0
+export BLOSC_ROOT=$PARTITION_LIB/BLOSC/$BLOSC_VERSION
 export CMAKE_PREFIX_PATH=$BLOSC_ROOT:$CMAKE_PREFIX_PATH
 export LD_LIBRARY_PATH=$BLOSC_ROOT/lib:$LD_LIBRARY_PATH
 
 ADIOS2_VERSION=2.10.2
-ADIOS2_ROOT=$PARTITION_LIB/ADIOS2/$ADIOS2_VERSION
+export ADIOS2_ROOT=$PARTITION_LIB/ADIOS2/$ADIOS2_VERSION
 export PATH=$ADIOS2_ROOT/bin:$PATH
 export CMAKE_PREFIX_PATH=$ADIOS2_ROOT:$CMAKE_PREFIX_PATH
 export LD_LIBRARY_PATH=$ADIOS2_ROOT/lib64:$LD_LIBRARY_PATH
 export PYTHONPATH=$ADIOS2_ROOT/lib/python3.11/site-packages:$PYTHONPATH
 
 OPENPMD_VERSION=0.16.1
-OPENPMD_ROOT=$PARTITION_LIB/OPENPMD/$OPENPMD_VERSION
+export OPENPMD_ROOT=$PARTITION_LIB/OPENPMD/$OPENPMD_VERSION
 export PATH=$OPENPMD_ROOT/bin:$PATH
 export CMAKE_PREFIX_PATH=$OPENPMD_ROOT:$CMAKE_PREFIX_PATH
 export LD_LIBRARY_PATH=$OPENPMD_ROOT/lib64:$LD_LIBRARY_PATH
@@ -72,10 +68,9 @@ export PYTHONPATH=$OPENPMD_ROOT/lib64/python3.11/site-packages:$PYTHONPATH
 
 # Environment #################################################################
 #
-export CC="$(which gcc)"
-export CXX="$(which g++)"
+export CC="$(which cc)"
+export CXX="$(which CC)"
 export CUDACXX=$(which nvcc)
-export CUDAHOSTCXX=$(which g++)
 
 export PICSRC=$HOME/src/picongpu
 export PIC_EXAMPLES=$PICSRC/share/picongpu/examples

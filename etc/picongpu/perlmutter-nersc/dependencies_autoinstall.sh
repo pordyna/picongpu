@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright 2023-2025 Axel Huebl, Marco Garten, Klaus Steiniger, Pawel Ordyna
+# Copyright 2023-2026 Axel Huebl, Marco Garten, Klaus Steiniger, Pawel Ordyna
 #
 # This file is part of PIConGPU.
 #
@@ -17,7 +17,7 @@
 # along with PIConGPU.
 # If not, see <http://www.gnu.org/licenses/>.
 #
-# last updated: 2025-03-10
+# last updated: 2025-01-06
 
 PIC_BRANCH="dev"
 PROJECT=$proj
@@ -50,14 +50,14 @@ fi
 #   c-blosc
 if [ ! -d "$BLOSC_ROOT" ]; then
     cd $SOURCE_DIR
-    git clone -b v2.17.0 https://github.com/Blosc/c-blosc2.git \
+    git clone -b v2.22.0 https://github.com/Blosc/c-blosc2.git \
         $SOURCE_DIR/c-blosc
     mkdir c-blosc-build
     cd c-blosc-build
     cmake -DCMAKE_INSTALL_PREFIX=$BLOSC_ROOT \
         -DMPI_C_COMPILER=cc -DMPI_CXX_COMPILER=CC \
         $SOURCE_DIR/c-blosc
-    make -j 10 install
+    make -j 16 install
 fi
 
 #   PNGwriter
@@ -69,19 +69,9 @@ if [ ! -d "$PNGwriter_ROOT" ]; then
     cd pngwriter-build
     cmake -DCMAKE_INSTALL_PREFIX=$PNGwriter_ROOT \
         $SOURCE_DIR/pngwriter
-    make -j 10 install
+    make -j 16 install
 fi
 
-#   HDF5
-if [ ! -d "$HDF5_ROOT" ]; then
-    cd $SOURCE_DIR
-    curl -Lo hdf5-1.14.6.tar.gz \
-        https://support.hdfgroup.org/releases/hdf5/v1_14/v1_14_6/downloads/hdf5-1.14.6.tar.gz
-    tar -xzf hdf5-1.14.6.tar.gz
-    cd hdf5-1.14.6
-    ./configure --enable-parallel --enable-shared --prefix $HDF5_ROOT CC=$(which cc) CXX=$(which CC)
-    make -j 10 && make install
-fi
 
 #   ADIOS2
 # force usage of MPI and HDF5 and point directly to MPI headers and libraries
@@ -101,7 +91,7 @@ if [ ! -d "$ADIOS2_ROOT" ]; then
         -DMPI_CXX_HEADER_DIR=${MPICH_DIR}/include \
         -DMPI_C_HEADER_DIR=${MPICH_DIR}/include \
         -DMPI_mpi_gnu_123_LIBRARY=${MPICH_DIR}/lib/libmpi_gnu_123.so
-    make -j 10 && make install
+    make -j 16 && make install
 fi
 
 #   openPMD-api
@@ -112,13 +102,14 @@ if [ ! -d "OPENPMD_ROOT" ]; then
     mkdir $SOURCE_DIR/openpmd-api-build
     cd $SOURCE_DIR/openpmd-api-build
     cmake $SOURCE_DIR/openpmd-api \
+                -DopenPMD_USE_HDF5=ON  -DopenPMD_USE_ADIOS2=ON \
         -DBUILD_EXAMPLES=OFF -DBUILD_TESTING=OFF \
         -DMPI_CXX_COMPILER=$(which CC) -DMPI_C_COMPILER=$(which cc) \
         -DMPI_CXX_HEADER_DIR=${MPICH_DIR}/include \
         -DMPI_C_HEADER_DIR=${MPICH_DIR}/include \
         -DMPI_mpi_gnu_123_LIBRARY=${MPICH_DIR}/lib/libmpi_gnu_123.so \
         -DCMAKE_INSTALL_PREFIX="$OPENPMD_ROOT"
-    make -j 10 install
+    make -j 16 install
 fi
 
 
