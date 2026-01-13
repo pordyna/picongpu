@@ -142,7 +142,9 @@ namespace picongpu
                 ("autoAdjustGrid", po::value<bool>(&autoAdjustGrid)->default_value(true),
                  "auto adjust the grid size if PIConGPU conditions are not fulfilled")
                 ("numRanksPerDevice,r", po::value<uint32_t>(&numRanksPerDevice)->default_value(1u),
-                 "set the number of MPI ranks using a single device together");
+                 "set the number of MPI ranks using a single device together")
+                ("apu", po::value<bool>(&isDeviceMemoryShared)->zero_tokens(),
+                     "enable APU mode where host and device share the same memory");
             // clang-format on
 
             // pluginRegisterHelp() is called before init therefore we need to create the member here.
@@ -400,17 +402,15 @@ namespace picongpu
 
 #if (BOOST_LANG_CUDA || BOOST_COMP_HIP)
             size_t heapSize = freeGpuMem - reservedGpuMemorySize;
-            GridController<simDim>& gc = Environment<simDim>::get().GridController();
-            if(Environment<>::get().MemoryInfo().isSharedMemoryPool(
-                   numRanksPerDevice,
-                   gc.getCommunicator().getMPIComm()))
+            if(isDeviceMemoryShared)
             {
                 heapSize /= 2u;
-                log<picLog::MEMORY>(
-                    "Shared RAM between GPU and host detected - using only half of the 'device' memory.");
+                log<picLog::MEMORY>("Shared RAM between GPU and host - using only half of the 'device' memory, remove "
+                                    "'--apu' to use full device memory.");
             }
             else
-                log<picLog::MEMORY>("Device RAM is NOT shared between GPU and host.");
+                log<picLog::MEMORY>(
+                    "Device RAM is NOT shared between GPU and host, use '--apu' to signal shared device memory.");
 
             // initializing the heap for particles
             deviceHeap->destructiveResize(alpakaDevice, alpakaQueue, heapSize);
@@ -641,6 +641,8 @@ namespace picongpu
         bool autoAdjustGrid = true;
         uint32_t numRanksPerDevice = 1u;
         bool skipSimulation{false};
+        // true if the device and host memory is shared, else false
+        bool isDeviceMemoryShared{false};
 
     private:
         /** Get available memory on device
