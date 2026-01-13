@@ -200,11 +200,11 @@ namespace pmacc
                 notifyPlugins(currentStep);
                 /* dump at the beginning of the simulated step */
                 dumpOneStep(currentStep);
-                // synchronize steps: this is a temporary fix for a potential signaling error
-                // TODO: replace it with Ibarrier instead of Barrier in front of all collective MPI
-                // together with a checkSignals in wait
-                eventSystem::waitForAllTasks();
-                MPI_CHECK(MPI_Barrier(Environment<DIM>::get().GridController().getCommunicator().getMPIComm()));
+                // // synchronize steps: this is a temporary fix for a potential signaling error
+                // // TODO: replace it with Ibarrier instead of Barrier in front of all collective MPI
+                // // together with a checkSignals in wait
+                // eventSystem::waitForAllTasks();
+                // MPI_CHECK(MPI_Barrier(Environment<DIM>::get().GridController().getCommunicator().getMPIComm()));
             }
 
             // simulation end
