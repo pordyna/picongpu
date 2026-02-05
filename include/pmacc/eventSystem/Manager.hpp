@@ -86,6 +86,15 @@ namespace pmacc
          */
         void addTask(ITask* task);
 
+        /** Add a task without any dependencies
+         *
+         * The task is running in parallel to any other task and is never blocking the event system.
+         * waitForAllTasks() will **NOT** wait until cooperative tasks are finished.
+         *
+         * @param task task to add to the manager
+         */
+        void addCooperativeTask(ITask* task);
+
         void addPassiveTask(ITask* task);
 
 
@@ -111,6 +120,7 @@ namespace pmacc
 
         TaskMap tasks;
         TaskMap passiveTasks;
+        TaskMap cooperativeTasks;
     };
 
 } // namespace pmacc

@@ -1,6 +1,4 @@
-/* Copyright 2013-2024 Felix Schmitt, Heiko Burau, Rene Widera,
- *                     Wolfgang Hoenig, Benjamin Worpitz,
- *                     Alexander Grund
+/* Copyright 2026 Rene Widera
  *
  * This file is part of PMacc.
  *
@@ -21,32 +19,26 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-#pragma once
 
-#include <cstdint>
+#include "pmacc/eventSystem/mpiBarrier.hpp"
 
-namespace pmacc
+#include "pmacc/communication/manager_common.hpp"
+#include "pmacc/eventSystem/Manager.hpp"
+
+namespace pmacc::eventSystem
 {
-    namespace eventSystem
+    void mpiBlocking(MPI_Comm communicator)
     {
-        /**
-         * Internal event/task type used for notifications in the event system.
-         */
-        enum EventType
-        {
-            FINISHED,
-            COPY,
-            SENDFINISHED,
-            RECVFINISHED,
-            LOGICALAND,
-            SETVALUE,
-            GETVALUE,
-            KERNEL,
-            SIGNAL
-        };
-
-    } // namespace eventSystem
-
-    // for backward compatibility pull all definitions into the pmacc namespace
-    using namespace eventSystem;
-} // namespace pmacc
+        MPI_Request ioBarrierMPI = MPI_REQUEST_NULL;
+        MPI_CHECK(MPI_Ibarrier(communicator, &ioBarrierMPI));
+        // block until all MPI ranks reach the barrier but keep the event system active
+        Manager::getInstance().waitFor(
+            [&]() -> bool
+            {
+                MPI_Status mpiBarrierStatus;
+                int flag = 0;
+                MPI_CHECK(MPI_Test(&ioBarrierMPI, &flag, &mpiBarrierStatus));
+                return flag != 0;
+            });
+    }
+} // namespace pmacc::eventSystem
