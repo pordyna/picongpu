@@ -22,6 +22,7 @@
 #pragma once
 
 #include "pmacc/eventSystem/events/EventTask.hpp"
+#include "pmacc/eventSystem/mpiBarrier.hpp"
 #include "pmacc/eventSystem/queues/Queue.hpp"
 #include "pmacc/eventSystem/tasks/ITask.hpp"
 #include "pmacc/eventSystem/waitForAllTasks.hpp"

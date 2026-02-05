@@ -1,4 +1,4 @@
-/* Copyright 2021-2024 Rene Widera
+/* Copyright 2021-2026 Rene Widera
  *
  * This file is part of PMacc.
  *
@@ -20,6 +20,7 @@
  */
 
 
+#include <atomic>
 #include <csignal>
 
 namespace pmacc
@@ -30,28 +31,29 @@ namespace pmacc
         {
             namespace
             {
-                std::sig_atomic_t volatile gStatusCreateCheckpoint = 0;
-                std::sig_atomic_t volatile gStatusStopSimulation = 0;
+                std::atomic<int> gStatusCreateCheckpoint = 0;
+                std::atomic<int> gStatusStopSimulation = 0;
+                std::atomic<int> gSignalLocked = 0;
             } // namespace
 
-            void setCreateCheckpoint(int signal)
+            void setCreateCheckpoint(int)
             {
-                gStatusCreateCheckpoint = 1;
+                gStatusCreateCheckpoint += 1;
             }
 
-            void setStopSimulation(int signal)
+            void setStopSimulation(int)
             {
-                gStatusStopSimulation = 1;
+                gStatusStopSimulation += 1;
             }
 
-            void setCreateCheckpointAndStopSimulation(int signal)
+            void setCreateCheckpointAndStopSimulation(int)
             {
-                gStatusCreateCheckpoint = 1;
-                gStatusStopSimulation = 1;
+                gStatusCreateCheckpoint += 1;
+                gStatusStopSimulation += 1;
             }
         } // namespace detail
 
-        void activate()
+        void activateSignalHandling()
         {
 #ifndef _WIN32
             std::signal(SIGHUP, detail::setStopSimulation);
@@ -67,23 +69,45 @@ namespace pmacc
 
         bool received()
         {
-            return detail::gStatusCreateCheckpoint != 0 || detail::gStatusStopSimulation != 0;
+            /* Do not handle any new signals until the last signal handle step is finished.
+             * Whoever called received() and got true must call release() after handling the signal.
+             */
+            if(detail::gSignalLocked)
+                return false;
+
+            bool receivedASignal
+                = detail::gStatusCreateCheckpoint.load() != 0 || detail::gStatusStopSimulation.load() != 0;
+            if(receivedASignal)
+                detail::gSignalLocked = 1;
+            return receivedASignal;
+        }
+
+        void release(bool checkPointHandled, bool stopSimulationHandled)
+        {
+            // only reset a signal if the signal counters are locked
+            if(detail::gSignalLocked)
+            {
+                if(checkPointHandled)
+                    detail::gStatusCreateCheckpoint -= 1;
+                if(stopSimulationHandled)
+                    detail::gStatusStopSimulation -= 1;
+            }
+            detail::gSignalLocked = 0;
         }
 
         bool createCheckpoint()
         {
-            auto result = detail::gStatusCreateCheckpoint != 0;
-            if(result)
-                detail::gStatusCreateCheckpoint = 0;
-            return result;
+            auto checkPointRequested = detail::gStatusCreateCheckpoint.load() != 0;
+            return checkPointRequested;
         }
 
         bool stopSimulation()
         {
-            auto result = detail::gStatusStopSimulation != 0;
-            if(result)
-                detail::gStatusCreateCheckpoint = 0;
-            return result;
+            // do not stop the simulation as long there are more than one outstanding checkpoint signal which are not
+            // handled yet
+            auto stopRequested
+                = detail::gStatusStopSimulation.load() != 0 && detail::gStatusCreateCheckpoint.load() <= 1;
+            return stopRequested;
         }
     } // namespace signal
 } // namespace pmacc

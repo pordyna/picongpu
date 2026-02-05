@@ -36,6 +36,7 @@ namespace pmacc
     Manager::~Manager()
     {
         waitForAllTasks();
+        PMACC_ASSERT(cooperativeTasks.size() == 0u);
     }
 
     bool Manager::execute(id_t taskToWait)
@@ -52,6 +53,26 @@ namespace pmacc
             old_max = deep;
         }
 #endif
+
+        static auto iterCooperative = cooperativeTasks.begin();
+        if(iterCooperative == cooperativeTasks.end())
+            iterCooperative = cooperativeTasks.begin();
+        while(iterCooperative != cooperativeTasks.end())
+        {
+            id_t id = iterCooperative->first;
+            ITask* taskPtr = iterCooperative->second;
+            PMACC_ASSERT(taskPtr != nullptr);
+            ++iterCooperative;
+            if(taskPtr->execute())
+            {
+                auto it = cooperativeTasks.find(id);
+                if(it != cooperativeTasks.end())
+                {
+                    cooperativeTasks.erase(id);
+                    delete taskPtr;
+                }
+            }
+        }
 
         static auto iter = tasks.begin();
 
@@ -172,6 +193,12 @@ namespace pmacc
     {
         PMACC_ASSERT(task != nullptr);
         tasks[task->getId()] = task;
+    }
+
+    void Manager::addCooperativeTask(ITask* task)
+    {
+        PMACC_ASSERT(task != nullptr);
+        cooperativeTasks[task->getId()] = task;
     }
 
     void Manager::addPassiveTask(ITask* task)

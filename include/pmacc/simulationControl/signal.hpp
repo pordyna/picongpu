@@ -1,4 +1,4 @@
-/* Copyright 2021-2024 Rene Widera
+/* Copyright 2021-2026 Rene Widera
  *
  * This file is part of PMacc.
  *
@@ -40,13 +40,23 @@ namespace pmacc
          * @attention  Signals will not be registered on Windows operating system.
          * This function is in this cas empty.
          */
-        void activate();
+        void activateSignalHandling();
 
-        /** Check if a signal is received
+        /** Check if a signal was received
          *
-         * @return true if at least one signal is received else false
+         * @return true if at least one signal is received else false.
+         *         If true is returned once this function is returning false until release() is called.
          */
         bool received();
+
+        /** Release signals
+         *
+         * This function should only be called if received() returned true.
+         *
+         * @param checkPointHandled if true the checkpoint signal state is reset.
+         * @param stopSimulationHandled if true the stop simulation signal state is reset.
+         */
+        void release(bool checkPointHandled, bool stopSimulationHandled);
 
         /** Status if checkpoint creation is requested.
          *
