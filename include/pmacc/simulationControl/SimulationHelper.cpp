@@ -1,4 +1,4 @@
-/* Copyright 2013-2024 Axel Huebl, Felix Schmitt, Rene Widera, Alexander Debus,
+/* Copyright 2013-2026 Axel Huebl, Felix Schmitt, Rene Widera, Alexander Debus,
  *                     Benjamin Worpitz, Alexander Grund, Sergei Bastrakov, Pawel Ordyna
  *
  * This file is part of PMacc.
@@ -85,57 +85,15 @@ namespace pmacc
     template<unsigned DIM>
     void SimulationHelper<DIM>::notifyPlugins(uint32_t currentStep)
     {
-        Environment<DIM>::get().PluginConnector().notifyPlugins(currentStep);
-        /* Handle signals after we executed the plugins but before checkpointing, this will result into lower
-         * response latency if we have long running plugins
-         */
         checkSignals(currentStep);
+        Environment<DIM>::get().PluginConnector().notifyPlugins(currentStep);
     }
 
     template<unsigned DIM>
     void SimulationHelper<DIM>::dumpOneStep(uint32_t currentStep)
     {
-        /* trigger checkpoint notification */
-        if(pluginSystem::containsStep(seqCheckpointPeriod, currentStep))
-        {
-            /* first synchronize: if something failed, we can spare the time
-             * for the checkpoint writing */
-            alpaka::wait(manager::Device<ComputeDevice>::get().current());
-
-            // avoid deadlock between not finished PMacc tasks and MPI_Barrier
-            eventSystem::getTransactionEvent().waitForFinished();
-
-            GridController<DIM>& gc = Environment<DIM>::get().GridController();
-            /* can be spared for better scalings, but allows to spare the
-             * time for checkpointing if some ranks died */
-            MPI_CHECK(MPI_Barrier(gc.getCommunicator().getMPIComm()));
-
-            /* create directory containing checkpoints  */
-            if(numCheckpoints == 0 && gc.getGlobalRank() == 0)
-            {
-                pmacc::Filesystem::get().createDirectoryWithPermissions(checkpointDirectory);
-            }
-
-            Environment<DIM>::get().PluginConnector().checkpointPlugins(currentStep, checkpointDirectory);
-
-            /* important synchronize: only if no errors occured until this
-             * point guarantees that a checkpoint is usable */
-            alpaka::wait(manager::Device<ComputeDevice>::get().current());
-
-            /* avoid deadlock between not finished PMacc tasks and MPI_Barrier */
-            eventSystem::getTransactionEvent().waitForFinished();
-
-            /* \todo in an ideal world with MPI-3, this would be an
-             * MPI_Ibarrier call and this function would return a MPI_Request
-             * that could be checked */
-            MPI_CHECK(MPI_Barrier(gc.getCommunicator().getMPIComm()));
-
-            if(gc.getGlobalRank() == 0)
-            {
-                writeCheckpointStep(currentStep);
-            }
-            numCheckpoints++;
-        }
+        checkSignals(currentStep);
+        checkpointing.template dump<DIM>(currentStep);
     }
 
     template<unsigned DIM>
@@ -180,7 +138,7 @@ namespace pmacc
             Environment<>::get().enableMpiDirect();
 
         // Install a signal handler
-        signal::activate();
+        signal::activateSignalHandling();
 
         // register concurrent thread to perform checkpointing periodically after a user defined time
         if(checkpointPeriodMinutes != 0)
@@ -218,6 +176,13 @@ namespace pmacc
             resetAll(0);
             uint32_t currentStep = fillSimulation();
             Environment<>::get().SimulationDescription().setCurrentStep(currentStep);
+
+            /* Ensure all ranks finished the initialization.
+             * This synchronization costs a little bit time but possible errors during the initialization will be
+             * easier to hunt because the rank that outputs timings will only show the timing for the initialization if
+             * all ranks reached this point.
+             */
+            eventSystem::mpiBlocking(Environment<DIM>::get().GridController().getCommunicator().getMPIComm());
 
             tInit.toggleEnd();
             if(output)
@@ -277,8 +242,23 @@ namespace pmacc
                 dumpOneStep(currentStep);
             }
 
-            // simulatation end
-            eventSystem::waitForAllTasks();
+            // The simulation is finished, wait until all MPI ranks finished the time step loop
+            MPI_Request globalMPISync = MPI_REQUEST_NULL;
+            MPI_CHECK(
+                MPI_Ibarrier(Environment<DIM>::get().GridController().getCommunicator().getMPIComm(), &globalMPISync));
+            Manager::getInstance().waitFor(
+                [&]() -> bool
+                {
+                    // check for signal in case other MPI ranks still process the time step loop
+                    checkSignals(currentStep);
+                    MPI_Status mpiBarrierStatus;
+                    int flag = 0;
+                    MPI_CHECK(MPI_Test(&globalMPISync, &flag, &mpiBarrierStatus));
+                    return flag != 0;
+                });
+
+            // ensure that the event system processed all tasks
+            eventSystem::getTransactionEvent().waitForFinished();
 
             tSimCalculation.toggleEnd();
 
@@ -346,90 +326,6 @@ namespace pmacc
     template<unsigned DIM>
     void SimulationHelper<DIM>::checkSignals(uint32_t const currentStep)
     {
-        /* Avoid signal handling if the last signal is still processed.
-         * Signal handling in the first step is always allowed.
-         */
-        bool const handleSignals = handleSignalAtStep < currentStep || currentStep == 0u;
-        if(handleSignals && signal::received())
-        {
-            /* Signals will not trigger actions directly, wait until handleSignalAtStep before
-             * a signal is translated into an explicit action. This is required to avoid dead locks
-             * with blocking collective operations. Each MPI rank can be in different time steps and phases
-             * of the simulation, therefore we can not assume that all MPI ranks received the signal in the same
-             * time step
-             */
-
-            if(output)
-                std::cout << "SIGNAL: received." << std::endl;
-
-            // wait for possible more signals
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000u));
-
-            /* After a signal is received we need to perform one more time step to avoid dead-locks if a
-             * simulation phase is using blocking MPI collectives. After the additional step we know that
-             * all MPI ranks participated in MPI_Iallreduce.
-             */
-            handleSignalAtStep = currentStep + 1;
-
-            // find largest time step of all MPI ranks
-            MPI_CHECK(MPI_Iallreduce(
-                &handleSignalAtStep,
-                &signalMaxTimestep,
-                1,
-                MPI_UINT32_T,
-                MPI_MAX,
-                Environment<DIM>::get().GridController().getCommunicator().getMPISignalComm(),
-                &signalMPI));
-
-            if(signal::createCheckpoint())
-            {
-                if(output)
-                    std::cout << "SIGNAL: Received at step " << currentStep << ". Schedule checkpointing. "
-                              << std::endl;
-                signalCreateCheckpoint = true;
-            }
-            if(signal::stopSimulation())
-            {
-                if(output)
-                    std::cout << "SIGNAL: Received at step " << currentStep << ". Schedule shutdown." << std::endl;
-                signalStopSimulation = true;
-            }
-        }
-        /* We will never handle a signal at step zero.
-         * If we received a signal handleSignalAtStep will be set to currentStep + 1 (see above)
-         */
-        if(currentStep != 0u && handleSignalAtStep == currentStep)
-        {
-            // Wait for MPI without blocking the event system.
-            Manager::getInstance().waitFor(
-                [&signalMPI = signalMPI]() -> bool
-                {
-                    // wait until we know the largest time step in the simulation
-                    MPI_Status mpiReduceStatus;
-
-                    int flag = 0;
-                    MPI_CHECK(MPI_Test(&signalMPI, &flag, &mpiReduceStatus));
-                    return flag != 0;
-                });
-
-            // Translate signals into actions
-            if(signalCreateCheckpoint)
-            {
-                if(output)
-                    std::cout << "SIGNAL: Activate checkpointing for step " << signalMaxTimestep << std::endl;
-                signalCreateCheckpoint = false;
-
-                // add a new checkpoint
-                seqCheckpointPeriod.push_back(pluginSystem::Slice(signalMaxTimestep, signalMaxTimestep));
-            }
-            if(signalStopSimulation)
-            {
-                if(output)
-                    std::cout << "SIGNAL: Shutdown simulation at step " << signalMaxTimestep << std::endl;
-                signalStopSimulation = false;
-                Environment<>::get().SimulationDescription().setRunSteps(signalMaxTimestep);
-            }
-        }
     }
 
     template<unsigned DIM>
