@@ -1416,10 +1416,6 @@ make sure that environment variable OPENPMD_BP_BACKEND is not set to ADIOS1.
              */
             void dumpData(uint32_t currentStep)
             {
-                /* ensure that all MPI ranks are in the same time step to avoid that MPI collectives block asynchronous
-                 * communication enqueued in the event system. */
-                eventSystem::mpiBlocking(Environment<simDim>::get().GridController().getCommunicator().getMPIComm());
-
                 // local offset + extent
                 pmacc::Selection<simDim> const localDomain = Environment<simDim>::get().SubGrid().getLocalDomain();
                 mThreadParams.cellDescription = m_cellDescription;

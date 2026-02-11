@@ -41,8 +41,7 @@ namespace pmacc
             LOGICALAND,
             SETVALUE,
             GETVALUE,
-            KERNEL,
-            SIGNAL
+            KERNEL
         };
 
     } // namespace eventSystem

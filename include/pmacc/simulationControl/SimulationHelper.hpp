@@ -1,4 +1,4 @@
-/* Copyright 2013-2026 Axel Huebl, Felix Schmitt, Rene Widera, Alexander Debus,
+/* Copyright 2013-2024 Axel Huebl, Felix Schmitt, Rene Widera, Alexander Debus,
  *                     Benjamin Worpitz, Alexander Grund, Sergei Bastrakov, Pawel Ordyna
  *
  * This file is part of PMacc.
@@ -195,13 +195,15 @@ namespace pmacc
         bool tryRestart = false;
 
     private:
-        /** Checks if we received a signal.
-         *
-         * This method can be called multiple time within a timestep to lower the latency of the response to it.
-         * The call is cheap if no signal was received.
-         * If signals of the same action will be sent multiple times they will be handled after ongoing registered
-         * action resulting from previous signals are executed.
-         */
+        /** Largest time step within the simulation (all MPI ranks) */
+        uint32_t signalMaxTimestep = 0u;
+        /** Time step at which we create actions out of an signal.*/
+        uint32_t handleSignalAtStep = 0u;
+        /** MPI request to find largest time step in the simulation */
+        MPI_Request signalMPI = MPI_REQUEST_NULL;
+        bool signalCreateCheckpoint = false;
+        bool signalStopSimulation = false;
+
         void checkSignals(uint32_t const currentStep);
 
         /**
