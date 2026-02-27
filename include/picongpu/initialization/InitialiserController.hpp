@@ -63,16 +63,17 @@ namespace picongpu
                 % restartDirectory;
 
             Environment<>::get().PluginConnector().restartPlugins(restartStep, restartDirectory);
+            eventSystem::getTransactionEvent().waitForFinished();
+
+            alpaka::wait(manager::Device<ComputeDevice>::get().current());
 
             GridController<simDim>& gc = Environment<simDim>::get().GridController();
-            /* can be spared for better scaling, but guarantees the user that the restart was successful */
-            eventSystem::mpiBlocking(gc.getCommunicator().getMPIComm());
-            // ensure that the event system finished all tasks
+
+            // avoid deadlock between not finished pmacc tasks and MPI_Barrier
             eventSystem::getTransactionEvent().waitForFinished();
-            /** @todo this should not be required but is kept because we do not know anymore why it is here
-             * maybe it should catch possible backend (CUDA/HIP) errors.
-             */
-            alpaka::wait(manager::Device<ComputeDevice>::get().current());
+            /* can be spared for better scalings, but guarantees the user
+             * that the restart was successful */
+            MPI_CHECK(MPI_Barrier(gc.getCommunicator().getMPIComm()));
 
             log<picLog::SIMULATION_STATE>("Loading from persistent data finished");
         }
