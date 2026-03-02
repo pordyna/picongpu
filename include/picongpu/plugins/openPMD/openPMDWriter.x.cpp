@@ -1275,7 +1275,7 @@ make sure that environment variable OPENPMD_BP_BACKEND is not set to ADIOS1.
                     % seriesIoVersion % picongpuIoVersion;
 
                 // handle compatibility between picongpu io file versions
-                if(picongpuIOVersionMajor < ioVersionUsedFileMajor)
+                if(picongpuIOVersionMajor + 1 < ioVersionUsedFileMajor)
                 {
                     throw std::runtime_error(
                         std::string("openPMD: Restart file IO version ") + seriesIoVersion
