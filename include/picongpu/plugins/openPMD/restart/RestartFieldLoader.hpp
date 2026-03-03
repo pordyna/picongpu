@@ -77,9 +77,6 @@ namespace picongpu
                 DataSpace<simDim> local_domain_size = params->window.localDimensions.size;
                 bool useLinearIdxAsDestination = false;
 
-                ::openPMD::Series& series = *params->openPMDSeries;
-                ::openPMD::Mesh& mesh = series.iterations[currentStep].open().meshes[objectName];
-
                 /* Patch for non-domain-bound fields
                  * This is an ugly fix to allow output of reduced 1d PML buffers
                  */
@@ -88,7 +85,6 @@ namespace picongpu
                     auto const field_layout = field.getGridLayout();
                     auto const field_no_guard = field_layout.sizeWithoutGuardND();
                     auto const elementCount = field_no_guard.productOfComponents();
-                    uint64_t pmlTotalSize = 0;
 
                     /* Scan the PML buffer local size along all local domains
                      * This code is symmetric to one in Field::writeField()
@@ -116,19 +112,8 @@ namespace picongpu
                     {
                         if(localSizes.at(2u * r + 1u) < rank)
                             domainOffset += localSizes.at(2u * r);
-                        pmlTotalSize += localSizes.at(2u * r);
                     }
                     log<picLog::INPUT_OUTPUT>("openPMD:  (end) collect PML sizes for %1%") % objectName;
-
-                    if(auto const& extentOnDisk = mesh.begin()->second.getExtent();
-                       extentOnDisk != ::openPMD::Extent{1, 1, pmlTotalSize})
-                    {
-                        log<picLog::INPUT_OUTPUT>(
-                            "openPMD:  Skip loading for PML fields. Expecting extent %1%, found extent %2% on disk. "
-                            "This may happen when restarting with a different domain decomposition.")
-                            % pmlTotalSize % extentOnDisk.at(2);
-                        return;
-                    }
 
                     domain_offset = DataSpace<simDim>::create(0);
                     domain_offset[0] = domainOffset;
@@ -136,6 +121,9 @@ namespace picongpu
                     local_domain_size[0] = elementCount;
                     useLinearIdxAsDestination = true;
                 }
+
+                ::openPMD::Series& series = *params->openPMDSeries;
+                ::openPMD::Container<::openPMD::Mesh>& meshes = series.iterations[currentStep].open().meshes;
 
                 auto destBox = field.getHostBuffer().getDataBox();
                 for(uint32_t n = 0; n < numComponents; ++n)
@@ -145,8 +133,9 @@ namespace picongpu
                     // data.
                     log<picLog::INPUT_OUTPUT>("openPMD: Read from domain: offset=%1% size=%2%") % domain_offset
                         % local_domain_size;
-                    ::openPMD::RecordComponent rc
-                        = numComponents > 1 ? mesh[name_lookup_tpl[n]] : mesh[::openPMD::RecordComponent::SCALAR];
+                    ::openPMD::RecordComponent rc = numComponents > 1
+                                                        ? meshes[objectName][name_lookup_tpl[n]]
+                                                        : meshes[objectName][::openPMD::RecordComponent::SCALAR];
 
                     log<picLog::INPUT_OUTPUT>("openPMD: Read from field '%1%'") % objectName;
 
@@ -169,7 +158,7 @@ namespace picongpu
                     std::shared_ptr<float_X> field_container = rc.loadChunk<float_X>(start, count);
 
                     /* start a blocking read of all scheduled variables */
-                    mesh.seriesFlush();
+                    meshes.seriesFlush();
 
 
                     int const elementCount = local_domain_size.productOfComponents();
@@ -229,6 +218,12 @@ namespace picongpu
 
                 /* load from openPMD */
                 bool const isDomainBound = traits::IsFieldDomainBound<T_Field>::value;
+
+                // Skip PML fields for load balancing purposes
+                if(!isDomainBound)
+                {
+                    return;
+                }
 
                 RestartFieldLoader::loadField(
                     field->getGridBuffer(),
