@@ -239,28 +239,28 @@ namespace picongpu
 
             void pluginUnload() override
             {
-                if(!binningData.notifyPeriod.empty() && binningData.dumpPeriod > 1 && reduceCounter != 0)
-                {
-                    auto hReducedBuffer = getReducedBuffer();
+                // if(!binningData.notifyPeriod.empty() && binningData.dumpPeriod > 1 && reduceCounter != 0)
+                // {
+                //     auto hReducedBuffer = getReducedBuffer();
 
-                    if(isMain)
-                    {
-                        std::optional<::openPMD::Series> unload_series;
+                //     if(isMain)
+                //     {
+                //         std::optional<::openPMD::Series> unload_series;
 
-                        histWriter(
-                            unload_series,
-                            OpenPMDWriteParams{
-                                std::string("binningOpenPMD/"),
-                                std::string("end_of_run_") + binningData.binnerOutputName,
-                                binningData.openPMDInfix,
-                                binningData.openPMDExtension,
-                                binningData.openPMDJsonCfg},
-                            std::move(hReducedBuffer),
-                            binningData,
-                            Environment<>::get().SimulationDescription().getRunSteps() - 1,
-                            reduceCounter);
-                    }
-                }
+                //         histWriter(
+                //             unload_series,
+                //             OpenPMDWriteParams{
+                //                 std::string("binningOpenPMD/"),
+                //                 std::string("end_of_run_") + binningData.binnerOutputName,
+                //                 binningData.openPMDInfix,
+                //                 binningData.openPMDExtension,
+                //                 binningData.openPMDJsonCfg},
+                //             std::move(hReducedBuffer),
+                //             binningData,
+                //             Environment<>::get().SimulationDescription().getRunSteps() - 1,
+                //             reduceCounter);
+                //     }
+                // }
             }
 
             virtual void doBinning(uint32_t currentStep) = 0;
