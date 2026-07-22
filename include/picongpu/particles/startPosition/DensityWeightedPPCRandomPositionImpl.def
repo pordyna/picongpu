@@ -48,11 +48,13 @@ namespace picongpu
             /** Set the in cell position randomly with density weighted number of particles per cell.
              *
              * The new position is uniformly distributed inside the cell.
-             * The number of particles per cells is ceil((cellDensity/ baseDensity) * particlesPerBaseDensity).
+             * The number of particles per cells is factor * ceil((cellDensity/ baseDensity) *
+             particlesPerBaseDensity).
              * This means at least 1 particle per cell, but not if the weighting would fall below the minimal
              * weighting.
              *
-             * @tparam T_ParamClass parameter class, must define ::particlesPerBaseDensity
+             * @tparam T_ParamClass parameter class, must define ::particlesPerBaseDensity and ::factor
+
              */
             template<typename T_ParamClass>
             using DensityWeightedPPCRandomPositionImpl = generic::FreeRng<
