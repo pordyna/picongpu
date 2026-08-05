@@ -91,6 +91,8 @@ namespace picongpu
                     auto const& subGrid = Environment<simDim>::get().SubGrid();
                     totalLocalDomainOffset = subGrid.getGlobalDomain().offset + subGrid.getLocalDomain().offset;
                     loadFile();
+                    log<picLog::INPUT_OUTPUT>("Finished loading density for species \"%1%\"")
+                        % SpeciesType::FrameType::getName();
                 }
 
                 /** Calculate the normalized density based on the file contents
@@ -123,6 +125,8 @@ namespace picongpu
                     auto const filename = getFilename();
                     log<picLog::PHYSICS>("Loading density for species \"%1%\" from file \"%2%\"")
                         % SpeciesType::FrameType::getName() % filename;
+                    // avoid deadlock between not finished pmacc tasks and mpi calls in openPMD
+                    eventSystem::getTransactionEvent().waitForFinished();
                     auto series
                         = ::openPMD::Series{filename, ::openPMD::Access::READ_ONLY, gc.getCommunicator().getMPIComm()};
                     auto mesh = series.iterations[ParamClass::iteration].meshes[ParamClass::datasetName];
@@ -157,12 +161,26 @@ namespace picongpu
                     auto data = std::shared_ptr<ValueType>{nullptr};
                     if(readFromFile)
                     {
+                        eventSystem::getTransactionEvent().waitForFinished();
                         data = dataset.loadChunk<ValueType>(
                             indexConverter.xyzToOpenPMD(chunkOffset),
                             indexConverter.xyzToOpenPMD(chunkExtent));
                     }
+                    else
+                    {
+                        // load a single value and discard it in case the loadChunk becmomes collective
+                        // it should not be, but it can make sense with hdf5
+                        eventSystem::getTransactionEvent().waitForFinished();
+                        data
+                            = dataset.loadChunk<ValueType>(::openPMD::Offset(simDim, 0), ::openPMD::Extent(simDim, 1));
+                    }
+                    // avoid deadlock between not finished pmacc tasks and mpi calls in openPMD
                     // This is MPI collective and so has to be done by all ranks
+                    eventSystem::getTransactionEvent().waitForFinished();
                     series.flush();
+
+                    log<picLog::INPUT_OUTPUT>("Finished flushing density for species \"%1%\" from file \"%2%\"")
+                        % SpeciesType::FrameType::getName() % filename;
 
                     if(readFromFile)
                     {
