@@ -62,9 +62,11 @@ namespace picongpu
                         float_X const cellDensity = realParticlesPerCell / cellVolume;
                         float_X const densInBaseDens = cellDensity / sim.pic.getBaseDensity();
                         constexpr auto particlesPerBaseDensity = T_ParamClass::particlesPerBaseDensity;
-                        uint32_t const numParticlesPerCell
-                            = math::min(T_ParamClass::factor
-                              * pmacc::math::float2int_ru(densInBaseDens * particlesPerBaseDensity), T_ParamClass::maxPpc);
+                        constexpr auto maxPpc = T_ParamClass::maxPpc;
+
+                        uint32_t const numParticlesPerCell = math::min(
+                            T_ParamClass::factor * pmacc::math::float2int_ru(densInBaseDens * particlesPerBaseDensity),
+                            maxPpc);
 
                         return startPosition::detail::WeightMacroParticles{}(
                             realParticlesPerCell,
